@@ -40,7 +40,6 @@ prost-build = { version = "0.14.3" }
 
 # ==================== ERROR HANDLING ====================
 thiserror = { version = "2.0.18" }
-eyre = { version = "0.6.12" }
 anyhow = { version = "1.0.18" }
 
 # ==================== LOGGING ====================
@@ -99,7 +98,7 @@ regex = { version = "1.12.2" }
 
 # ==================== UTILITIES ====================
 chrono = { version = "0.4.43", features = ["serde", "std"] }
-cuid2 = { version = "0.1.4", features = ["v4", "serde"] }
+cuid2 = { version = "0.1.4" }
 url = { version = "2.5.8" }
 base64 = { version = "0.22.1" }
 uuid = { version = "1.8.0", features = ["v4", "serde"] }
