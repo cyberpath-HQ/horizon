@@ -1095,11 +1095,6 @@ productivity. Cross-platform compilation supports deployment targets including L
 codebase. The Axum framework provides ergonomic API design with strong type safety, integrating seamlessly with Tokio
 for asynchronous operations. This stack balances security, performance, and development velocity.
 
-**Alternative Considered:** Go was evaluated as an alternative. While Go offers simpler concurrency and faster initial
-development, Rust's memory safety guarantees and comparable performance make it preferable for a security-focused
-system. The eventual consistency of Go's garbage collection was considered a disadvantage for the agent component where
-predictable resource consumption is critical.
-
 ### 11.2 Database Selection
 
 **Decision:** Use PostgreSQL as the primary relational database with Redis for caching and session management.
@@ -1195,80 +1190,6 @@ The following deliverables complete Phase 1 and enable Phase 2 commencement:
 
 5. **Documentation:** API documentation generated from OpenAPI specification. Deployment procedures for server
    components. Configuration reference for all server settings.
-
-### 12.3 Risk Assessment and Mitigation
-
-Several risks require ongoing attention throughout implementation:
-
-**Risk:** Scope creep extending development timeline.  
-**Mitigation:** Establish clear feature boundaries with explicit in-scope and out-of-scope definitions. Use feature
-flags to defer lower-priority capabilities without blocking core functionality.
-
-**Risk:** Agent deployment challenges in diverse environments.  
-**Mitigation:** Prioritize agent testing across representative environments. Establish container-based deployment for
-environments where package installation is impractical. Provide clear documentation for deployment troubleshooting.
-
-**Risk:** Performance degradation with large asset counts.  
-**Mitigation:** Implement pagination and filtering from the outset. Establish performance benchmarks with realistic data
-volumes. Plan for database optimization and potential read replica deployment.
-
-**Risk:** Security vulnerabilities in developed components.  
-**Mitigation:** Follow secure development practices including code review, static analysis, and dependency scanning.
-Conduct penetration testing before major releases. Establish vulnerability disclosure and response procedures.
-
-### 12.4 Success Criteria
-
-Phase completion requires meeting the following success criteria:
-
-**Phase 1 Success:** Users can authenticate, perform asset CRUD operations through both API and web interface, and
-manage user permissions. API responds within 200ms for typical queries. Web interface loads within 3 seconds on standard
-connections.
-
-**Phase 2 Success:** Agents deploy successfully across supported platforms. Agent resource consumption meets specified
-targets. Automated asset discovery populates inventory with accurate data. Agent communication operates reliably over
-lossy network connections.
-
-**Phase 3 Success:** Software inventory tracks all major software products and versions. Configuration management
-enables environment definition and baseline management. Configuration deployment executes successfully with rollback
-capability.
-
-**Phase 4 Success:** CVE synchronization completes within acceptable time windows. Vulnerability correlation accurately
-identifies affected assets. Patch deployment completes successfully across test asset populations.
-
-**Phase 5 Success:** Network flow mapping identifies traffic patterns with acceptable accuracy. Vendor management
-supports complete vendor lifecycle. Reports generate accurately and within reasonable timeframes.
-
----
-
-## Appendix A: Glossary
-
-**Asset:** Any discrete component of IT infrastructure requiring tracking, including physical hardware, virtual
-resources, cloud resources, and logical constructs.
-
-**CVE:** Common Vulnerabilities and Exposures, a dictionary of publicly disclosed security vulnerabilities maintained by
-the MITRE Corporation.
-
-**CVSS:** Common Vulnerability Scoring System, a standardized method for assessing vulnerability severity.
-
-**CMDB:** Configuration Management Database, a repository of information about IT assets and their relationships.
-
-**Flow:** A record of network communication between two endpoints, potentially aggregated from multiple observed
-connections.
-
-**JWT:** JSON Web Token, a compact, URL-safe token format for representing claims between parties.
-
-**RBAC:** Role-Based Access Control, an authorization model assigning permissions to roles rather than individual users.
-
----
-
-## Appendix B: Reference Documents
-
-The following external resources inform Horizon design and implementation:
-
-- NIST Special Publication 800-53: Security and Privacy Controls for Information Systems and Organizations
-- CIS Benchmarks: Configuration baselines for various operating systems and applications
-- Common Vulnerability Scoring System v3.1 Specification
-- National Vulnerability Database API Documentation
 
 ---
 
