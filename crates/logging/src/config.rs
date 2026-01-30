@@ -65,7 +65,7 @@ impl LoggingConfig {
 
     /// Build the tracing subscriber from this configuration.
     pub fn build(&self) -> Box<dyn tracing::Subscriber + Send + Sync> {
-        let level: LevelFilter = self.level.parse().unwrap_or_else(|_| LevelFilter::INFO);
+        let level: LevelFilter = self.level.parse().unwrap_or(LevelFilter::INFO);
 
         match self.format.as_str() {
             "json" => self.build_json_subscriber(level),

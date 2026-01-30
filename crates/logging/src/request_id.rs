@@ -7,7 +7,7 @@ use std::cell::RefCell;
 
 thread_local! {
     /// Thread-local storage for request ID.
-    static REQUEST_ID: RefCell<Option<RequestId>> = RefCell::new(None);
+    static REQUEST_ID: RefCell<Option<RequestId>> = const { RefCell::new(None) };
 }
 
 /// A request ID type using CUID2.

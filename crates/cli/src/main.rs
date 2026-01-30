@@ -10,7 +10,7 @@
 //! horizon --help   # Show help
 //! ```
 
-use clap::{Args, CommandFactory, Parser, Subcommand};
+use clap::{Args, CommandFactory as _, Parser, Subcommand};
 use error::Result;
 
 /// Horizon CMDB - Configuration Management Database
