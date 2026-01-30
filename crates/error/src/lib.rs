@@ -3,11 +3,13 @@
 //! Error types and API response handling for the Horizon application.
 
 pub mod codes;
+pub mod middleware;
 pub mod response;
 pub mod traits;
 
 pub use response::{ApiResponse, ApiResponseBuilder, PaginationMeta};
 pub use traits::{Context, ResultExt};
+pub use middleware::{ErrorHandler, IntoResponse, PanicRecovery, RequestLogger};
 
 /// Convenience type alias for Result with AppError.
 pub type Result<T, E = AppError> = std::result::Result<T, E>;
@@ -213,9 +215,55 @@ impl AppError {
         }
     }
 
+    /// Get the error message.
+    pub fn message(&self) -> String {
+        match self {
+            AppError::NotFound {
+                message,
+                ..
+            } => message.clone(),
+            AppError::BadRequest {
+                message,
+                ..
+            } => message.clone(),
+            AppError::Unauthorized {
+                message,
+                ..
+            } => message.clone(),
+            AppError::Forbidden {
+                message,
+                ..
+            } => message.clone(),
+            AppError::Conflict {
+                message,
+                ..
+            } => message.clone(),
+            AppError::Validation {
+                message,
+                ..
+            } => message.clone(),
+            AppError::RateLimit {
+                message,
+                ..
+            } => message.clone(),
+            AppError::Internal {
+                message,
+                ..
+            } => message.clone(),
+            AppError::Database {
+                message,
+                ..
+            } => message.clone(),
+            AppError::Io {
+                message,
+                ..
+            } => message.clone(),
+        }
+    }
+
     /// Add context to the error.
     #[inline]
-    pub fn context(mut self, context: impl ToString) -> Self {
+    pub fn context(self, context: impl ToString) -> Self {
         let context_msg = context.to_string();
         match self {
             AppError::NotFound {
