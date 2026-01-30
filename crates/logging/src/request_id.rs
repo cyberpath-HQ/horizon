@@ -19,8 +19,8 @@ impl RequestId {
     #[inline]
     pub fn new() -> Self {
         // Generate a CUID2-like ID (24 chars, URL-safe)
-        let cuid = cuid2::Cuid::generate();
-        Self(cuid.to_string())
+        let cuid = cuid2::create_id();
+        Self(cuid)
     }
 
     /// Generate a new request ID from a string.
@@ -60,25 +60,22 @@ pub fn set_request_id(id: RequestId) {
 }
 
 /// Get the current request ID for this thread.
-pub fn get_request_id() -> Option<RequestId> { REQUEST_ID.with(|cell| *cell.borrow()) }
-
-/// Get the current request ID, or generate a new one if none exists.
-pub fn get_or_init_request_id() -> RequestId { get_request_id().unwrap_or_else(RequestId::new) }
-
-/// Clear the current request ID.
-pub fn clear_request_id() {
-    REQUEST_ID.with(|cell| {
-        *cell.borrow_mut() = None;
-    });
-}
+pub fn get_request_id() -> Option<RequestId> { REQUEST_ID.with(|cell| cell.borrow().clone()) }
 
 /// Generate a new request ID and set it for this thread.
 pub fn init_request_id() -> RequestId {
     let id = RequestId::new();
     REQUEST_ID.with(|cell| {
-        *cell.borrow_mut() = Some(id);
+        *cell.borrow_mut() = Some(id.clone());
     });
     id
+}
+
+/// Clear the current request ID for this thread.
+pub fn clear_request_id() {
+    REQUEST_ID.with(|cell| {
+        *cell.borrow_mut() = None;
+    });
 }
 
 /// Try to get the request ID from a header value.
@@ -113,7 +110,7 @@ mod tests {
 
     #[test]
     fn test_request_id_from_str() {
-        let cuid = "k192v2g4w3zq8h6j5k1";
+        let cuid = "k192v2g4w3zq8h6j5k123";
         let id = RequestId::from_str(cuid).unwrap();
         assert_eq!(id.as_str(), cuid);
     }
@@ -127,7 +124,7 @@ mod tests {
     #[test]
     fn test_request_id_set_get() {
         let id = RequestId::new();
-        set_request_id(id);
+        set_request_id(id.clone());
         let retrieved = get_request_id();
         assert_eq!(retrieved, Some(id));
         clear_request_id();
