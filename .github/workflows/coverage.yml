@@ -1,0 +1,38 @@
+name: Coverage
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rust-src,llvm-tools-preview
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install grcov
+        run: cargo install grcov
+
+      - name: Generate coverage reports
+        run: bash ./scripts/run_coverage.sh
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: cyberpath-HQ/sentinel
+          flags: rust
+          name: codecov-umbrella
+          fail_ci_if_error: true
+          files: ./target/coverage/lcov.info
