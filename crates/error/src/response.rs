@@ -87,9 +87,10 @@ impl PaginationMeta {
 /// ```rust
 /// use error::ApiResponse;
 ///
-/// let response = ApiResponse::ok()
+/// let response = ApiResponse::builder()
 ///     .with_data(vec!["item1", "item2"])
-///     .with_pagination(1, 10, 100);
+///     .with_request_id("req-123")
+///     .build();
 ///
 /// let json = serde_json::to_string(&response).unwrap();
 /// ```
@@ -409,7 +410,7 @@ mod tests {
 
     #[test]
     fn test_response_error() {
-        let response = ApiResponse::error("NOT_FOUND", "Resource not found");
+        let response: ApiResponse<()> = ApiResponse::error("NOT_FOUND", "Resource not found");
         match response {
             ApiResponse::Error {
                 code,
@@ -445,7 +446,7 @@ mod tests {
 
     #[test]
     fn test_response_builder() {
-        let response = ApiResponse::builder::<String>()
+        let response = ApiResponse::builder()
             .with_data("test".to_string())
             .with_request_id("req-123")
             .with_response_time(42)
