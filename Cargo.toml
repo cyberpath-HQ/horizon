@@ -7,7 +7,7 @@ members = [
 [workspace.package]
 authors = ["Emanuele (Ebalo) Balsamo <emanuele.balsamo@cyberpath-hq.com>"]
 edition = "2024"
-rust-version = "1.94.0-nightly"
+rust-version = "1.93.0"
 version = "0.1.0"
 readme = "README.md"
 description = "Horizon is a self-hostable Configuration Management Database (CMDB) system for comprehensive IT infrastructure visibility"
