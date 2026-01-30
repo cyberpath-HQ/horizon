@@ -5,8 +5,10 @@
 
 pub mod config;
 pub mod macros;
+pub mod request_id;
 
 pub use config::LoggingConfig;
+pub use request_id::RequestId;
 // Re-export tracing macros
 pub use tracing::{debug, error, info, trace, warn};
 
