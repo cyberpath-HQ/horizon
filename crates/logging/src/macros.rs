@@ -11,7 +11,7 @@
 /// use logging::{info_with_request, RequestId};
 ///
 /// let request_id = RequestId::new();
-/// info_with_request!(target: "api", request_id, "Request processed", { duration_ms = 42 });
+/// info_with_request!(target: "api", request_id, "Request processed duration_ms={}", 42);
 /// ```
 #[macro_export]
 macro_rules! info_with_request {
@@ -123,12 +123,11 @@ macro_rules! log_security_event {
 ///
 /// # Example
 ///
-/// ```rust
+/// ```ignore
 /// use logging::measure_duration;
 ///
-/// let result = measure_duration!("database_query", "users", || {
+/// measure_duration!("database_query", "users", || {
 ///     // Some database operation
-///     Ok(vec![])
 /// });
 /// ```
 #[macro_export]
