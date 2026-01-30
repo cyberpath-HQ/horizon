@@ -12,6 +12,10 @@ keywords.workspace = true
 categories.workspace = true
 
 [dependencies]
+# CLI framework
+clap = { version = "4.5.56", features = ["derive", "env"] }
+clap_complete = "4.5.65"
+
 # Logging
 logging = { path = "../logging" }
 
