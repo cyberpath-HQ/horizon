@@ -98,9 +98,18 @@ pub fn try_from_header(value: &str) -> Option<RequestId> {
 }
 
 /// Generate a request ID from an incoming request.
-pub fn extract_from_headers<_H>(_: &[_H]) -> Option<RequestId> {
-    Some(RequestId::new())
-}
+pub fn extract_from_headers<_H>(_: &[_H]) -> Option<RequestId> { Some(RequestId::new()) }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_request_id_new() {
+        let id = RequestId::new();
+        assert!(!id.as_str().is_empty());
+        assert!(id.as_str().len() >= 20);
+    }
 
     #[test]
     fn test_request_id_from_str() {
