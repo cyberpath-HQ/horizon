@@ -129,23 +129,29 @@ mod tests {
 
     #[test]
     fn test_config_default() {
-        let config = LoggingConfig::default();
+        let config = LoggingConfig::from_env("info", "json", None);
         assert_eq!(config.level, "info");
         assert_eq!(config.format, "json");
-        assert!(config.include_timestamp);
+        assert_eq!(config.environment, "development");
     }
 
     #[test]
     fn test_config_from_env() {
-        std::env::set_var("RUST_LOG", "debug");
-        std::env::set_var("HORIZON_LOG_FORMAT", "pretty");
+        // Safe in test context - used to verify environment-based config
+        unsafe {
+            std::env::set_var("RUST_LOG", "debug");
+            std::env::set_var("HORIZON_LOG_FORMAT", "pretty");
+        }
 
         let config = LoggingConfig::from_env("info", "json", None);
         assert_eq!(config.level, "debug");
         assert_eq!(config.format, "pretty");
 
-        std::env::remove_var("RUST_LOG");
-        std::env::remove_var("HORIZON_LOG_FORMAT");
+        // Safe in test context - cleanup after test
+        unsafe {
+            std::env::remove_var("RUST_LOG");
+            std::env::remove_var("HORIZON_LOG_FORMAT");
+        }
     }
 
     #[test]
