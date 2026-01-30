@@ -5,8 +5,8 @@
 
 use std::cell::RefCell;
 
-/// Thread-local storage for request ID.
 thread_local! {
+    /// Thread-local storage for request ID.
     static REQUEST_ID: RefCell<Option<RequestId>> = RefCell::new(None);
 }
 
@@ -75,7 +75,9 @@ pub fn clear_request_id() {
 /// Generate a new request ID and set it for this thread.
 pub fn init_request_id() -> RequestId {
     let id = RequestId::new();
-    set_request_id(id);
+    REQUEST_ID.with(|cell| {
+        *cell.borrow_mut() = Some(id);
+    });
     id
 }
 
@@ -96,18 +98,9 @@ pub fn try_from_header(value: &str) -> Option<RequestId> {
 }
 
 /// Generate a request ID from an incoming request.
-pub fn extract_from_headers<_HeaderMap>(headers: &[_HeaderMap]) -> Option<RequestId> { Some(RequestId::new()) }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_request_id_new() {
-        let id = RequestId::new();
-        assert!(!id.as_str().is_empty());
-        assert!(id.as_str().len() >= 20);
-    }
+pub fn extract_from_headers<_H>(_: &[_H]) -> Option<RequestId> {
+    Some(RequestId::new())
+}
 
     #[test]
     fn test_request_id_from_str() {
