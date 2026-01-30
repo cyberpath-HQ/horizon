@@ -4,7 +4,7 @@
 
 use std::fmt;
 
-use crate::{response::ApiResponse, AppError, Result};
+use crate::{AppError, Result};
 
 /// Trait for adding context to errors.
 pub trait Context<T> {
@@ -109,7 +109,10 @@ mod tests {
 
     #[test]
     fn test_wrap_err() {
-        let err = wrap_err(AppError::not_found("User"), "Failed to process user");
+        let err = wrap_err(
+            AppError::not_found("User not found"),
+            "Failed to process user",
+        );
         // The context method returns a new error
         assert_eq!(
             format!("{}", err),
