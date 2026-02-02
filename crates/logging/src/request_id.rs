@@ -151,4 +151,67 @@ mod tests {
         let result = try_from_header("invalid!@#");
         assert!(result.is_none());
     }
+
+    #[test]
+    fn test_init_request_id() {
+        let id = init_request_id();
+        assert!(!id.as_str().is_empty());
+
+        // Should be set in thread-local
+        let retrieved = get_request_id();
+        assert!(retrieved.is_some());
+        assert_eq!(retrieved.unwrap().as_str(), id.as_str());
+
+        clear_request_id();
+    }
+
+    #[test]
+    fn test_request_id_into_string() {
+        let id = RequestId::new();
+        let string = id.clone().into_string();
+        assert!(!string.is_empty());
+        assert_eq!(string.len(), id.as_str().len());
+    }
+
+    #[test]
+    fn test_request_id_clone() {
+        let id = RequestId::new();
+        let cloned = id.clone();
+        assert_eq!(cloned.as_str(), id.as_str());
+    }
+
+    #[test]
+    fn test_request_id_partial_eq() {
+        let id1 = RequestId::from_str("k192v2g4w3zq8h6j5k12345678").unwrap();
+        let id2 = RequestId::from_str("k192v2g4w3zq8h6j5k12345678").unwrap();
+        assert_eq!(id1, id2);
+    }
+
+    #[test]
+    fn test_request_id_not_equal() {
+        let id1 = RequestId::from_str("k192v2g4w3zq8h6j5k12345678").unwrap();
+        let id2 = RequestId::from_str("a192v2g4w3zq8h6j5k12345678").unwrap();
+        assert_ne!(id1, id2);
+    }
+
+    #[test]
+    fn test_try_from_header_with_underscore() {
+        let cuid = "k192v2g4w3zq8h6j5k123_7890";
+        let result = try_from_header(cuid);
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_try_from_header_with_dash() {
+        let cuid = "k192v2g4w3zq8h6j5k123-7890";
+        let result = try_from_header(cuid);
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_extract_from_headers_empty() {
+        let headers: Vec<String> = vec![];
+        let result = extract_from_headers(&headers);
+        assert!(result.is_some());
+    }
 }
