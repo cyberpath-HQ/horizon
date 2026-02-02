@@ -137,7 +137,11 @@ mod tests {
 
     #[test]
     fn test_config_from_env() {
-        // Safe in test context - used to verify environment-based config
+        // Save original values
+        let orig_rust_log = std::env::var("RUST_LOG").ok();
+        let orig_format = std::env::var("HORIZON_LOG_FORMAT").ok();
+
+        // Set test values
         unsafe {
             std::env::set_var("RUST_LOG", "debug");
             std::env::set_var("HORIZON_LOG_FORMAT", "pretty");
@@ -147,10 +151,16 @@ mod tests {
         assert_eq!(config.level, "debug");
         assert_eq!(config.format, "pretty");
 
-        // Safe in test context - cleanup after test
+        // Restore original values
         unsafe {
-            std::env::remove_var("RUST_LOG");
-            std::env::remove_var("HORIZON_LOG_FORMAT");
+            match orig_rust_log {
+                Some(v) => std::env::set_var("RUST_LOG", v),
+                None => std::env::remove_var("RUST_LOG"),
+            }
+            match orig_format {
+                Some(v) => std::env::set_var("HORIZON_LOG_FORMAT", v),
+                None => std::env::remove_var("HORIZON_LOG_FORMAT"),
+            }
         }
     }
 
@@ -174,5 +184,91 @@ mod tests {
             ..Default::default()
         };
         let _subscriber = config.build();
+    }
+
+    #[test]
+    fn test_build_compact_subscriber() {
+        let config = LoggingConfig {
+            level: "debug".to_string(),
+            format: "compact".to_string(),
+            log_file: None,
+            ..Default::default()
+        };
+        let _subscriber = config.build();
+    }
+
+    #[test]
+    fn test_build_invalid_format_defaults_to_json() {
+        let config = LoggingConfig {
+            level: "debug".to_string(),
+            format: "invalid_format".to_string(),
+            log_file: None,
+            ..Default::default()
+        };
+        let _subscriber = config.build();
+    }
+
+    #[test]
+    fn test_build_invalid_level_defaults_to_info() {
+        let config = LoggingConfig {
+            level: "invalid_level".to_string(),
+            format: "json".to_string(),
+            log_file: None,
+            ..Default::default()
+        };
+        let _subscriber = config.build();
+    }
+
+    #[test]
+    fn test_config_with_log_file() {
+        let config = LoggingConfig {
+            level: "info".to_string(),
+            format: "json".to_string(),
+            log_file: Some("/var/log/app.log".to_string()),
+            ..Default::default()
+        };
+        let _subscriber = config.build();
+    }
+
+    #[test]
+    fn test_config_environment_variable() {
+        // Save original value
+        let orig = std::env::var("HORIZON_ENV").ok();
+
+        unsafe {
+            std::env::set_var("HORIZON_ENV", "production");
+        }
+
+        let config = LoggingConfig::from_env("info", "json", None);
+        assert_eq!(config.environment, "production");
+
+        // Restore
+        unsafe {
+            match orig {
+                Some(v) => std::env::set_var("HORIZON_ENV", v),
+                None => std::env::remove_var("HORIZON_ENV"),
+            }
+        }
+    }
+
+    #[test]
+    fn test_config_log_file_variable() {
+        // Save original value
+        let orig = std::env::var("HORIZON_LOG_FILE").ok();
+
+        unsafe {
+            std::env::set_var("HORIZON_LOG_FILE", "/custom/path.log");
+        }
+
+        let config = LoggingConfig::from_env("info", "json", None);
+        assert_eq!(config.log_file, Some("/custom/path.log".to_string()));
+
+        // Restore
+        unsafe {
+            match orig {
+                Some(v) => std::env::set_var("HORIZON_LOG_FILE", v),
+                None => std::env::remove_var("HORIZON_LOG_FILE"),
+            }
+        }
     }
 }
