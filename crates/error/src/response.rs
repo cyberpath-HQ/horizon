@@ -567,12 +567,44 @@ mod tests {
     }
 
     #[test]
-    fn test_response_data_methods() {
-        let response_ok = ApiResponse::ok(42);
-        assert_eq!(response_ok.data(), Some(&42));
+    fn test_into_result() {
+        let response_ok: ApiResponse<&str> = ApiResponse::ok("data");
+        assert_eq!(response_ok.into_result(), Ok("data"));
+
+        let response_err: ApiResponse<String> = ApiResponse::error("CODE", "msg");
+        assert_eq!(
+            response_err.into_result(),
+            Err(("CODE".to_string(), "msg".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_map() {
+        let response: ApiResponse<i32> = ApiResponse::ok(42);
+        let mapped = response.map(|x| x * 2);
+
+        match mapped {
+            ApiResponse::Success {
+                data: 84,
+                ..
+            } => {},
+            _ => panic!("Expected success with 84"),
+        }
 
         let response_err: ApiResponse<()> = ApiResponse::error("CODE", "msg");
-        assert_eq!(response_err.data(), None);
+        let mapped_err = response_err.map(|_| "mapped");
+
+        match mapped_err {
+            ApiResponse::Error {
+                code,
+                message,
+                ..
+            } => {
+                assert_eq!(code, "CODE");
+                assert_eq!(message, "msg");
+            },
+            _ => panic!("Expected error"),
+        }
     }
 
     #[test]
@@ -589,6 +621,120 @@ mod tests {
                 assert_eq!(data, vec![1, 2, 3, 4]);
             },
             _ => panic!(),
+        }
+    }
+
+    #[test]
+    fn test_with_error_details() {
+        let details = serde_json::json!({"field": "value"});
+        let response: ApiResponse<()> = ApiResponse::builder()
+            .with_error_details("VALIDATION", "Validation failed", details.clone())
+            .build();
+
+        match response {
+            ApiResponse::Error {
+                code,
+                message,
+                details: resp_details,
+                ..
+            } => {
+                assert_eq!(code, "VALIDATION");
+                assert_eq!(message, "Validation failed");
+                assert_eq!(resp_details, Some(details));
+            },
+            _ => panic!("Expected error response"),
+        }
+    }
+
+    #[test]
+    fn test_with_pagination() {
+        // Test that pagination meta is created correctly
+        let meta = PaginationMeta::new(1, 10, 100);
+        assert_eq!(meta.page, 1);
+        assert_eq!(meta.per_page, 10);
+        assert_eq!(meta.total_items, 100);
+        assert_eq!(meta.total_pages, 10);
+        assert!(meta.has_next.unwrap());
+        assert!(!meta.has_prev.unwrap());
+    }
+
+    #[test]
+    fn test_is_success() {
+        let response_ok = ApiResponse::ok("data");
+        let response_err: ApiResponse<()> = ApiResponse::error("CODE", "msg");
+
+        assert!(response_ok.is_success());
+        assert!(!response_err.is_success());
+    }
+
+    #[test]
+    fn test_is_error() {
+        let response_ok = ApiResponse::ok("data");
+        let response_err: ApiResponse<()> = ApiResponse::error("CODE", "msg");
+
+        assert!(!response_ok.is_error());
+        assert!(response_err.is_error());
+    }
+
+    #[test]
+    fn test_empty() {
+        let response: ApiResponse<()> = ApiResponse::empty();
+        match response {
+            ApiResponse::Success {
+                data: (),
+                ..
+            } => {},
+            _ => panic!("Expected empty success"),
+        }
+    }
+
+    #[test]
+    fn test_into_api_response_trait() {
+        // Test for types that implement Default
+        let response: ApiResponse<i32> = 42.into_response();
+        assert!(response.is_success());
+
+        // Test for ApiResponse itself
+        let original: ApiResponse<String> = ApiResponse::ok("test".to_string());
+        let converted: ApiResponse<String> = original.into_response();
+        assert!(converted.is_success());
+    }
+
+    #[test]
+    fn test_response_meta_default() {
+        let meta = ResponseMeta::default();
+        assert!(meta.request_id.is_none());
+        assert!(meta.response_time_ms.is_none());
+    }
+
+    #[test]
+    fn test_pagination_meta_last_page() {
+        // Total items exactly divisible by per_page
+        let meta = PaginationMeta::new(5, 10, 50);
+        assert_eq!(meta.total_pages, 5);
+        assert!(!meta.has_next.unwrap());
+        assert!(meta.has_prev.unwrap());
+    }
+
+    #[test]
+    fn test_response_builder_error_path() {
+        let response: ApiResponse<()> = ApiResponse::builder()
+            .with_error("ERR", "Error message")
+            .with_request_id("req-123")
+            .build();
+
+        match response {
+            ApiResponse::Error {
+                code,
+                message,
+                request_id,
+                ..
+            } => {
+                assert_eq!(code, "ERR");
+                assert_eq!(message, "Error message");
+                assert_eq!(request_id, Some("req-123".to_string()));
+            },
+            _ => panic!("Expected error response"),
         }
     }
 }
