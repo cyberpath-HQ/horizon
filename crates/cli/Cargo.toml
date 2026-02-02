@@ -21,6 +21,7 @@ logging = { path = "../logging" }
 
 # Error handling
 error = { path = "../error" }
+anyhow = { workspace = true }
 
 # Core dependencies
 tokio = { workspace = true, features = ["full"] }
