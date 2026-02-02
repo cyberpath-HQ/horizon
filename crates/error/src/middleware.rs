@@ -198,6 +198,112 @@ mod tests {
     fn test_request_logger_skip() {
         let logger = RequestLogger::new();
         assert!(logger.should_skip("/health"));
+        assert!(logger.should_skip("/ready"));
         assert!(!logger.should_skip("/api/users"));
+        assert!(!logger.should_skip("/v1/assets"));
+    }
+
+    #[test]
+    fn test_error_handler_rate_limit() {
+        let handler = ErrorHandler::new(false);
+        let err = AppError::rate_limited(60);
+        let response = handler.to_response(&err);
+
+        assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert!(response.headers().contains_key("Retry-After"));
+    }
+
+    #[test]
+    fn test_error_handler_different_status_codes() {
+        let handler = ErrorHandler::new(false);
+
+        // Test all error types
+        assert_eq!(
+            handler.to_response(&AppError::not_found("x")).status(),
+            StatusCode::NOT_FOUND
+        );
+        assert_eq!(
+            handler.to_response(&AppError::bad_request("x")).status(),
+            StatusCode::BAD_REQUEST
+        );
+        assert_eq!(
+            handler.to_response(&AppError::unauthorized("x")).status(),
+            StatusCode::UNAUTHORIZED
+        );
+        assert_eq!(
+            handler.to_response(&AppError::forbidden("x")).status(),
+            StatusCode::FORBIDDEN
+        );
+        assert_eq!(
+            handler.to_response(&AppError::conflict("x")).status(),
+            StatusCode::CONFLICT
+        );
+        assert_eq!(
+            handler.to_response(&AppError::validation("x")).status(),
+            StatusCode::BAD_REQUEST
+        );
+        assert_eq!(
+            handler.to_response(&AppError::internal("x")).status(),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+        assert_eq!(
+            handler.to_response(&AppError::database("x")).status(),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+        assert_eq!(
+            handler.to_response(&AppError::rate_limited(1)).status(),
+            StatusCode::TOO_MANY_REQUESTS
+        );
+        assert_eq!(
+            handler
+                .to_response(&AppError::Io {
+                    message: "x".to_string(),
+                })
+                .status(),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
+
+    #[test]
+    fn test_error_handler_response_has_content_type() {
+        let handler = ErrorHandler::new(false);
+        let err = AppError::not_found("Test");
+        let response = handler.to_response(&err);
+
+        assert!(response.headers().contains_key("Content-Type"));
+    }
+
+    #[test]
+    fn test_error_handler_response_is_json() {
+        let handler = ErrorHandler::new(true);
+        let err = AppError::bad_request("Invalid input");
+        let response = handler.to_response(&err);
+
+        let content_type = response.headers().get("Content-Type").unwrap();
+        assert!(content_type.to_str().unwrap().contains("application/json"));
+    }
+
+    #[test]
+    fn test_error_handler_retry_after_header() {
+        let handler = ErrorHandler::new(false);
+        let err = AppError::rate_limited(120);
+        let response = handler.to_response(&err);
+
+        let retry_after = response.headers().get("Retry-After").unwrap();
+        assert_eq!(retry_after.to_str().unwrap(), "120");
+    }
+
+    #[test]
+    fn test_panic_recovery_new() {
+        let panic_handler = PanicRecovery::new("Custom panic message");
+        assert_eq!(panic_handler.message, "Custom panic message");
+    }
+
+    #[test]
+    fn test_request_logger_default_skip_paths() {
+        let logger = RequestLogger::new();
+        assert_eq!(logger.skip_paths.len(), 2);
+        assert!(logger.skip_paths.contains(&"/health"));
+        assert!(logger.skip_paths.contains(&"/ready"));
     }
 }

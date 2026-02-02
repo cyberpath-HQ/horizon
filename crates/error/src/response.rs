@@ -138,7 +138,7 @@ pub struct ApiResponseBuilder<T> {
     pagination: Option<PaginationMeta>,
 }
 
-impl<T> ApiResponseBuilder<T> {
+impl<T: Default> ApiResponseBuilder<T> {
     /// Create a new builder.
     #[inline]
     pub fn new() -> Self {
@@ -211,10 +211,7 @@ impl<T> ApiResponseBuilder<T> {
             };
         }
 
-        let data = self.data.unwrap_or_else(|| {
-            // This panics if T doesn't implement Default, which is intentional
-            panic!("ApiResponseBuilder: data not set")
-        });
+        let data = self.data.unwrap_or_default();
 
         let meta = self.meta;
 
@@ -225,11 +222,11 @@ impl<T> ApiResponseBuilder<T> {
     }
 }
 
-impl<T> Default for ApiResponseBuilder<T> {
+impl<T: Default> Default for ApiResponseBuilder<T> {
     fn default() -> Self { Self::new() }
 }
 
-impl<T> ApiResponse<T> {
+impl<T: Default> ApiResponse<T> {
     /// Create a success response with data.
     #[inline]
     pub fn ok(data: T) -> Self {
@@ -466,6 +463,132 @@ mod tests {
                 assert_eq!(meta.as_ref().unwrap().response_time_ms, Some(42));
             },
             _ => panic!("Expected success response"),
+        }
+    }
+
+    // Additional Coverage Tests
+    #[test]
+    fn test_response_ok_with_vec() {
+        let response = ApiResponse::ok(vec![1, 2, 3]);
+        match response {
+            ApiResponse::Success {
+                data,
+                ..
+            } => {
+                assert_eq!(data, vec![1, 2, 3]);
+            },
+            _ => panic!("Expected success"),
+        }
+    }
+
+    #[test]
+    fn test_response_ok_with_option() {
+        let response = ApiResponse::ok(Some(42));
+        match response {
+            ApiResponse::Success {
+                data,
+                ..
+            } => {
+                assert_eq!(data, Some(42));
+            },
+            _ => panic!("Expected success"),
+        }
+    }
+
+    #[test]
+    fn test_response_error_with_details() {
+        let details = serde_json::json!({"field": "error"});
+        let response: ApiResponse<()> = ApiResponse::error_with_details("VALIDATION", "Failed", details.clone());
+
+        match response {
+            ApiResponse::Error {
+                code,
+                message,
+                details: resp_details,
+                ..
+            } => {
+                assert_eq!(code, "VALIDATION");
+                assert_eq!(message, "Failed");
+                assert_eq!(resp_details, Some(details));
+            },
+            _ => panic!("Expected error"),
+        }
+    }
+
+    #[test]
+    fn test_response_serialization() {
+        let response = ApiResponse::ok("test");
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(json.contains("\"status\":\"success\""));
+        assert!(json.contains("\"data\":\"test\""));
+    }
+
+    #[test]
+    fn test_response_error_serialization() {
+        let response: ApiResponse<()> = ApiResponse::error("NOT_FOUND", "Not found");
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(json.contains("\"status\":\"error\""));
+        assert!(json.contains("\"code\":\"NOT_FOUND\""));
+        assert!(json.contains("\"message\":\"Not found\""));
+    }
+
+    #[test]
+    fn test_response_builder_empty() {
+        let response: ApiResponse<()> = ApiResponse::builder().build();
+        match response {
+            ApiResponse::Success {
+                data: (),
+                ..
+            } => {},
+            _ => panic!("Expected success"),
+        }
+    }
+
+    #[test]
+    fn test_pagination_edge_cases() {
+        // First page
+        let meta = PaginationMeta::new(1, 10, 0);
+        assert_eq!(meta.offset(), 0);
+        assert!(!meta.has_next.unwrap());
+
+        // Last page
+        let meta = PaginationMeta::new(10, 10, 100);
+        assert_eq!(meta.offset(), 90);
+        assert!(!meta.has_next.unwrap());
+        assert!(meta.has_prev.unwrap());
+    }
+
+    #[test]
+    fn test_pagination_single_page() {
+        let meta = PaginationMeta::new(1, 10, 5);
+        assert_eq!(meta.total_pages, 1);
+        assert!(!meta.has_next.unwrap());
+        assert!(!meta.has_prev.unwrap());
+    }
+
+    #[test]
+    fn test_response_data_methods() {
+        let response_ok = ApiResponse::ok(42);
+        assert_eq!(response_ok.data(), Some(&42));
+
+        let response_err: ApiResponse<()> = ApiResponse::error("CODE", "msg");
+        assert_eq!(response_err.data(), None);
+    }
+
+    #[test]
+    fn test_response_data_mut() {
+        let mut response = ApiResponse::ok(vec![1, 2, 3]);
+        if let Some(data) = response.data_mut() {
+            data.push(4);
+        }
+        match response {
+            ApiResponse::Success {
+                data,
+                ..
+            } => {
+                assert_eq!(data, vec![1, 2, 3, 4]);
+            },
+            _ => panic!(),
         }
     }
 }
