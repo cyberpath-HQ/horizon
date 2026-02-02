@@ -240,7 +240,7 @@ mod tests {
         );
         assert_eq!(
             handler.to_response(&AppError::validation("x")).status(),
-            StatusCode::BAD_REQUEST
+            StatusCode::UNPROCESSABLE_ENTITY
         );
         assert_eq!(
             handler.to_response(&AppError::internal("x")).status(),

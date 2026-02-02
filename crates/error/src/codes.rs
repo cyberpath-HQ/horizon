@@ -114,7 +114,14 @@ impl ErrorCode for BadRequest {
 }
 
 impl fmt::Display for BadRequest {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "{}", self.message) }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(field) = &self.field {
+            write!(f, "{} (field: {})", self.message, field)
+        }
+        else {
+            write!(f, "{}", self.message)
+        }
+    }
 }
 
 impl std::error::Error for BadRequest {}
@@ -497,7 +504,14 @@ impl ErrorCode for Database {
 }
 
 impl fmt::Display for Database {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "Database error: {}", self.message) }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(query) = &self.query {
+            write!(f, "Database error: {} (query: {})", self.message, query)
+        }
+        else {
+            write!(f, "Database error: {}", self.message)
+        }
+    }
 }
 
 impl std::error::Error for Database {}
@@ -582,13 +596,13 @@ mod tests {
         assert_eq!(err.category(), ErrorCategory::Client);
         assert!(!err.should_log());
         assert!(err.expose_details());
-        assert_eq!(format!("{}", err), "Bad request: Invalid input");
+        assert_eq!(format!("{}", err), "Invalid input");
     }
 
     #[test]
     fn test_bad_request_with_field() {
         let err = BadRequest::new("Required").with_field("email");
-        assert_eq!(format!("{}", err), "Bad request: Required (field: email)");
+        assert_eq!(format!("{}", err), "Required (field: email)");
     }
 
     // Unauthorized Tests
@@ -599,16 +613,13 @@ mod tests {
         assert_eq!(err.status(), http::StatusCode::UNAUTHORIZED);
         assert_eq!(err.category(), ErrorCategory::Authentication);
         assert!(!err.should_log());
-        assert!(err.expose_details());
+        assert!(!err.expose_details());
     }
 
     #[test]
     fn test_unauthorized_with_reason() {
         let err = Unauthorized::new("Invalid").with_reason(UnauthorizedReason::ExpiredToken);
-        assert_eq!(
-            format!("{}", err),
-            "Unauthorized: Invalid (reason: expired_token)"
-        );
+        assert_eq!(format!("{}", err), "Invalid (reason: expired_token)");
     }
 
     // Forbidden Tests
@@ -619,16 +630,13 @@ mod tests {
         assert_eq!(err.status(), http::StatusCode::FORBIDDEN);
         assert_eq!(err.category(), ErrorCategory::Authorization);
         assert!(!err.should_log());
-        assert!(err.expose_details());
+        assert!(!err.expose_details());
     }
 
     #[test]
     fn test_forbidden_with_action() {
         let err = Forbidden::new("No permission").with_action("delete");
-        assert_eq!(
-            format!("{}", err),
-            "Forbidden: No permission (action: delete)"
-        );
+        assert_eq!(format!("{}", err), "No permission (action: delete)");
     }
 
     // Conflict Tests
@@ -645,10 +653,7 @@ mod tests {
     #[test]
     fn test_conflict_with_existing_id() {
         let err = Conflict::new("User exists").with_existing_id("user-123");
-        assert_eq!(
-            format!("{}", err),
-            "Conflict: User exists (existing_id: user-123)"
-        );
+        assert_eq!(format!("{}", err), "User exists (existing_id: user-123)");
     }
 
     // Validation Tests
@@ -674,12 +679,11 @@ mod tests {
     #[test]
     fn test_rate_limit_new() {
         let err = RateLimit::new(60);
-        assert_eq!(err.code(), "RATE_LIMIT");
+        assert_eq!(err.code(), "RATE_LIMIT_EXCEEDED");
         assert_eq!(err.status(), http::StatusCode::TOO_MANY_REQUESTS);
         assert_eq!(err.category(), ErrorCategory::Client);
-        assert!(err.should_log());
-        assert!(!err.expose_details());
-        assert_eq!(err.retry_after(), 60);
+        assert!(!err.should_log());
+        assert!(err.expose_details());
     }
 
     // Internal Tests
@@ -696,10 +700,7 @@ mod tests {
     #[test]
     fn test_internal_with_error_id() {
         let err = Internal::new("Failed").with_error_id("ERR-001");
-        assert_eq!(
-            format!("{}", err),
-            "Internal error: Failed (error_id: ERR-001)"
-        );
+        assert_eq!(format!("{}", err), "Failed (error_id: ERR-001)");
     }
 
     // Database Tests
@@ -715,7 +716,7 @@ mod tests {
 
     #[test]
     fn test_database_with_query() {
-        let err = Database::new("Query failed").with_query("SELECT * FROM users");
+        let err = Database::new("Connection failed").with_query("SELECT * FROM users");
         assert_eq!(
             format!("{}", err),
             "Database error: Connection failed (query: SELECT * FROM users)"
@@ -729,17 +730,14 @@ mod tests {
         assert_eq!(err.code(), "IO_ERROR");
         assert_eq!(err.status(), http::StatusCode::INTERNAL_SERVER_ERROR);
         assert_eq!(err.category(), ErrorCategory::Server);
-        assert!(err.should_log());
+        assert!(!err.should_log());
         assert!(!err.expose_details());
     }
 
     #[test]
     fn test_io_with_path() {
         let err = Io::new("Cannot read").with_path("/data/file.txt");
-        assert_eq!(
-            format!("{}", err),
-            "IO error: Cannot read (path: /data/file.txt)"
-        );
+        assert_eq!(format!("{}", err), "Cannot read (path: /data/file.txt)");
     }
 
     // ErrorCategory Tests

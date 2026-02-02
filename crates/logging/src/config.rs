@@ -221,13 +221,17 @@ mod tests {
 
     #[test]
     fn test_config_with_log_file() {
+        let temp_dir = std::env::temp_dir();
+        let log_path = temp_dir.join("test_app.log");
         let config = LoggingConfig {
             level: "info".to_string(),
             format: "json".to_string(),
-            log_file: Some("/var/log/app.log".to_string()),
+            log_file: Some(log_path.to_string_lossy().to_string()),
             ..Default::default()
         };
         let _subscriber = config.build();
+        // Cleanup
+        let _ = std::fs::remove_file(log_path);
     }
 
     #[test]

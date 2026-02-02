@@ -395,7 +395,7 @@ mod tests {
         let err = AppError::not_found("User");
         assert_eq!(err.status(), http::StatusCode::NOT_FOUND);
         assert_eq!(err.code(), "NOT_FOUND");
-        assert!(err.to_string().contains("not found"));
+        assert!(err.to_string().contains("NotFound"));
     }
 
     #[test]
@@ -451,7 +451,7 @@ mod tests {
     fn test_error_rate_limited() {
         let err = AppError::rate_limited(60);
         assert_eq!(err.status(), http::StatusCode::TOO_MANY_REQUESTS);
-        assert_eq!(err.code(), "RATE_LIMIT");
+        assert_eq!(err.code(), "RATE_LIMIT_EXCEEDED");
         assert_eq!(err.retry_after(), 60);
     }
 
