@@ -41,5 +41,28 @@ grcov . \
     --ignore "*/src-tauri/*" \
     --ignore "*/.cargo/*" \
     -o ./target/coverage/lcov.info
-
 echo "LCOV report generated at ./target/coverage/lcov.info"
+
+echo "Generating additional coverage formats..."
+
+grcov . \
+    --binary-path ./target/debug/deps/ \
+    -s . \
+    -t cobertura \
+    --branch \
+    --ignore-not-existing \
+    --ignore "*/src-tauri/*" \
+    --ignore "*/.cargo/*" \
+    -o ./target/coverage/cobertura.xml
+
+grcov . \
+    --binary-path ./target/debug/deps/ \
+    -s . \
+    -t markdown \
+    --branch \
+    --ignore-not-existing \
+    --ignore "*/src-tauri/*" \
+    --ignore "*/.cargo/*" \
+    -o ./target/coverage/coverage.md
+
+echo "Additional coverage reports generated in ./target/coverage/"
