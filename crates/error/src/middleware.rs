@@ -97,6 +97,10 @@ impl RequestLogger {
     pub fn should_skip(&self, path: &str) -> bool { self.skip_paths.iter().any(|p| path.starts_with(p)) }
 }
 
+impl Default for RequestLogger {
+    fn default() -> Self { Self::new() }
+}
+
 /// Middleware for recovering from panics.
 #[derive(Clone)]
 pub struct PanicRecovery {
@@ -305,5 +309,89 @@ mod tests {
         assert_eq!(logger.skip_paths.len(), 2);
         assert!(logger.skip_paths.contains(&"/health"));
         assert!(logger.skip_paths.contains(&"/ready"));
+    }
+
+    #[test]
+    fn test_into_response_for_api_response_success() {
+        let response: ApiResponse<()> = ApiResponse::ok(());
+        let http_response = response.into_response();
+        assert_eq!(http_response.status(), StatusCode::OK);
+    }
+
+    #[test]
+    fn test_into_response_for_api_response_error() {
+        let response: ApiResponse<()> = ApiResponse::error("CODE", "message");
+        let http_response = response.into_response();
+        assert_eq!(http_response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn test_into_response_for_response() {
+        let response = Response::builder()
+            .status(StatusCode::ACCEPTED)
+            .body(Body::empty())
+            .unwrap();
+        let result = response.into_response();
+        assert_eq!(result.status(), StatusCode::ACCEPTED);
+    }
+
+    #[test]
+    fn test_into_response_for_static_str() {
+        let response: &'static str = "Hello, World!";
+        let http_response = response.into_response();
+        assert_eq!(http_response.status(), StatusCode::OK);
+        assert!(http_response.headers().contains_key("Content-Type"));
+    }
+
+    #[test]
+    fn test_into_response_for_string() {
+        let response = String::from("Hello, World!");
+        let http_response = response.into_response();
+        assert_eq!(http_response.status(), StatusCode::OK);
+        assert!(http_response.headers().contains_key("Content-Type"));
+    }
+
+    #[test]
+    fn test_into_response_for_app_error() {
+        let app_error = AppError::not_found("Resource not found");
+        let http_response = app_error.into_response();
+        assert_eq!(http_response.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn test_error_handler_with_different_error_details() {
+        let handler = ErrorHandler::new(true);
+        let err = AppError::validation("Field is required");
+        let response = handler.to_response(&err);
+
+        assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        assert!(response.headers().contains_key("Content-Type"));
+    }
+
+    #[test]
+    fn test_error_handler_authorization_error() {
+        let handler = ErrorHandler::new(false);
+        let err = AppError::unauthorized("Invalid token");
+        let response = handler.to_response(&err);
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[test]
+    fn test_error_handler_forbidden_error() {
+        let handler = ErrorHandler::new(false);
+        let err = AppError::forbidden("Access denied");
+        let response = handler.to_response(&err);
+
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[test]
+    fn test_error_handler_conflict_error() {
+        let handler = ErrorHandler::new(false);
+        let err = AppError::conflict("Resource already exists");
+        let response = handler.to_response(&err);
+
+        assert_eq!(response.status(), StatusCode::CONFLICT);
     }
 }
