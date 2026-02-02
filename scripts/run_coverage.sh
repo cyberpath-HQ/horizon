@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # Script to run code coverage using grcov
+# Excludes src-tauri from coverage
 
 set -e
 
@@ -11,15 +12,34 @@ echo "Creating profile directory..."
 mkdir -p target/profraw
 mkdir -p target/coverage
 
-echo "Running tests with coverage instrumentation..."
-RUSTFLAGS="-Cinstrument-coverage" LLVM_PROFILE_FILE="target/profraw/cyberpath-%p-%m.profraw" cargo test
+# Clean any existing profraw files
+rm -f target/profraw/*.profraw
+
+echo "Running tests with coverage instrumentation (excluding src-tauri)..."
+RUSTFLAGS="-Cinstrument-coverage" LLVM_PROFILE_FILE="target/profraw/cyberpath-%p-%m.profraw" cargo test --workspace --exclude ui
 
 echo "Generating coverage report..."
-grcov . --binary-path ./target/debug/deps/ -s . -t html --branch --ignore-not-existing -o ./target/coverage/html
+grcov . \
+    --binary-path ./target/debug/deps/ \
+    -s . \
+    -t html \
+    --branch \
+    --ignore-not-existing \
+    --ignore "*/src-tauri/*" \
+    --ignore "*/.cargo/*" \
+    -o ./target/coverage/html
 
 echo "Coverage report generated at ./target/coverage/html/index.html"
 
 # Optional: Generate lcov for CI
-grcov . --binary-path ./target/debug/deps/ -s . -t lcov --branch --ignore-not-existing -o ./target/coverage/lcov.info
+grcov . \
+    --binary-path ./target/debug/deps/ \
+    -s . \
+    -t lcov \
+    --branch \
+    --ignore-not-existing \
+    --ignore "*/src-tauri/*" \
+    --ignore "*/.cargo/*" \
+    -o ./target/coverage/lcov.info
 
 echo "LCOV report generated at ./target/coverage/lcov.info"
