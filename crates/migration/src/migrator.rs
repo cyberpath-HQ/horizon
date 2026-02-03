@@ -5,7 +5,7 @@
 
 use sea_orm_migration::prelude::*;
 
-use crate::migrators::m20260202_init::M20230101Init;
+use crate::migrators::m20260202_init::M20260202Init;
 
 /// The main migrator that coordinates all migration operations
 ///
@@ -34,7 +34,7 @@ impl MigratorTrait for Migrator {
     fn migrations() -> Vec<Box<dyn MigrationTrait>> {
         vec![
             // Initial schema migration - must be first
-            Box::new(M20230101Init),
+            Box::new(M20260202Init),
         ]
     }
 }
