@@ -67,6 +67,61 @@ pub enum AppError {
     Io {
         message: String,
     },
+
+    #[error("Config: {message}")]
+    Config {
+        message: String,
+    },
+
+    #[error("Migration: {message}")]
+    Migration {
+        message: String,
+    },
+}
+
+/// Seed operation result
+#[derive(Debug, Clone)]
+pub struct SeedResult {
+    /// Number of records inserted
+    pub inserted_count: usize,
+    /// Number of records updated
+    pub updated_count:  usize,
+    /// Seed name for logging
+    pub seed_name:      String,
+    /// Duration of the seed operation in milliseconds
+    pub duration_ms:    u64,
+    /// Any errors that occurred
+    pub errors:         Vec<String>,
+}
+
+impl SeedResult {
+    /// Creates a new successful seed result
+    #[must_use]
+    pub fn success(seed_name: &str, inserted: usize, duration_ms: u64) -> Self {
+        Self {
+            inserted_count: inserted,
+            updated_count: 0,
+            seed_name: seed_name.to_string(),
+            duration_ms,
+            errors: Vec::new(),
+        }
+    }
+
+    /// Creates a new failed seed result
+    #[must_use]
+    pub fn with_error(seed_name: &str, error: &str) -> Self {
+        Self {
+            inserted_count: 0,
+            updated_count:  0,
+            seed_name:      seed_name.to_string(),
+            duration_ms:    0,
+            errors:         vec![error.to_string()],
+        }
+    }
+
+    /// Returns true if the seed operation was successful
+    #[must_use]
+    pub fn is_success(&self) -> bool { self.errors.is_empty() }
 }
 
 impl AppError {
@@ -134,6 +189,22 @@ impl AppError {
         }
     }
 
+    /// Create a config error.
+    #[inline]
+    pub fn config(message: impl ToString) -> Self {
+        Self::Config {
+            message: message.to_string(),
+        }
+    }
+
+    /// Create a migration error.
+    #[inline]
+    pub fn migration(message: impl ToString) -> Self {
+        Self::Migration {
+            message: message.to_string(),
+        }
+    }
+
     /// Create a rate limit error.
     #[inline]
     pub fn rate_limited(retry_after: u64) -> Self {
@@ -176,6 +247,12 @@ impl AppError {
             AppError::Io {
                 ..
             } => http::StatusCode::INTERNAL_SERVER_ERROR,
+            AppError::Config {
+                ..
+            } => http::StatusCode::INTERNAL_SERVER_ERROR,
+            AppError::Migration {
+                ..
+            } => http::StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 
@@ -212,6 +289,12 @@ impl AppError {
             AppError::Io {
                 ..
             } => "IO_ERROR",
+            AppError::Config {
+                ..
+            } => "CONFIG_ERROR",
+            AppError::Migration {
+                ..
+            } => "MIGRATION_ERROR",
         }
     }
 
@@ -255,6 +338,14 @@ impl AppError {
                 ..
             } => message.clone(),
             AppError::Io {
+                message,
+                ..
+            } => message.clone(),
+            AppError::Config {
+                message,
+                ..
+            } => message.clone(),
+            AppError::Migration {
                 message,
                 ..
             } => message.clone(),
@@ -349,6 +440,20 @@ impl AppError {
                     message: format!("{}: {}", context_msg, message),
                 }
             },
+            AppError::Config {
+                message,
+            } => {
+                Self::Config {
+                    message: format!("{}: {}", context_msg, message),
+                }
+            },
+            AppError::Migration {
+                message,
+            } => {
+                Self::Migration {
+                    message: format!("{}: {}", context_msg, message),
+                }
+            },
         }
     }
 }
@@ -383,6 +488,15 @@ impl From<String> for AppError {
 /// Convert &str to AppError.
 impl From<&str> for AppError {
     fn from(s: &str) -> Self { Self::from(s.to_string()) }
+}
+
+/// Convert Sea-ORM database errors to AppError.
+impl From<sea_orm::DbErr> for AppError {
+    fn from(err: sea_orm::DbErr) -> Self {
+        Self::Database {
+            message: err.to_string(),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -464,6 +578,22 @@ mod tests {
         assert_eq!(err.code(), "IO_ERROR");
     }
 
+    #[test]
+    fn test_error_config() {
+        let err = AppError::config("Invalid configuration");
+        assert_eq!(err.status(), http::StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(err.code(), "CONFIG_ERROR");
+        assert!(err.to_string().contains("Config"));
+    }
+
+    #[test]
+    fn test_error_migration() {
+        let err = AppError::migration("Migration failed");
+        assert_eq!(err.status(), http::StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(err.code(), "MIGRATION_ERROR");
+        assert!(err.to_string().contains("Migration"));
+    }
+
     // Context Tests
     #[test]
     fn test_error_context_not_found() {
@@ -516,6 +646,26 @@ mod tests {
     fn test_from_str() {
         let err: AppError = "Bad request".into();
         assert_eq!(err.code(), "BAD_REQUEST");
+    }
+
+    // SeedResult Tests
+    #[test]
+    fn test_seed_result_success() {
+        let result = SeedResult::success("test_seed", 5, 100);
+        assert_eq!(result.inserted_count, 5);
+        assert_eq!(result.updated_count, 0);
+        assert_eq!(result.seed_name, "test_seed");
+        assert_eq!(result.duration_ms, 100);
+        assert!(result.errors.is_empty());
+        assert!(result.is_success());
+    }
+
+    #[test]
+    fn test_seed_result_error() {
+        let result = SeedResult::with_error("test_seed", "Error message");
+        assert_eq!(result.inserted_count, 0);
+        assert!(result.errors.contains(&"Error message".to_string()));
+        assert!(!result.is_success());
     }
 
     // Status Code Tests
