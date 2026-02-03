@@ -5,6 +5,9 @@ mod m20260203_0000025_add_teams_parent_fk;
 mod m20260203_000002_create_teams_table;
 mod m20260203_000003_create_team_members_table;
 mod m20260203_000004_add_teams_manager_fk;
+mod m20260203_000005_create_roles_table;
+mod m20260203_000006_create_user_roles_table;
+mod m20260203_000007_create_api_keys_table;
 
 pub struct Migrator;
 
@@ -17,6 +20,9 @@ impl MigratorTrait for Migrator {
             Box::new(m20260203_0000025_add_teams_parent_fk::Migration),
             Box::new(m20260203_000003_create_team_members_table::Migration),
             Box::new(m20260203_000004_add_teams_manager_fk::Migration),
+            Box::new(m20260203_000005_create_roles_table::Migration),
+            Box::new(m20260203_000006_create_user_roles_table::Migration),
+            Box::new(m20260203_000007_create_api_keys_table::Migration),
         ]
     }
 }
