@@ -81,7 +81,7 @@ jsonwebtoken = { version = "10.3.0" }
 totp-rs = { version = "5.7.0" }
 
 # ==================== AI PROVIDERS ====================
-reqwest = { version = "0.13.1", default_features = false, features = ["rustls-native-certs", "json", "charset", "http2", "system-proxy"] }
+reqwest = { version = "0.13.1", default-features = false, features = ["rustls-native-certs", "json", "charset", "http2", "system-proxy"] }
 async-openai = { version = "0.32.4" }
 anthropic = { version = "0.0.8" }
 
