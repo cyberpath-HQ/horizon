@@ -184,7 +184,7 @@ async fn serve(args: &ServeArgs) -> Result<()> {
 
     // Run migrations automatically on startup
     logging::info!(target: "serve", "Running database migrations...");
-    migration::Migrator::up(&db.inner, None)
+    migration::Migrator::up(db.get_connection(), None)
         .await
         .map_err(|e| anyhow::anyhow!("Migration failed: {}", e))?;
 
@@ -255,7 +255,7 @@ async fn migrate(args: &MigrateArgs) -> Result<()> {
             .await
             .map_err(|e| anyhow::anyhow!("Failed to connect to database: {}", e))?;
 
-        migration::Migrator::down(&db.inner, None)
+        migration::Migrator::down(db.get_connection(), None)
             .await
             .map_err(|e| anyhow::anyhow!("Rollback failed: {}", e))?;
 
@@ -269,7 +269,7 @@ async fn migrate(args: &MigrateArgs) -> Result<()> {
         .map_err(|e| anyhow::anyhow!("Failed to connect to database: {}", e))?;
 
     // Run migrations
-    migration::Migrator::up(&db.inner, None)
+    migration::Migrator::up(db.get_connection(), None)
         .await
         .map_err(|e| anyhow::anyhow!("Migration failed: {}", e))?;
 
