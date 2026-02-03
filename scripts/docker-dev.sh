@@ -150,7 +150,7 @@ show_help() {
     echo "================================"
     echo ""
     echo "Services started:"
-    echo "  - PostgreSQL: localhost:${POSTGRES_PORT:-5432}"
+    echo "  - PostgreSQL: localhost:${HORIZON_DATABASE_PORT:-5432}"
     echo "  - Redis:      localhost:${REDIS_PORT:-6379}"
     echo ""
     echo "Useful commands:"
