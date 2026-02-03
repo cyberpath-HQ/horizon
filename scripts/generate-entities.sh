@@ -130,6 +130,7 @@ generate_entities() {
         "sea-orm-cli"
         "generate"
         "entity"
+        "--lib"
         "-u" "$DATABASE_URL"
         "-o" "$ENTITY_DIR"
         "--with-serde" "both"
@@ -156,6 +157,9 @@ generate_entities() {
 
     # List generated files
     local generated_count
+    rm -f "$ENTITY_DIR/lib.rs"  # Remove lib.rs to avoid counting it
+    rm -f "$ENTITY_DIR/mod.rs"  # Remove mod.rs to avoid counting it
+    rm -f "$ENTITY_DIR/prelude.rs"  # Remove prelude.rs to avoid counting it
     generated_count=$(find "$ENTITY_DIR" -name "*.rs" -type f | wc -l)
     log_info "Generated $generated_count entity files"
 }
@@ -169,37 +173,33 @@ update_lib_rs() {
     local modules_list=""
 
     for file in "${entity_files[@]}"; do
-        if [ -f "$file" ] && [ "$(basename "$file")" != "lib.rs" ]; then
+        local filename
+        filename=$(basename "$file")
+        if [ -f "$file" ] && [ "$filename" != "lib.rs" ] && [ "$filename" != "mod.rs" ] && [ "$filename" != "prelude.rs" ] && [ "$filename" != "sea_orm_active_enums.rs" ]; then
             local module_name
             module_name=$(basename "$file" .rs)
             modules_list="${modules_list}pub mod ${module_name};"$'\n'
 
-            # Extract entity name for re-export
-            local entity_name
-            entity_name=$(grep -oP 'pub struct Entity\s*;' "$file" 2>/dev/null | \
-                         sed 's/pub struct Entity\s*;.*//' | \
-                         head -1 | \
-                         xargs)
-            if [ -n "$entity_name" ]; then
-                # Extract the module name in PascalCase for Entity name
-                local pascal_module
-                pascal_module=$(echo "$module_name" | sed -r 's/(^|_)([a-z])/\U\2/g')
-                modules_list="${modules_list}pub use ${module_name}::Entity as ${pascal_module};"$'\n'
-            fi
+            # Extract the module name in PascalCase for Entity name
+            local pascal_module
+            pascal_module=$(echo "$module_name" | sed -r 's/(^|_)([a-z])/\U\2/g')
+            modules_list="${modules_list}pub use ${module_name}::Entity as ${pascal_module};"$'\n'
         fi
     done
 
-    # Generate new lib.rs
+    # Generate new lib.rs with correct format
     local lib_content="//! Entity definitions for Horizon CMDB
 //!
 //! This crate contains Sea-ORM entity definitions for the database models.
 //! Entities are auto-generated from the database schema.
 
-$modules_list
+pub mod sea_orm_active_enums;
+${modules_list}
 "
 
     if [ "$DRY_RUN" = true ]; then
         log_info "[DRY-RUN] Would update lib.rs with entity exports"
+        echo "$lib_content"
         return 0
     fi
 
