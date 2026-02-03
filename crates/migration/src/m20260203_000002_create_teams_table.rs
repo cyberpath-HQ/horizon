@@ -12,7 +12,12 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(Teams::Table)
                     .if_not_exists()
-                    .col(pk_auto(Teams::Id))
+                    .col(
+                        uuid(Teams::Id)
+                            .not_null()
+                            .primary_key()
+                            .default(Expr::cust("gen_random_uuid()")),
+                    )
                     .col(string(Teams::Name).not_null())
                     .col(string(Teams::Slug).not_null().unique_key())
                     .col(text(Teams::Description).null())
@@ -29,18 +34,6 @@ impl MigrationTrait for Migration {
                             .default(Expr::current_timestamp()),
                     )
                     .col(timestamp(Teams::DeletedAt).null())
-                    .to_owned(),
-            )
-            .await?;
-
-        // Add foreign key for parent team (self-referencing for hierarchy)
-        manager
-            .create_foreign_key(
-                ForeignKey::create()
-                    .name("fk_teams_parent_team_id")
-                    .from(Teams::Table, Teams::ParentTeamId)
-                    .to(Teams::Table, Teams::Id)
-                    .on_delete(ForeignKeyAction::SetNull)
                     .to_owned(),
             )
             .await?;

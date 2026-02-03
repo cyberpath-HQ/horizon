@@ -23,7 +23,12 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(Users::Table)
                     .if_not_exists()
-                    .col(pk_auto(Users::Id))
+                    .col(
+                        uuid(Users::Id)
+                            .not_null()
+                            .primary_key()
+                            .default(Expr::cust("gen_random_uuid()")),
+                    )
                     .col(string(Users::Email).not_null().unique_key())
                     .col(string(Users::Username).not_null().unique_key())
                     .col(string(Users::PasswordHash).not_null())
@@ -75,7 +80,7 @@ impl MigrationTrait for Migration {
             .await?;
 
         manager
-            .drop_type(Type::drop().name("user_status").to_owned())
+            .drop_type(Type::drop().name(Alias::new("user_status")).to_owned())
             .await?;
 
         Ok(())
@@ -99,18 +104,4 @@ pub enum Users {
     CreatedAt,
     UpdatedAt,
     DeletedAt,
-}
-
-#[allow(dead_code)]
-#[derive(DeriveIden)]
-pub enum UserStatus {
-    Table,
-    #[sea_orm(string_value = "active")]
-    Active,
-    #[sea_orm(string_value = "inactive")]
-    Inactive,
-    #[sea_orm(string_value = "suspended")]
-    Suspended,
-    #[sea_orm(string_value = "pending_verification")]
-    PendingVerification,
 }

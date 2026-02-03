@@ -27,7 +27,12 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(TeamMembers::Table)
                     .if_not_exists()
-                    .col(pk_auto(TeamMembers::Id))
+                    .col(
+                        uuid(TeamMembers::Id)
+                            .not_null()
+                            .primary_key()
+                            .default(Expr::cust("gen_random_uuid()")),
+                    )
                     .col(uuid(TeamMembers::TeamId).not_null())
                     .col(uuid(TeamMembers::UserId).not_null())
                     .col(
