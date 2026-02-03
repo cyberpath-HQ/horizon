@@ -1,4 +1,5 @@
 use sea_orm_migration::{prelude::*, schema::*, sea_query::extension::postgres::Type};
+use sea_query::Alias;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -10,13 +11,8 @@ impl MigrationTrait for Migration {
         manager
             .create_type(
                 Type::create()
-                    .as_enum(UserStatus::Table)
-                    .values(vec![
-                        UserStatus::Active,
-                        UserStatus::Inactive,
-                        UserStatus::Suspended,
-                        UserStatus::PendingVerification,
-                    ])
+                    .as_enum(Alias::new("user_status"))
+                    .values(["active", "inactive", "suspended", "pending_verification"])
                     .to_owned(),
             )
             .await?;
@@ -35,16 +31,12 @@ impl MigrationTrait for Migration {
                     .col(string(Users::FirstName).null())
                     .col(string(Users::LastName).null())
                     .col(string(Users::AvatarUrl).null())
-                    .col(enumeration_null(
-                        Users::Status,
-                        UserStatus::Table,
-                        vec![
-                            UserStatus::Active,
-                            UserStatus::Inactive,
-                            UserStatus::Suspended,
-                            UserStatus::PendingVerification,
-                        ],
-                    ))
+                    .col(
+                        ColumnDef::new(Users::Status)
+                            .custom(Alias::new("user_status"))
+                            .not_null()
+                            .default(Expr::cust("'pending_verification'")),
+                    )
                     .col(timestamp(Users::EmailVerifiedAt).null())
                     .col(timestamp(Users::LastLoginAt).null())
                     .col(
@@ -83,7 +75,7 @@ impl MigrationTrait for Migration {
             .await?;
 
         manager
-            .drop_type(Type::drop().name(UserStatus::Table).to_owned())
+            .drop_type(Type::drop().name("user_status").to_owned())
             .await?;
 
         Ok(())
@@ -109,6 +101,7 @@ pub enum Users {
     DeletedAt,
 }
 
+#[allow(dead_code)]
 #[derive(DeriveIden)]
 pub enum UserStatus {
     Table,
