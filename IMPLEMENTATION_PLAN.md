@@ -242,8 +242,8 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 
 - Implement Argon2id password hashing using argon2 crate
 - Create password hashing and verification functions
-- Implement initial setup endpoint for first-user creation (POST /api/v1/auth/setup), this must be disabled after
-  first user creation
+- Implement initial setup endpoint for first-user creation (POST /api/v1/auth/setup), this must be disabled after first
+  user creation
 - Implement login endpoint (POST /api/v1/auth/login)
 - Implement logout endpoint (POST /api/v1/auth/logout)
 
@@ -277,6 +277,35 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Configure per-endpoint rate limits based on sensitivity
 - Implement IP-based rate limiting rules
 - Add security headers (CSP, X-Frame-Options, etc.) to all responses
+- Add MFA enforcement middleware for sensitive endpoints
+- Implement account lockout after multiple failed login attempts
+- Implement password complexity validation
+- Add MFA verification requirement on login if enabled
+
+#### B-08: API Access
+
+- Implement API key authentication middleware
+- Create API key generation endpoint (POST /api/v1/auth/api-keys)
+- Implement API key revocation endpoint (DELETE /api/v1/auth/api-keys/{id})
+- Implement API key usage tracking and last used timestamp update
+- Create API key permission scope enforcement
+- Implement API key expiration handling
+- Create API key listing endpoint (GET /api/v1/auth/api-keys)
+- Implement API key rotation functionality
+- Create API key usage audit logging
+- Implement API key prefix matching for authentication
+- Create API key search and filtering functionality
+- Implement API key rate limiting based on key permissions (configurable)
+- Create API key detailed view endpoint (GET /api/v1/auth/api-keys/{id})
+- Implement API key usage statistics endpoint (GET /api/v1/auth/api-keys/{id}/usage)
+- Implement API key permission modification endpoint (PUT /api/v1/auth/api-keys/{id}/permissions)
+- ensure that api keys cannot be used to access user management endpoints unless explicitly granted the necessary
+  permissions. This includes restricting access to user creation, deletion, and role assignment endpoints.
+- ensure all permissions of the user associated with the api key are checked before allowing any action. if the user has
+  been deactivated or had their roles changed, the api key should reflect those changes immediately.
+- ensure all api keys are logged with their usage, including timestamp, endpoint accessed, and action performed for
+  auditing purposes.
+- ensure all api keys are linked to their creator user for accountability.
 
 ---
 
