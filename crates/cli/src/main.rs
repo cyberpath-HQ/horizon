@@ -57,8 +57,7 @@ impl Default for DatabaseConfig {
 pub fn build_database_url(config: &DatabaseConfig) -> String {
     format!(
         "postgres://{}:{}@{}:{}/{}?sslmode={}",
-        config.username, config.password, config.host, config.port, config.database,
-        config.ssl_mode
+        config.username, config.password, config.host, config.port, config.database, config.ssl_mode
     )
 }
 
