@@ -113,53 +113,11 @@ check_prerequisites() {
         log_warning "cargo not found - some features may not work"
     fi
 
-    # Check database connectivity
-    log_info "Testing database connection..."
-    if ! PGPASSWORD="$DATABASE_URL" psql "$DATABASE_URL" -c "SELECT 1;" &> /dev/null; then
-        log_error "Cannot connect to database. Please check your DATABASE_URL."
-        exit 1
-    fi
-    log_success "Database connection successful"
-
     # Ensure entity directory exists
     if [ ! -d "$ENTITY_DIR" ]; then
         log_info "Creating entity directory: $ENTITY_DIR"
         mkdir -p "$ENTITY_DIR"
     fi
-}
-
-# Discover tables from database
-discover_tables() {
-    log_step "Discovering tables from database..."
-
-    # Query PostgreSQL to get list of tables
-    local tables_query="SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' ORDER BY table_name"
-
-    local tables
-    tables=$(PGPASSWORD="$DATABASE_URL" psql "$DATABASE_URL" -t -A -c "$tables_query" 2>/dev/null)
-
-    if [ -z "$tables" ]; then
-        log_warning "No tables found in database. Make sure migrations have been run."
-        log_info "To run migrations: cd crates/migration && cargo run -- up"
-        return 1
-    fi
-
-    # Filter out migration tracking table
-    local entity_tables=""
-    while IFS= read -r table; do
-        # Skip seaql_migrations table and other system tables
-        if [[ "$table" != "seaql_migrations" && "$table" != *"pg_"* && "$table" != *"information_schema"* ]]; then
-            entity_tables="${entity_tables}${table}"$'\n'
-        fi
-    done <<< "$tables"
-
-    if [ -z "$entity_tables" ]; then
-        log_warning "No entity tables found (only system tables exist)"
-        return 1
-    fi
-
-    log_success "Discovered $(echo -n "$entity_tables" | grep -c '^') tables"
-    echo "$entity_tables"
 }
 
 # Generate entities using sea-orm-cli
@@ -313,19 +271,6 @@ main() {
     echo ""
 
     check_prerequisites
-
-    # Discover tables
-    local tables
-    tables=$(discover_tables)
-    if [ $? -ne 0 ] || [ -z "$tables" ]; then
-        log_warning "No tables to process"
-        exit 0
-    fi
-
-    echo ""
-    echo "Tables to generate entities for:"
-    echo "$tables" | sed 's/^/  - /'
-    echo ""
 
     # Generate entities
     generate_entities || exit 1
