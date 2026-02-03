@@ -29,7 +29,10 @@
 
 ## 1. Executive Summary
 
-Horizon is a self-hostable Configuration Management Database (CMDB) system designed to provide comprehensive visibility into an organization's IT infrastructure. The system combines a powerful backend with a lightweight, cross-platform agent to automatically discover and inventory hardware assets, software installations, network configurations, and security-relevant information.
+Horizon is a self-hostable Configuration Management Database (CMDB) system designed to provide comprehensive visibility
+into an organization's IT infrastructure. The system combines a powerful backend with a lightweight, cross-platform
+agent to automatically discover and inventory hardware assets, software installations, network configurations, and
+security-relevant information.
 
 ---
 
@@ -37,7 +40,8 @@ Horizon is a self-hostable Configuration Management Database (CMDB) system desig
 
 ### 2.1 Purpose and Scope
 
-Horizon provides organizations with complete control over their IT asset data through a self-hostable solution with no licensing costs and complete data ownership.
+Horizon provides organizations with complete control over their IT asset data through a self-hostable solution with no
+licensing costs and complete data ownership.
 
 ### 2.2 Strategic Goals
 
@@ -54,47 +58,49 @@ Horizon provides organizations with complete control over their IT asset data th
 
 ### 3.1 High-Level Architecture
 
-Three-tier architecture with presentation layer (web/desktop), business logic layer (API server with AI inference), and data persistence layer (PostgreSQL and Redis).
+Three-tier architecture with presentation layer (web/desktop), business logic layer (API server with AI inference), and
+data persistence layer (PostgreSQL and Redis).
 
 ### 3.2 Technology Stack Selection
 
-**Version Policy:** All components use the latest stable or nightly versions available. Rust version requirement: **minimum 1.94.0-nightly**.
+**Version Policy:** All components use the latest stable or nightly versions available. Rust version requirement:
+**minimum 1.94.0-nightly**.
 
 **Core Crates:**
 
-| Category | Primary Crates | Purpose |
-|----------|---------------|---------|
-| Web Framework | **axum**, **tokio**, **tower** | REST API server with async support |
-| Database ORM | **sea-orm**, **sqlx** | Entity management with migrations |
-| Database Driver | **tokio-postgres**, **postgres-types** | PostgreSQL driver |
-| Redis | **redis-rs** | Caching and session management |
-| Serialization | **serde**, **serde_json**, **prost** | JSON and Protocol Buffer handling |
-| Error Handling | **thiserror**, **anyhow** | Error types and propagation |
-| Logging | **tracing**, **tracing-subscriber** | Structured logging |
+| Category        | Primary Crates                         | Purpose                            |
+| --------------- | -------------------------------------- | ---------------------------------- |
+| Web Framework   | **axum**, **tokio**, **tower**         | REST API server with async support |
+| Database ORM    | **sea-orm**, **sqlx**                  | Entity management with migrations  |
+| Database Driver | **tokio-postgres**, **postgres-types** | PostgreSQL driver                  |
+| Redis           | **redis-rs**                           | Caching and session management     |
+| Serialization   | **serde**, **serde_json**, **prost**   | JSON and Protocol Buffer handling  |
+| Error Handling  | **thiserror**, **anyhow**              | Error types and propagation        |
+| Logging         | **tracing**, **tracing-subscriber**    | Structured logging                 |
 
 **Encryption Stack (RustCrypto - Best Security Standards):**
 
-| Operation | Crate | Algorithm |
-|-----------|-------|-----------|
-| Password Hashing | **argon2** | Argon2id |
-| Symmetric Encryption | **chacha20poly1305** | XChaCha20-Poly1305 |
-| Hashing | **blake3** | BLAKE3 |
-| Backup Hashing | **sha3** | SHA3-256/512 |
-| MAC | **hmac** | HMAC-BLAKE3 |
-| Digital Signatures | **ed25519** | Ed25519 |
-| Key Exchange | **x25519** | X25519 |
-| Random | **rand** + **getrandom** | CSPRNG |
-| Memory Clearing | **zeroize** | N/A |
+| Operation            | Crate                    | Algorithm          |
+| -------------------- | ------------------------ | ------------------ |
+| Password Hashing     | **argon2**               | Argon2id           |
+| Symmetric Encryption | **chacha20poly1305**     | XChaCha20-Poly1305 |
+| Hashing              | **blake3**               | BLAKE3             |
+| Backup Hashing       | **sha3**                 | SHA3-256/512       |
+| MAC                  | **hmac**                 | HMAC-BLAKE3        |
+| Digital Signatures   | **ed25519**              | Ed25519            |
+| Key Exchange         | **x25519**               | X25519             |
+| Random               | **rand** + **getrandom** | CSPRNG             |
+| Memory Clearing      | **zeroize**              | N/A                |
 
 **AI Providers (Inference-First):**
 
-| Provider | Type | Integration Method |
-|----------|------|-------------------|
-| **OpenAI** | Remote Inference | REST API |
-| **Anthropic** | Remote Inference | REST API |
-| **GitHub Copilot** | Remote Inference | REST API |
-| **opencode** | CLI Inference | Subprocess |
-| **copilot-cli** | CLI Inference | Subprocess |
+| Provider           | Type             | Integration Method |
+| ------------------ | ---------------- | ------------------ |
+| **OpenAI**         | Remote Inference | REST API           |
+| **Anthropic**      | Remote Inference | REST API           |
+| **GitHub Copilot** | Remote Inference | REST API           |
+| **opencode**       | CLI Inference    | Subprocess         |
+| **copilot-cli**    | CLI Inference    | Subprocess         |
 
 ---
 
@@ -102,13 +108,13 @@ Three-tier architecture with presentation layer (web/desktop), business logic la
 
 ### 4.1 API Server
 
-| Module | Primary Crates | Purpose |
-|--------|---------------|---------|
-| Authentication | **axum**, **jsonwebtoken**, **argon2**, **totp** | User login, token, MFA |
-| Assets | **sea-orm**, **sqlx**, **serde** | CRUD operations |
-| AI Providers | **reqwest**, **async-openai**, **anthropic**, **tokio::process** | Remote and CLI AI |
-| Encryption | **chacha20poly1305**, **blake3**, **ed25519**, **argon2**, **zeroize** | Cryptographic operations |
-| Notifications | **lettre**, **reqwest**, **hmac** | Email, webhooks |
+| Module         | Primary Crates                                                         | Purpose                  |
+| -------------- | ---------------------------------------------------------------------- | ------------------------ |
+| Authentication | **axum**, **jsonwebtoken**, **argon2**, **totp**                       | User login, token, MFA   |
+| Assets         | **sea-orm**, **sqlx**, **serde**                                       | CRUD operations          |
+| AI Providers   | **reqwest**, **async-openai**, **anthropic**, **tokio::process**       | Remote and CLI AI        |
+| Encryption     | **chacha20poly1305**, **blake3**, **ed25519**, **argon2**, **zeroize** | Cryptographic operations |
+| Notifications  | **lettre**, **reqwest**, **hmac**                                      | Email, webhooks          |
 
 ### 4.2 Database Layer
 
@@ -140,7 +146,8 @@ Lightweight agent (<50MB memory) with RustCrypto encryption (ChaCha20-Poly1305, 
 
 ## 8. Feature Specifications
 
-Asset inventory, network flow mapping, vulnerability management, security configuration, BIA, vendor management, and notification systems.
+Asset inventory, network flow mapping, vulnerability management, security configuration, BIA, vendor management, and
+notification systems.
 
 ---
 
@@ -157,7 +164,7 @@ Asset inventory, network flow mapping, vulnerability management, security config
 
 ## 10. Configuration Management
 
-Three-level hierarchy: Runtime API, Environment Variables (HORIZON_*), Configuration Files.
+Three-level hierarchy: Runtime API, Environment Variables (HORIZON\_\*), Configuration Files.
 
 ---
 
@@ -172,24 +179,28 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 ### Group A: Foundation
 
 #### A-01: Project Infrastructure Setup
+
 - Initialize Rust workspace with Cargo.toml defining core dependencies
 - Configure Git repository with branch protection rules
 - Set up GitHub Actions CI/CD pipeline for testing and linting
 - Create development environment documentation in README.md
 
 #### A-02: Docker Development Environment
+
 - Define Docker Compose configuration for PostgreSQL
 - Define Docker Compose configuration for Redis
 - Configure internal network for service communication
 - Create environment file template for all services
 
 #### A-03: Logging and Error Handling Infrastructure
+
 - Implement tracing and logging infrastructure with structured JSON output
 - Define API response types using thiserror
 - Implement error handling middleware with anyhow propagation
 - Configure log levels and output formats for all environments
 
 #### A-04: Database Migrations Infrastructure
+
 - Set up Sea-ORM connection to PostgreSQL
 - Create migration runner with up/down functionality
 - Implement migration version tracking table
@@ -200,13 +211,27 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 ### Group B: Authentication
 
 #### B-01: User and Team Database Schema
+
 - Define users table (id, email, username, password_hash, totp_secret, status, created_at, updated_at)
 - Define teams table (id, name, slug, description, parent_team_id, manager_id, created_at)
 - Define team_members table (id, team_id, user_id, role, joined_at)
-- Create Sea-ORM entities for users, teams, and team_members
+- Create Sea-ORM entities for users, teams, and team_members.
 - Write migrations for authentication schema
+- create an entity generation and reconciliation script to create new entities as needed, and update existing ones. this
+  will be used instead of the default sea-orm codegen tool to ensure consistency across the project. default tool
+  overwrites everything. this script will be idempotent and can be run as part of the build process or CI/CD pipeline.
+  It will use the command line interface to generate entities based on the current database schema, and will compare the
+  generated entities with the existing ones in the codebase. it will overwrite everything but keep any customization
+  made within a set of designated regions (e.g., between special comments). the called cli uses the `migration` crate
+  and provides at least the following options (check command line options for sea-orm-cli for more ideas and additional
+  cli flags):
+  - `--with-serde`
+  - `--impl-active-model-behavior`
+  - `--entity-format dense`
+  - `--serde-skip-hidden-column`
 
 #### B-02: Role-Based Access Control Schema
+
 - Define roles table (id, name, slug, description, permissions, is_system, created_at)
 - Define user_roles table (id, user_id, role_id, scope_type, scope_id, expires_at, assigned_at)
 - Define api_keys table (id, user_id, name, key_hash, key_prefix, permissions, expires_at, last_used_at)
@@ -214,6 +239,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Write migrations for RBAC schema
 
 #### B-03: Password Authentication Implementation
+
 - Implement Argon2id password hashing using argon2 crate
 - Create password hashing and verification functions
 - Implement user registration endpoint (POST /api/v1/auth/register)
@@ -221,6 +247,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement logout endpoint (POST /api/v1/auth/logout)
 
 #### B-04: JWT Token Management
+
 - Implement JWT authentication middleware using jsonwebtoken crate
 - Create access token generation and validation
 - Create refresh token generation and storage
@@ -228,6 +255,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement session storage in Redis with token blacklisting
 
 #### B-05: Multi-Factor Authentication
+
 - Implement TOTP MFA using totp crate
 - Create TOTP secret generation and QR code display
 - Implement MFA verification endpoint (POST /api/v1/auth/mfa/verify)
@@ -235,6 +263,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement backup codes generation and storage
 
 #### B-06: User and Team API Endpoints
+
 - Implement user profile endpoints (GET/PUT /api/v1/users/me)
 - Implement user list endpoint (GET /api/v1/users)
 - Implement team CRUD endpoints (GET/POST /api/v1/teams)
@@ -242,6 +271,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement API key management endpoints
 
 #### B-07: Rate Limiting and Security Middleware
+
 - Implement rate limiting middleware using Redis sorted sets
 - Configure per-endpoint rate limits based on sensitivity
 - Implement IP-based rate limiting rules
@@ -252,6 +282,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 ### Group C: Web Frontend Foundation
 
 #### C-01: React Application Setup
+
 - Create React application with Vite and TypeScript
 - Configure Tailwind CSS and shadcn/ui component library
 - Set up React Router for client-side routing
@@ -259,6 +290,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Set up build optimization and code splitting
 
 #### C-02: Authentication Pages
+
 - Implement login page with email/password form
 - Implement registration page with validation
 - Implement MFA verification page
@@ -266,6 +298,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement session timeout and refresh handling
 
 #### C-03: Layout and Navigation Components
+
 - Create main application layout with sidebar
 - Implement navigation menu with role-based visibility
 - Create header with user menu and notifications
@@ -273,6 +306,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Create page wrapper with loading states
 
 #### C-04: Session and Token Management
+
 - Implement JWT token storage (localStorage/secure storage)
 - Create authentication context and provider
 - Implement automatic token refresh on expiration
@@ -284,13 +318,17 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 ### Group D: Asset Inventory Core
 
 #### D-01: Asset Type Schema and API
+
 - Define asset_types table (id, parent_id, name, slug, description, icon, color, metadata_schema, is_active)
-- Define assets table (id, inventory_number, asset_type_id, name, description, serial_number, manufacturer, model, owner_id, custodian_id, status, tags, custom_attributes, agent_id, bia_criticality, last_seen_at, created_by, created_at, updated_at)
+- Define assets table (id, inventory_number, asset_type_id, name, description, serial_number, manufacturer, model,
+  owner_id, custodian_id, status, tags, custom_attributes, agent_id, bia_criticality, last_seen_at, created_by,
+  created_at, updated_at)
 - Create Sea-ORM entities for asset_types and assets
 - Write migrations for asset schema
 - Implement asset type CRUD endpoints
 
 #### D-02: Asset CRUD API Endpoints
+
 - Implement asset list endpoint with filtering, pagination, and sorting
 - Implement asset create endpoint (POST /api/v1/assets)
 - Implement asset detail endpoint (GET /api/v1/assets/{id})
@@ -298,20 +336,25 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement asset delete endpoint (DELETE /api/v1/assets/{id})
 
 #### D-03: Asset Relationships Schema and API
-- Define asset_relationships table (id, source_asset_id, target_asset_id, relationship_type, metadata, strength, is_active)
+
+- Define asset_relationships table (id, source_asset_id, target_asset_id, relationship_type, metadata, strength,
+  is_active)
 - Define relationship strength enum (strong, medium, weak, unknown)
 - Create Sea-ORM entity for asset_relationships
 - Implement relationship CRUD endpoints
 - Implement relationship query by asset
 
 #### D-04: Asset History Tracking
-- Define asset_history table (id, asset_id, action, field_name, old_value, new_value, actor_type, actor_id, actor_name, change_reason, created_at)
+
+- Define asset_history table (id, asset_id, action, field_name, old_value, new_value, actor_type, actor_id, actor_name,
+  change_reason, created_at)
 - Define actor_type enum (user, agent, system, import, api)
 - Create Sea-ORM entity for asset_history
 - Implement history recording on all asset changes
 - Implement history query endpoint (GET /api/v1/assets/{id}/history)
 
 #### D-05: Asset Search and Full-Text Search
+
 - Implement PostgreSQL full-text search for assets
 - Create search index on name, description, serial_number, manufacturer, model
 - Implement search endpoint with query parameters
@@ -319,6 +362,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement search result highlighting
 
 #### D-06: Asset Import Functionality
+
 - Implement CSV import for assets
 - Implement field mapping for different column names
 - Create validation rules for required fields
@@ -326,6 +370,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Create import preview with dry-run capability
 
 #### D-07: Web UI for Asset Management
+
 - Create asset list page with filtering and pagination
 - Create asset detail page with tabs (info, relationships, history, software, vulnerabilities)
 - Create asset create/edit forms with validation
@@ -337,6 +382,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 ### Group E: Agent Foundation
 
 #### E-01: Agent Project Setup
+
 - Create agent Rust project as workspace member
 - Implement agent command-line interface with clap
 - Define agent configuration loading from environment and files
@@ -344,6 +390,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Set up agent update mechanism
 
 #### E-02: Agent Platform Detection
+
 - Implement platform detection (Linux, Windows, macOS)
 - Create platform abstraction layer
 - Implement OS-specific information collection
@@ -351,6 +398,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Handle platform-specific edge cases
 
 #### E-03: Agent Hardware Inventory Collection
+
 - Implement CPU information collection (model, cores, frequency)
 - Implement memory information collection (total, available, slots)
 - Implement storage information collection (disks, SMART status)
@@ -358,6 +406,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement peripheral device enumeration
 
 #### E-04: Agent OS and Software Inventory
+
 - Implement OS information collection (kernel, distribution, hostname, uptime)
 - Implement installed package collection (dpkg, rpm, brew, chocolatey, winget)
 - Implement running service enumeration (systemctl, service, launchctl)
@@ -365,6 +414,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Create normalized software inventory format
 
 #### E-05: Agent Communication Protocol
+
 - Define Protocol Buffers message format with prost
 - Implement agent report message structure
 - Create compression for report transmission
@@ -372,6 +422,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Create offline queue with local SQLite storage
 
 #### E-06: Server-Side Agent Registration
+
 - Define agents table (id, asset_id, name, version, platform, last_seen_at, status, cert_expires_at)
 - Create agent registration endpoint (POST /api/v1/agents/register)
 - Implement agent status tracking
@@ -383,6 +434,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 ### Group F: Software Management
 
 #### F-01: Software Schema and API
+
 - Define software_vendors, software_products, software_versions tables
 - Define software_installations, software_licenses tables
 - Create Sea-ORM entities for all software tables
@@ -390,6 +442,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement software product CRUD endpoints
 
 #### F-02: Version Management
+
 - Implement version string normalization with semantic versioning parsing
 - Create version comparison functions
 - Implement version parsing (major, minor, patch, build)
@@ -397,6 +450,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement version sorting and range queries
 
 #### F-03: Software Installation Tracking
+
 - Implement software installation tracking linked to assets
 - Create installation discovery from agent reports
 - Implement manual installation entry
@@ -404,6 +458,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement installation search and filtering
 
 #### F-04: License Management
+
 - Implement license tracking with license_key, license_type, seats
 - Track license expiry dates and alerts
 - Create license association with installations
@@ -411,6 +466,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Create license compliance reports
 
 #### F-05: Software Web UI
+
 - Create software product list page
 - Create product detail page with version history
 - Create installation tracking page
@@ -422,6 +478,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 ### Group G: Security Configuration
 
 #### G-01: Configuration Schema and Baselines
+
 - Define security_baselines, baseline_rules, environments tables
 - Define configuration_items, configuration_assessments, configuration_violations tables
 - Create Sea-ORM entities for configuration tables
@@ -429,6 +486,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement baseline and rule CRUD endpoints
 
 #### G-02: CIS Benchmark Support
+
 - Define CIS benchmark data structure
 - Implement CIS rule import functionality
 - Create CIS rule validation queries
@@ -436,6 +494,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Create CIS compliance reporting
 
 #### G-03: Configuration Assessment Engine
+
 - Implement automated configuration assessment
 - Create rule severity classification
 - Implement deviation type detection
@@ -443,6 +502,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement assessment scheduling
 
 #### G-04: Configuration Drift Detection
+
 - Implement configuration history tracking
 - Create drift detection by comparison
 - Implement drift alerts
@@ -450,6 +510,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement baseline versioning
 
 #### G-05: AI Configuration Analysis
+
 - Implement AI-powered configuration analysis
 - Create configuration analysis prompt templates
 - Implement remediation guidance generation
@@ -457,6 +518,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement AI analysis caching
 
 #### G-06: Configuration Web UI
+
 - Create baseline management page
 - Create rule management page
 - Create compliance dashboard
@@ -468,6 +530,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 ### Group H: Vulnerability Management
 
 #### H-01: Vulnerability Schema and CVE Sync
+
 - Define vulnerability_sources, vulnerabilities, vulnerability_assessments tables
 - Define penetration_test_engagements, penetration_test_findings tables
 - Define red_team_engagements, red_team_findings tables
@@ -476,6 +539,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement NVD API integration for CVE synchronization
 
 #### H-02: Vulnerability-Asset Correlation
+
 - Implement vulnerability-asset correlation through software mapping
 - Create automatic vulnerability detection based on installed software
 - Implement manual vulnerability assignment
@@ -483,6 +547,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement bulk vulnerability operations
 
 #### H-03: Penetration Test Integration
+
 - Implement penetration test engagement tracking
 - Create finding management with evidence upload
 - Implement retesting workflow
@@ -490,6 +555,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement pentest reporting
 
 #### H-04: Red Team Integration
+
 - Implement red team engagement tracking
 - Create MITRE ATT&CK technique mapping
 - Implement IOC tracking
@@ -497,6 +563,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement dwell time and detection metrics
 
 #### H-05: Vulnerability Web UI
+
 - Create vulnerability list page with filtering
 - Create vulnerability detail page with affected assets
 - Create pentest management page
@@ -508,6 +575,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 ### Group I: Network Flow Mapping
 
 #### I-01: Network Schema and Interface Discovery
+
 - Define subnets, network_interfaces, ip_addresses tables
 - Define network_flows, flow_sessions, network_topology tables
 - Create Sea-ORM entities for network tables
@@ -515,6 +583,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement interface discovery API
 
 #### I-02: IP Address and Subnet Tracking
+
 - Implement IPv4/IPv6 address tracking
 - Create subnet management with CIDR notation
 - Implement address allocation tracking
@@ -522,6 +591,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement IP history and change tracking
 
 #### I-03: Flow Collection and Aggregation
+
 - Implement flow collection from agents
 - Create flow parsing and normalization
 - Implement session aggregation
@@ -529,6 +599,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement flow statistics calculation
 
 #### I-04: Network Topology and Visualization
+
 - Implement topology discovery from interface connections
 - Create topology visualization data structure
 - Implement topology change detection
@@ -536,6 +607,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement link status tracking
 
 #### I-05: Flow Analysis and Anomaly Detection
+
 - Implement behavioral baselining
 - Create anomaly detection using inference providers
 - Implement unexpected traffic alerts
@@ -543,6 +615,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement bandwidth analysis
 
 #### I-06: Network Web UI
+
 - Create network topology visualization
 - Create interface list page
 - Create flow explorer page
@@ -554,6 +627,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 ### Group J: Business Impact Analysis
 
 #### J-01: BIA Schema and Business Functions
+
 - Define business_functions, critical_systems tables
 - Define system_dependencies, recovery_contacts tables
 - Define bia_status_history, recovery_plans, recovery_tests tables
@@ -562,6 +636,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement business function CRUD endpoints
 
 #### J-02: Critical System Registry
+
 - Implement critical system registration linked to assets/software
 - Create criticality classification (critical, high, medium, low, non_critical)
 - Implement RTO/RPO tracking
@@ -569,6 +644,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement maximum tolerable outage tracking
 
 #### J-03: Dependency Mapping
+
 - Implement system dependency registration
 - Create dependency graph structure
 - Implement impact cascade analysis
@@ -576,6 +652,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement dependency criticality scoring
 
 #### J-04: Recovery Management
+
 - Implement recovery procedures documentation
 - Create recovery contact management
 - Implement recovery plan creation
@@ -583,6 +660,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement BIA review scheduling
 
 #### J-05: BIA Web UI
+
 - Create business function management page
 - Create critical system registry page
 - Create dependency graph visualization
@@ -594,6 +672,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 ### Group K: Vendor Management
 
 #### K-01: Vendor Schema and API
+
 - Define vendors, vendor_contacts tables
 - Define vendor_contracts, vendor_contract_assets tables
 - Define vendor_performance, vendor_documents tables
@@ -602,6 +681,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement vendor CRUD endpoints
 
 #### K-02: Contract Management
+
 - Implement contract lifecycle tracking
 - Create contract status management (draft, pending, active, expiring, expired)
 - Implement automatic expiration detection
@@ -609,6 +689,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement auto-renewal with notice period
 
 #### K-03: Asset-Vendor Association
+
 - Implement asset-contract association
 - Create coverage tracking by asset/software
 - Implement SLA tracking
@@ -616,6 +697,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement contract asset reports
 
 #### K-04: Vendor Web UI
+
 - Create vendor management page
 - Create contact management page
 - Create contract management page
@@ -627,6 +709,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 ### Group L: Notification System
 
 #### L-01: Notification Schema and Templates
+
 - Define notification_templates, notification_triggers tables
 - Define notification_subscriptions, webhook_endpoints tables
 - Define notification_log, notification_aggregates tables
@@ -635,6 +718,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement template CRUD endpoints
 
 #### L-02: Trigger Configuration
+
 - Implement event-based trigger system
 - Create condition-based filtering
 - Define event types (asset_created, vulnerability_detected, etc.)
@@ -642,6 +726,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Create trigger testing functionality
 
 #### L-03: Multi-Channel Delivery
+
 - Implement email delivery using lettre
 - Implement webhook delivery with HMAC-BLAKE3 signatures
 - Implement Slack integration
@@ -649,6 +734,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement push notification support
 
 #### L-04: Notification Delivery Engine
+
 - Implement notification queue processing
 - Create retry logic with exponential backoff
 - Implement delivery status tracking
@@ -656,6 +742,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement notification aggregation
 
 #### L-05: Notification Web UI
+
 - Create trigger management page
 - Create subscription management page
 - Create webhook management page
@@ -667,6 +754,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 ### Group M: Agent Security and Configuration
 
 #### M-01: Certificate Authority
+
 - Implement Certificate Authority using rcgen crate
 - Create agent certificate issuance workflow
 - Implement certificate renewal endpoint
@@ -674,6 +762,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement certificate validation
 
 #### M-02: Agent mTLS Communication
+
 - Implement mTLS mutual authentication
 - Create agent registration with certificate issuance
 - Implement certificate renewal with CSR
@@ -681,6 +770,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement secure offline queue
 
 #### M-03: Message Signing and Encryption
+
 - Implement message signing using ed25519 crate with constant-time operations
 - Implement ChaCha20-Poly1305 encryption for agent-server communication
 - Implement X25519 key exchange for forward secrecy
@@ -688,6 +778,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement secure message format
 
 #### M-04: Runtime Configuration API
+
 - Implement configuration loading from environment variables
 - Implement configuration file parsing (YAML, TOML, JSON)
 - Create runtime configuration API with immediate application
@@ -695,6 +786,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Create configuration versioning and rollback
 
 #### M-05: Credential Storage
+
 - Implement secure credential storage with encryption at rest
 - Create credential CRUD API
 - Implement credential encryption using ChaCha20-Poly1305
@@ -706,6 +798,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 ### Group N: AI Inference Providers
 
 #### N-01: AI Provider Abstraction Layer
+
 - Define AI provider trait-based abstraction
 - Create provider configuration structure
 - Implement provider registry
@@ -713,6 +806,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement provider health checking
 
 #### N-02: OpenAI Integration
+
 - Implement OpenAI API integration using async-openai crate
 - Create API key management for OpenAI
 - Implement model selection and configuration
@@ -720,6 +814,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement OpenAI inference endpoint
 
 #### N-03: Anthropic Integration
+
 - Implement Anthropic API integration
 - Create API key management for Anthropic
 - Implement model selection and configuration
@@ -727,6 +822,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement Anthropic inference endpoint
 
 #### N-04: GitHub Copilot Integration
+
 - Implement GitHub Copilot API integration
 - Create token management for Copilot
 - Implement Copilot-specific prompts
@@ -734,6 +830,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement token usage tracking
 
 #### N-05: CLI Tool Integration
+
 - Implement opencode CLI integration using tokio::process
 - Implement copilot-cli integration
 - Create CLI timeout and error handling
@@ -741,6 +838,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Create CLI provider configuration
 
 #### N-06: AI Inference API and Caching
+
 - Implement unified AI inference API
 - Create analysis type enumeration
 - Implement response caching with TTL
@@ -748,6 +846,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement fallback chain for failures
 
 #### N-07: AI Web UI
+
 - Create AI provider management page
 - Create prompt template editor
 - Create AI usage dashboard
@@ -759,6 +858,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 ### Group O: Import/Export
 
 #### O-01: CSV Import/Export
+
 - Implement CSV parsing using csv crate
 - Create CSV generation for all data types
 - Implement field mapping for different column names
@@ -766,6 +866,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement conflict resolution strategies
 
 #### O-02: Excel Import/Export
+
 - Implement Excel file reading using calamine crate
 - Implement Excel file writing
 - Create multi-sheet export support
@@ -773,6 +874,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Create Excel template management
 
 #### O-03: JSON/XML Import/Export
+
 - Implement JSON import/export with nested structure support
 - Implement XML import/export for legacy systems
 - Create schema validation for imports
@@ -780,6 +882,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Create data validation engine
 
 #### O-04: Import/Export API
+
 - Implement import preview endpoint
 - Create import execution endpoint
 - Implement export job creation
@@ -787,6 +890,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement import/export job status tracking
 
 #### O-05: Import/Export Web UI
+
 - Create import wizard with file upload
 - Create field mapping interface
 - Create validation error display
@@ -798,6 +902,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 ### Group P: Desktop Application
 
 #### P-01: Tauri Project Setup
+
 - Create Tauri project with Rust backend
 - Configure React frontend for Tauri
 - Set up build configuration for all platforms
@@ -805,6 +910,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement auto-update mechanism
 
 #### P-02: Multi-Server Profile Management
+
 - Implement server profile struct (url, name, credentials)
 - Create profile CRUD operations
 - Implement profile switching
@@ -812,6 +918,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement profile import/export
 
 #### P-03: Offline Mode and Caching
+
 - Implement local SQLite cache using rusqlite
 - Create offline data synchronization
 - Implement conflict resolution
@@ -819,6 +926,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement background sync jobs
 
 #### P-04: System Tray and Notifications
+
 - Implement system tray integration
 - Create tray menu with quick actions
 - Implement native notifications
@@ -826,6 +934,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement notification badge handling
 
 #### P-05: Desktop UI Components
+
 - Implement dark/light theme switching
 - Create keyboard shortcuts
 - Implement global search
@@ -833,6 +942,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement window state persistence
 
 #### P-06: Desktop Agent Integration
+
 - Create agent management UI
 - Implement local agent installation
 - Create agent status monitoring
@@ -844,6 +954,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 ### Group Q: Docker and Kubernetes
 
 #### Q-01: Server Docker Image
+
 - Create multi-stage Dockerfile for server with rust:1.94-nightly-slim
 - Optimize build for minimal image size
 - Configure non-root user
@@ -851,6 +962,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Set up health checks
 
 #### Q-02: Agent Docker Image
+
 - Create multi-stage Dockerfile for agent with alpine:3.21
 - Include all agent dependencies
 - Configure for containerized environments
@@ -858,6 +970,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Set up agent auto-update
 
 #### Q-03: Web Docker Image
+
 - Create Dockerfile for web application with node:22-alpine
 - Build static files with Vite
 - Configure nginx for serving
@@ -865,6 +978,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement multi-stage build
 
 #### Q-04: Docker Compose Configuration
+
 - Define Docker Compose with all services
 - Configure PostgreSQL with volume persistence
 - Configure Redis with volume persistence
@@ -872,6 +986,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Create network configuration
 
 #### Q-05: Kubernetes Manifests
+
 - Create ConfigMap for configuration
 - Create Secret for sensitive data
 - Create Deployment for server
@@ -879,6 +994,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Create Ingress with TLS
 
 #### Q-06: Kubernetes Scaling and Storage
+
 - Create HorizontalPodAutoscaler
 - Create PodDisruptionBudget
 - Create PersistentVolumeClaims
@@ -886,6 +1002,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement readiness probes
 
 #### Q-07: Helm Chart
+
 - Create Helm chart structure
 - Implement values.yaml with all configurations
 - Create templates for all resources
@@ -897,6 +1014,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 ### Group R: Testing and Hardening
 
 #### R-01: Unit Testing Infrastructure
+
 - Set up test framework (rstest or standard lib tests)
 - Create test utilities and fixtures
 - Implement tests for core business logic
@@ -904,6 +1022,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Create test data generators
 
 #### R-02: API Integration Testing
+
 - Create API integration tests
 - Implement authentication testing
 - Test all CRUD endpoints
@@ -911,6 +1030,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Create test database fixtures
 
 #### R-03: End-to-End Testing
+
 - Set up Playwright for E2E tests
 - Create critical workflow tests
 - Test authentication flows
@@ -918,6 +1038,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Create test reporting
 
 #### R-04: Security Testing
+
 - Implement security testing with OWASP ZAP
 - Conduct third-party penetration testing
 - Create security audit report
@@ -925,6 +1046,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Test authentication security05: API Documentation
 
 #### R-
+
 - Create OpenAPI 3.0 specification
 - Generate Swagger UI
 - Document all endpoints
@@ -932,6 +1054,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement API versioning
 
 #### R-06: Health Checks and Monitoring
+
 - Implement /health endpoint
 - Implement /ready endpoint
 - Implement /metrics endpoint (Prometheus)
@@ -952,7 +1075,8 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 
 ### 13.2 AI: Inference-First Strategy
 
-AI provided through inference providers (remote APIs and CLI tools). Local models only when strictly necessary, pre-trained at build time.
+AI provided through inference providers (remote APIs and CLI tools). Local models only when strictly necessary,
+pre-trained at build time.
 
 ### 13.3 Version Policy
 
@@ -976,20 +1100,21 @@ Always use latest available versions with Rust minimum 1.94.0-nightly.
 
 ## Appendix A: Glossary
 
-| Term | Definition |
-|------|------------|
+| Term      | Definition                               |
+| --------- | ---------------------------------------- |
 | **Agent** | Lightweight software for data collection |
 | **Asset** | Any discrete IT infrastructure component |
-| **BIA** | Business Impact Analysis |
-| **CVE** | Common Vulnerabilities and Exposures |
-| **mTLS** | Mutual TLS authentication |
-| **CMDB** | Configuration Management Database |
+| **BIA**   | Business Impact Analysis                 |
+| **CVE**   | Common Vulnerabilities and Exposures     |
+| **mTLS**  | Mutual TLS authentication                |
+| **CMDB**  | Configuration Management Database        |
 
 ---
 
 ## Appendix B: Technology Stack Reference
 
 **Backend Stack:**
+
 - Language: Rust 1.94.0-nightly (minimum, always latest)
 - Web Framework: Axum
 - ORM: Sea-ORM
@@ -998,26 +1123,32 @@ Always use latest available versions with Rust minimum 1.94.0-nightly.
 - Cache: Redis (latest stable)
 
 **Encryption (RustCrypto Best Standards):**
+
 - argon2, chacha20poly1305, blake3, sha3
 - hmac, ed25519, x25519
 - rand, getrandom, zeroize
 
 **AI Providers (Inference-First):**
+
 - Remote: OpenAI, Anthropic, GitHub Copilot
 - CLI: opencode, copilot-cli
 - Local: ONNX only if strictly needed
 
 **Frontend Stack:**
+
 - React, TypeScript, Vite
 - Tailwind CSS, shadcn/ui
 
 **Desktop Stack:**
+
 - Tauri, React
 
 **Deployment:**
+
 - Docker, Docker Compose
 - Kubernetes, Helm
 
 ---
 
-_This implementation plan uses granular, PR-sized sub-phases. Each sub-phase contains 3-5 focused deliverables for focused development and review._
+_This implementation plan uses granular, PR-sized sub-phases. Each sub-phase contains 3-5 focused deliverables for
+focused development and review._
