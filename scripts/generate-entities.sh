@@ -28,7 +28,7 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 ENTITY_DIR="$PROJECT_ROOT/crates/entity/src"
 DRY_RUN=false
 VERBOSE=false
-DATABASE_URL=""
+# Don't override - allow environment variable to persist if no argument provided
 
 # Logging functions
 log_info() {
@@ -49,6 +49,18 @@ log_error() {
 
 log_step() {
     echo -e "${CYAN}[STEP]${NC} $1"
+}
+
+# Safe URL display - redact credentials
+safe_url() {
+    local url="$1"
+    if [[ "$url" =~ ^([^:]+://[^@]+@)(.+)$ ]]; then
+        # Contains credentials - redact everything after ://
+        echo "${BASH_REMATCH[1]}[REDACTED]${BASH_REMATCH[2]}"
+    else
+        # No credentials, show as-is (or just show host)
+        echo "[REDACTED - contains credentials]"
+    fi
 }
 
 # Parse command line arguments
@@ -89,11 +101,9 @@ parse_args() {
 
     # Check DATABASE_URL
     if [ -z "$DATABASE_URL" ]; then
-        DATABASE_URL="${DATABASE_URL:-}"
-        if [ -z "$DATABASE_URL" ]; then
-            log_error "Database URL not provided. Use: $0 <database_url> [--dry-run]"
-            exit 1
-        fi
+        log_error "Database URL not provided. Use: $0 <database_url> [--dry-run]"
+        log_error "Or set DATABASE_URL environment variable"
+        exit 1
     fi
 }
 
@@ -264,7 +274,7 @@ main() {
 
     echo ""
     echo "Configuration:"
-    echo "  Database URL: ${DATABASE_URL:0:50}..."
+    echo "  Database URL: $(safe_url "$DATABASE_URL")"
     echo "  Entity Dir:   $ENTITY_DIR"
     echo "  Dry Run:      $DRY_RUN"
     echo "  Verbose:      $VERBOSE"
