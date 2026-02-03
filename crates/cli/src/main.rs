@@ -5,13 +5,53 @@
 //! ## Usage
 //!
 //! ```bash
-//! horizon serve    # Start the API server
+//! horizon serve    # Start the API server (runs migrations automatically)
 //! horizon migrate  # Run database migrations
 //! horizon --help   # Show help
 //! ```
 
 use clap::{Args, CommandFactory as _, Parser, Subcommand};
 use error::Result;
+use migration::MigratorTrait;
+
+/// Database configuration for CLI
+#[derive(Debug, Clone)]
+pub struct DatabaseConfig {
+    /// Database host address
+    pub host:      String,
+    /// Database port number
+    pub port:      u16,
+    /// Database name
+    pub database:  String,
+    /// Database username
+    pub username:  String,
+    /// Database password
+    pub password:  String,
+    /// SSL mode
+    pub ssl_mode:  String,
+    /// Connection pool size
+    pub pool_size: u32,
+}
+
+impl Default for DatabaseConfig {
+    fn default() -> Self {
+        Self {
+            host:      std::env::var("HORIZON_DATABASE_HOST").unwrap_or_else(|_| "localhost".to_string()),
+            port:      std::env::var("HORIZON_DATABASE_PORT")
+                .unwrap_or_else(|_| "5432".to_string())
+                .parse()
+                .unwrap_or(5432),
+            database:  std::env::var("HORIZON_DATABASE_NAME").unwrap_or_else(|_| "horizon".to_string()),
+            username:  std::env::var("HORIZON_DATABASE_USER").unwrap_or_else(|_| "horizon".to_string()),
+            password:  std::env::var("HORIZON_DATABASE_PASSWORD").unwrap_or_else(|_| String::new()),
+            ssl_mode:  std::env::var("HORIZON_DATABASE_SSL_MODE").unwrap_or_else(|_| "require".to_string()),
+            pool_size: std::env::var("HORIZON_DATABASE_POOL_SIZE")
+                .unwrap_or_else(|_| "10".to_string())
+                .parse()
+                .unwrap_or(10),
+        }
+    }
+}
 
 /// Horizon CMDB - Configuration Management Database
 #[derive(Parser, Debug)]
@@ -127,9 +167,38 @@ async fn serve(args: &ServeArgs) -> Result<()> {
         "Starting API server..."
     );
 
+    // Load database configuration
+    let db_config = DatabaseConfig::default();
+
+    logging::info!(target: "serve",
+        host = %db_config.host,
+        port = %db_config.port,
+        database = %db_config.database,
+        "Connecting to database..."
+    );
+
+    // Connect to the database
+    let db = migration::SeaDb::new()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to connect to database: {}", e))?;
+
+    // Run migrations automatically on startup
+    logging::info!(target: "serve", "Running database migrations...");
+    migration::Migrator::up(&db.inner, None)
+        .await
+        .map_err(|e| anyhow::anyhow!("Migration failed: {}", e))?;
+
+    logging::info!(target: "serve", "Database migrations completed successfully");
+
+    // Run seed data
+    logging::info!(target: "serve", "Running seed data...");
+    migration::seeds::run_all_seeds(&db, true)
+        .await
+        .map_err(|e| anyhow::anyhow!("Seeding failed: {:?}", e))?;
+
+    logging::info!(target: "serve", "Seed data completed successfully");
+
     // TODO: Implement server startup
-    // - Load configuration
-    // - Initialize database connection
     // - Set up Axum router
     // - Apply middleware
     // - Start listening
@@ -147,13 +216,71 @@ async fn migrate(args: &MigrateArgs) -> Result<()> {
         "Running database migrations..."
     );
 
-    // TODO: Implement migration runner
-    // - Connect to database
-    // - Load migration files
-    // - Apply or rollback migrations
-    // - Track migration history
+    if args.dry_run {
+        // Dry run mode - just show what would happen
+        logging::info!(target: "migrate", "Dry run mode - showing migrations that would be applied");
 
-    logging::info!(target: "migrate", "Migration functionality to be implemented");
+        // Connect to database
+        let db = migration::SeaDb::new()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to connect to database: {}", e))?;
+
+        // Get migration status
+        let status = migration::runners::status::get_migration_status(&db, true)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to get migration status: {}", e))?;
+
+        // Format and display
+        let output = migration::runners::status::format_migration_status(&status, true);
+        println!("{}", output);
+
+        // Dry run migrations
+        let result = migration::runners::dry_run::dry_run_migrations(&db, None, true)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to dry run migrations: {}", e))?;
+
+        logging::info!(target: "migrate",
+            migrations_to_apply = %result.migrations_to_apply,
+            "Dry run complete"
+        );
+
+        return Ok(());
+    }
+
+    if args.rollback {
+        // Rollback the last migration
+        logging::info!(target: "migrate", "Rolling back the last migration...");
+
+        let db = migration::SeaDb::new()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to connect to database: {}", e))?;
+
+        migration::Migrator::down(&db.inner, None)
+            .await
+            .map_err(|e| anyhow::anyhow!("Rollback failed: {}", e))?;
+
+        logging::info!(target: "migrate", "Rollback completed successfully");
+        return Ok(());
+    }
+
+    // Connect to database and run migrations
+    let db = migration::SeaDb::new()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to connect to database: {}", e))?;
+
+    // Run migrations
+    migration::Migrator::up(&db.inner, None)
+        .await
+        .map_err(|e| anyhow::anyhow!("Migration failed: {}", e))?;
+
+    logging::info!(target: "migrate", "Migrations completed successfully");
+
+    // Run seed data
+    migration::seeds::run_all_seeds(&db, true)
+        .await
+        .map_err(|e| anyhow::anyhow!("Seeding failed: {:?}", e))?;
+
+    logging::info!(target: "migrate", "Seed data completed successfully");
     Ok(())
 }
 

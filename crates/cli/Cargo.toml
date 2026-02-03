@@ -23,6 +23,9 @@ logging = { path = "../logging" }
 error = { path = "../error" }
 anyhow = { workspace = true }
 
+# Migration
+migration = { path = "../migration" }
+
 # Core dependencies
 tokio = { workspace = true, features = ["full"] }
 serde = { workspace = true }
