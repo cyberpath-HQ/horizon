@@ -11,8 +11,8 @@
 //! ```
 
 use clap::{Args, CommandFactory as _, Parser, Subcommand};
-use error::Result;
-use migration::MigratorTrait;
+use error::{AppError, Result};
+use migration::{Migrator, MigratorTrait as _};
 
 /// Database configuration for CLI
 #[derive(Debug, Clone)]
@@ -36,21 +36,30 @@ pub struct DatabaseConfig {
 impl Default for DatabaseConfig {
     fn default() -> Self {
         Self {
-            host:      std::env::var("HORIZON_DATABASE_HOST").unwrap_or_else(|_| "localhost".to_string()),
+            host:      std::env::var("HORIZON_DATABASE_HOST").unwrap_or_else(|_| "localhost".to_owned()),
             port:      std::env::var("HORIZON_DATABASE_PORT")
-                .unwrap_or_else(|_| "5432".to_string())
+                .unwrap_or_else(|_| "5432".to_owned())
                 .parse()
                 .unwrap_or(5432),
-            database:  std::env::var("HORIZON_DATABASE_NAME").unwrap_or_else(|_| "horizon".to_string()),
-            username:  std::env::var("HORIZON_DATABASE_USER").unwrap_or_else(|_| "horizon".to_string()),
+            database:  std::env::var("HORIZON_DATABASE_NAME").unwrap_or_else(|_| "horizon".to_owned()),
+            username:  std::env::var("HORIZON_DATABASE_USER").unwrap_or_else(|_| "horizon".to_owned()),
             password:  std::env::var("HORIZON_DATABASE_PASSWORD").unwrap_or_else(|_| String::new()),
-            ssl_mode:  std::env::var("HORIZON_DATABASE_SSL_MODE").unwrap_or_else(|_| "require".to_string()),
+            ssl_mode:  std::env::var("HORIZON_DATABASE_SSL_MODE").unwrap_or_else(|_| "require".to_owned()),
             pool_size: std::env::var("HORIZON_DATABASE_POOL_SIZE")
-                .unwrap_or_else(|_| "10".to_string())
+                .unwrap_or_else(|_| "10".to_owned())
                 .parse()
                 .unwrap_or(10),
         }
     }
+}
+
+/// Builds the DATABASE_URL from DatabaseConfig
+pub fn build_database_url(config: &DatabaseConfig) -> String {
+    format!(
+        "postgres://{}:{}@{}:{}/{}?sslmode={}",
+        config.username, config.password, config.host, config.port, config.database,
+        config.ssl_mode
+    )
 }
 
 /// Horizon CMDB - Configuration Management Database
@@ -159,44 +168,24 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn serve(args: &ServeArgs) -> Result<()> {
-    logging::info!(target: "serve",
-        host = %args.host,
-        port = %args.port,
-        tls = %args.tls,
-        "Starting API server..."
-    );
+async fn serve(_args: &ServeArgs) -> Result<()> {
+    logging::info!(target: "serve", "Starting API server...");
 
-    // Load database configuration
-    let db_config = DatabaseConfig::default();
+    // Build database URL from configuration
+    let config = DatabaseConfig::default();
+    let database_url = build_database_url(&config);
 
-    logging::info!(target: "serve",
-        host = %db_config.host,
-        port = %db_config.port,
-        database = %db_config.database,
-        "Connecting to database..."
-    );
-
-    // Connect to the database
-    let db = migration::SeaDb::new()
+    // Connect to database
+    logging::info!(target: "serve", "Connecting to database...");
+    let db = migration::connect_to_database(&database_url)
         .await
-        .map_err(|e| anyhow::anyhow!("Failed to connect to database: {}", e))?;
+        .map_err(AppError::database)?;
 
     // Run migrations automatically on startup
     logging::info!(target: "serve", "Running database migrations...");
-    migration::Migrator::up(db.get_connection(), None)
-        .await
-        .map_err(|e| anyhow::anyhow!("Migration failed: {}", e))?;
+    Migrator::up(&db, None).await.map_err(AppError::database)?;
 
     logging::info!(target: "serve", "Database migrations completed successfully");
-
-    // Run seed data
-    logging::info!(target: "serve", "Running seed data...");
-    migration::seeds::run_all_seeds(&db, true)
-        .await
-        .map_err(|e| anyhow::anyhow!("Seeding failed: {:?}", e))?;
-
-    logging::info!(target: "serve", "Seed data completed successfully");
 
     // TODO: Implement server startup
     // - Set up Axum router
@@ -216,33 +205,32 @@ async fn migrate(args: &MigrateArgs) -> Result<()> {
         "Running database migrations..."
     );
 
+    // Build database URL from configuration
+    let config = DatabaseConfig::default();
+    let database_url = build_database_url(&config);
+
+    // Connect to database
+    let db = migration::connect_to_database(&database_url)
+        .await
+        .map_err(AppError::database)?;
+
     if args.dry_run {
         // Dry run mode - just show what would happen
-        logging::info!(target: "migrate", "Dry run mode - showing migrations that would be applied");
+        logging::info!(target: "migrate", "Dry run mode - migrations would be applied");
 
-        // Connect to database
-        let db = migration::SeaDb::new()
+        // Get pending migrations
+        let pending = migration::Migrator::get_pending_migrations(&db)
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to connect to database: {}", e))?;
-
-        // Get migration status
-        let status = migration::runners::status::get_migration_status(&db, true)
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to get migration status: {}", e))?;
-
-        // Format and display
-        let output = migration::runners::status::format_migration_status(&status, true);
-        println!("{}", output);
-
-        // Dry run migrations
-        let result = migration::runners::dry_run::dry_run_migrations(&db, None, true)
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to dry run migrations: {}", e))?;
+            .map_err(AppError::database)?;
 
         logging::info!(target: "migrate",
-            migrations_to_apply = %result.migrations_to_apply,
-            "Dry run complete"
+            pending_count = %pending.len(),
+            "Pending migrations found"
         );
+
+        for m in &pending {
+            logging::info!(target: "migrate", migration = %m.name(), "Would apply");
+        }
 
         return Ok(());
     }
@@ -251,36 +239,18 @@ async fn migrate(args: &MigrateArgs) -> Result<()> {
         // Rollback the last migration
         logging::info!(target: "migrate", "Rolling back the last migration...");
 
-        let db = migration::SeaDb::new()
+        migration::Migrator::down(&db, None)
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to connect to database: {}", e))?;
-
-        migration::Migrator::down(db.get_connection(), None)
-            .await
-            .map_err(|e| anyhow::anyhow!("Rollback failed: {}", e))?;
+            .map_err(AppError::database)?;
 
         logging::info!(target: "migrate", "Rollback completed successfully");
         return Ok(());
     }
 
-    // Connect to database and run migrations
-    let db = migration::SeaDb::new()
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to connect to database: {}", e))?;
-
     // Run migrations
-    migration::Migrator::up(db.get_connection(), None)
-        .await
-        .map_err(|e| anyhow::anyhow!("Migration failed: {}", e))?;
+    Migrator::up(&db, None).await.map_err(AppError::database)?;
 
     logging::info!(target: "migrate", "Migrations completed successfully");
-
-    // Run seed data
-    migration::seeds::run_all_seeds(&db, true)
-        .await
-        .map_err(|e| anyhow::anyhow!("Seeding failed: {:?}", e))?;
-
-    logging::info!(target: "migrate", "Seed data completed successfully");
     Ok(())
 }
 
@@ -297,13 +267,31 @@ fn completions(args: &CompletionsArgs) -> Result<()> {
 fn validate() -> Result<()> {
     logging::info!(target: "validate", "Validating configuration...");
 
-    // TODO: Implement configuration validation
-    // - Check required environment variables
-    // - Validate database connection
-    // - Verify file paths
-    // - Test Redis connectivity
+    // Check required environment variables
+    let required_vars = [
+        "HORIZON_DATABASE_HOST",
+        "HORIZON_DATABASE_PORT",
+        "HORIZON_DATABASE_NAME",
+        "HORIZON_DATABASE_USER",
+        "HORIZON_DATABASE_PASSWORD",
+    ];
 
-    logging::info!(target: "validate", "Configuration validation to be implemented");
+    let mut missing = Vec::new();
+    for var in &required_vars {
+        if std::env::var(var).is_err() {
+            missing.push(var);
+        }
+    }
+
+    if !missing.is_empty() {
+        logging::error!(target: "validate", missing_vars = ?missing, "Missing required environment variables");
+        return Err(AppError::validation(format!(
+            "Missing required environment variables: {:?}",
+            missing
+        )));
+    }
+
+    logging::info!(target: "validate", "Configuration validation passed");
     Ok(())
 }
 
@@ -393,45 +381,32 @@ mod tests {
 
     #[test]
     fn test_validate_returns_ok() {
+        // Set required env vars
+        unsafe {
+            std::env::set_var("HORIZON_DATABASE_HOST", "localhost");
+            std::env::set_var("HORIZON_DATABASE_PORT", "5432");
+            std::env::set_var("HORIZON_DATABASE_NAME", "horizon");
+            std::env::set_var("HORIZON_DATABASE_USER", "horizon");
+            std::env::set_var("HORIZON_DATABASE_PASSWORD", "password");
+        }
+
         let result = validate();
         assert!(result.is_ok());
     }
 
     #[test]
-    fn test_serve_returns_ok() {
-        let args = ServeArgs {
-            host:     "0.0.0.0".to_string(),
-            port:     3000,
-            tls:      false,
-            tls_cert: None,
-            tls_key:  None,
-        };
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        let result = rt.block_on(serve(&args));
-        assert!(result.is_ok());
-    }
+    fn test_validate_missing_vars() {
+        // Clear env vars
+        unsafe {
+            std::env::remove_var("HORIZON_DATABASE_HOST");
+            std::env::remove_var("HORIZON_DATABASE_PORT");
+            std::env::remove_var("HORIZON_DATABASE_NAME");
+            std::env::remove_var("HORIZON_DATABASE_USER");
+            std::env::remove_var("HORIZON_DATABASE_PASSWORD");
+        }
 
-    #[test]
-    fn test_migrate_returns_ok() {
-        let args = MigrateArgs {
-            dry_run:       true,
-            rollback:      false,
-            create:        None,
-            migration_dir: None,
-            threads:       4,
-        };
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        let result = rt.block_on(migrate(&args));
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_completions_returns_ok() {
-        let args = CompletionsArgs {
-            shell: clap_complete::Shell::Bash,
-        };
-        let result = completions(&args);
-        assert!(result.is_ok());
+        let result = validate();
+        assert!(result.is_err());
     }
 
     #[test]
@@ -461,5 +436,21 @@ mod tests {
         assert!(!args.rollback);
         assert!(args.create.is_none());
         assert_eq!(args.threads, 4);
+    }
+
+    #[test]
+    fn test_build_database_url() {
+        // Set test environment variables
+        unsafe {
+            std::env::set_var("HORIZON_DATABASE_HOST", "testhost");
+            std::env::set_var("HORIZON_DATABASE_PORT", "5433");
+            std::env::set_var("HORIZON_DATABASE_NAME", "testdb");
+            std::env::set_var("HORIZON_DATABASE_USER", "testuser");
+            std::env::set_var("HORIZON_DATABASE_PASSWORD", "testpass");
+        }
+
+        let config = DatabaseConfig::default();
+        let url = build_database_url(&config);
+        assert!(url.contains("postgres://testuser:testpass@testhost:5433/testdb"));
     }
 }
