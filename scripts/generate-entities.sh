@@ -28,7 +28,7 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 ENTITY_DIR="$PROJECT_ROOT/crates/entity/src"
 DRY_RUN=false
 VERBOSE=false
-# Don't override - allow environment variable to persist if no argument provided
+: "${DATABASE_URL=}"  # Only initialize if not already set
 
 # Logging functions
 log_info() {
@@ -262,6 +262,58 @@ validate_entities() {
     fi
 }
 
+# ============================================================================
+# SECURITY: Inject serde skip attributes for sensitive fields
+# This ensures sensitive fields like password_hash and totp_secret are not
+# serialized by default, preventing accidental exposure in API responses.
+# This function is idempotent and safe to run multiple times.
+# ============================================================================
+inject_security_attributes() {
+    log_step "Injecting security attributes for sensitive fields..."
+
+    # Define sensitive field patterns (field name only, pattern is built below)
+    local sensitive_fields=("password_hash" "totp_secret")
+
+    local modified_count=0
+
+    for field_name in "${sensitive_fields[@]}"; do
+        # Find entity files containing this field
+        while IFS= read -r entity_file; do
+            if [ -f "$entity_file" ]; then
+                # Check if serde skip is already applied to avoid duplicates
+                if ! grep -B1 "pub ${field_name}:" "$entity_file" 2>/dev/null | grep -q "serde(skip_serializing)"; then
+                    if [ "$DRY_RUN" = true ]; then
+                        log_info "[DRY-RUN] Would add #[serde(skip_serializing)] to ${field_name} in $(basename "$entity_file")"
+                    else
+                        # Use awk to insert the serde attribute with proper indentation (4 spaces)
+                        # Pattern: "^    pub field_name:" matches field declarations in generated entities
+                        awk -v field="pub ${field_name}:" '
+                            $0 ~ field {
+                                print "    #[serde(skip_serializing)]"
+                            }
+                            { print }
+                        ' "$entity_file" > "${entity_file}.tmp" && mv "${entity_file}.tmp" "$entity_file"
+                        log_info "Added security attribute to ${field_name} in $(basename "$entity_file")"
+                        ((modified_count++)) || true
+                    fi
+                else
+                    log_info "Security attribute already present for ${field_name} in $(basename "$entity_file")"
+                fi
+            fi
+        done < <(grep -l "pub ${field_name}:" "$ENTITY_DIR"/*.rs 2>/dev/null | head -1)
+    done
+
+    if [ "$DRY_RUN" = true ]; then
+        return 0
+    fi
+
+    if [ $modified_count -gt 0 ]; then
+        log_success "Security attributes injected in $modified_count field(s)"
+    else
+        log_info "No new security attributes needed"
+    fi
+}
+
 # Main execution
 main() {
     echo ""
@@ -287,6 +339,9 @@ main() {
 
     # Update lib.rs
     update_lib_rs
+
+    # Inject security attributes for sensitive fields
+    inject_security_attributes
 
     # Format code
     format_code
