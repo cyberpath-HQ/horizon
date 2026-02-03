@@ -1,0 +1,21 @@
+[package]
+name = "entity"
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+version.workspace = true
+readme.workspace = true
+description.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+sea-orm = { workspace = true }
+serde = { workspace = true }
+chrono = { version = "0.4.40", features = ["serde"] }
+uuid = { version = "1.11.0", features = ["v4", "serde"] }
+
+[lints]
+workspace = true
