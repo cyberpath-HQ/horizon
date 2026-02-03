@@ -242,7 +242,8 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 
 - Implement Argon2id password hashing using argon2 crate
 - Create password hashing and verification functions
-- Implement user registration endpoint (POST /api/v1/auth/register)
+- Implement initial setup endpoint for first-user creation (POST /api/v1/auth/setup), this must be disabled after
+  first user creation
 - Implement login endpoint (POST /api/v1/auth/login)
 - Implement logout endpoint (POST /api/v1/auth/logout)
 
