@@ -46,6 +46,7 @@ impl MigrationTrait for Migration {
                                 TeamMemberRole::Viewer,
                             ],
                         )
+                        .not_null()
                         .default("member"),
                     )
                     .col(
