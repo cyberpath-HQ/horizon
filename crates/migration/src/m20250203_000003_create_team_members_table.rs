@@ -1,4 +1,4 @@
-use sea_orm_migration::{prelude::*, sea_query::extension::postgres::Type};
+use sea_orm_migration::{prelude::*, schema::*, sea_query::extension::postgres::Type};
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -21,41 +21,40 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // Create team_members table
+        // Create team_members table using schema helpers
         manager
             .create_table(
                 Table::create()
                     .table(TeamMembers::Table)
                     .if_not_exists()
+                    .col(pk_auto(TeamMembers::Id))
+                    .col(uuid(TeamMembers::TeamId).not_null())
+                    .col(uuid(TeamMembers::UserId).not_null())
                     .col(
-                        ColumnDef::new(TeamMembers::Id)
-                            .uuid()
-                            .not_null()
-                            .primary_key(),
-                    )
-                    .col(ColumnDef::new(TeamMembers::TeamId).uuid().not_null())
-                    .col(ColumnDef::new(TeamMembers::UserId).uuid().not_null())
-                    .col(
-                        ColumnDef::new(TeamMembers::Role)
-                            .custom(TeamMemberRole::Table)
-                            .not_null()
-                            .default(Expr::cust("'member'")),
-                    )
-                    .col(
-                        ColumnDef::new(TeamMembers::JoinedAt)
-                            .timestamp()
-                            .not_null()
-                            .default(Expr::current_timestamp()),
+                        enumeration(
+                            TeamMembers::Role,
+                            TeamMemberRole::Table,
+                            vec![
+                                TeamMemberRole::Owner,
+                                TeamMemberRole::Admin,
+                                TeamMemberRole::Member,
+                                TeamMemberRole::Viewer,
+                            ],
+                        )
+                        .default("member"),
                     )
                     .col(
-                        ColumnDef::new(TeamMembers::CreatedAt)
-                            .timestamp()
+                        timestamp(TeamMembers::JoinedAt)
                             .not_null()
                             .default(Expr::current_timestamp()),
                     )
                     .col(
-                        ColumnDef::new(TeamMembers::UpdatedAt)
-                            .timestamp()
+                        timestamp(TeamMembers::CreatedAt)
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        timestamp(TeamMembers::UpdatedAt)
                             .not_null()
                             .default(Expr::current_timestamp()),
                     )
@@ -106,17 +105,6 @@ impl MigrationTrait for Migration {
             .create_index(
                 Index::create()
                     .if_not_exists()
-                    .name("idx_team_members_team_id")
-                    .table(TeamMembers::Table)
-                    .col(TeamMembers::TeamId)
-                    .to_owned(),
-            )
-            .await?;
-
-        manager
-            .create_index(
-                Index::create()
-                    .if_not_exists()
                     .name("idx_team_members_user_id")
                     .table(TeamMembers::Table)
                     .col(TeamMembers::UserId)
@@ -132,14 +120,8 @@ impl MigrationTrait for Migration {
             .drop_table(Table::drop().table(TeamMembers::Table).to_owned())
             .await?;
 
-        // Drop enum type
         manager
-            .drop_type(
-                Type::drop()
-                    .if_exists()
-                    .name(TeamMemberRole::Table)
-                    .to_owned(),
-            )
+            .drop_type(Type::drop().name(TeamMemberRole::Table).to_owned())
             .await?;
 
         Ok(())

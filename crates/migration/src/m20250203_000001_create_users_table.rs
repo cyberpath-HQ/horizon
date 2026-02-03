@@ -1,4 +1,4 @@
-use sea_orm_migration::{prelude::*, sea_query::extension::postgres::Type};
+use sea_orm_migration::{prelude::*, schema::*, sea_query::extension::postgres::Type};
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -6,7 +6,7 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        // Create user_status enum type
+        // Create enum type first
         manager
             .create_type(
                 Type::create()
@@ -21,78 +21,48 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // Create users table with authentication fields
+        // Create users table using schema helpers
         manager
             .create_table(
                 Table::create()
                     .table(Users::Table)
                     .if_not_exists()
-                    .col(ColumnDef::new(Users::Id).uuid().not_null().primary_key())
+                    .col(pk_auto(Users::Id))
+                    .col(string(Users::Email).not_null().unique_key())
+                    .col(string(Users::Username).not_null().unique_key())
+                    .col(string(Users::PasswordHash).not_null())
+                    .col(string(Users::TotpSecret).null())
+                    .col(string(Users::FirstName).null())
+                    .col(string(Users::LastName).null())
+                    .col(string(Users::AvatarUrl).null())
+                    .col(enumeration_null(
+                        Users::Status,
+                        UserStatus::Table,
+                        vec![
+                            UserStatus::Active,
+                            UserStatus::Inactive,
+                            UserStatus::Suspended,
+                            UserStatus::PendingVerification,
+                        ],
+                    ))
+                    .col(timestamp(Users::EmailVerifiedAt).null())
+                    .col(timestamp(Users::LastLoginAt).null())
                     .col(
-                        ColumnDef::new(Users::Email)
-                            .string()
-                            .not_null()
-                            .unique_key(),
-                    )
-                    .col(
-                        ColumnDef::new(Users::Username)
-                            .string()
-                            .not_null()
-                            .unique_key(),
-                    )
-                    .col(ColumnDef::new(Users::PasswordHash).string().not_null())
-                    .col(ColumnDef::new(Users::TotpSecret).string().null())
-                    .col(ColumnDef::new(Users::FirstName).string().null())
-                    .col(ColumnDef::new(Users::LastName).string().null())
-                    .col(ColumnDef::new(Users::AvatarUrl).string().null())
-                    .col(
-                        ColumnDef::new(Users::Status)
-                            .custom(UserStatus::Table)
-                            .not_null()
-                            .default(Expr::cust("'pending_verification'")),
-                    )
-                    .col(ColumnDef::new(Users::EmailVerifiedAt).timestamp().null())
-                    .col(ColumnDef::new(Users::LastLoginAt).timestamp().null())
-                    .col(
-                        ColumnDef::new(Users::CreatedAt)
-                            .timestamp()
+                        timestamp(Users::CreatedAt)
                             .not_null()
                             .default(Expr::current_timestamp()),
                     )
                     .col(
-                        ColumnDef::new(Users::UpdatedAt)
-                            .timestamp()
+                        timestamp(Users::UpdatedAt)
                             .not_null()
                             .default(Expr::current_timestamp()),
                     )
-                    .col(ColumnDef::new(Users::DeletedAt).timestamp().null())
+                    .col(timestamp(Users::DeletedAt).null())
                     .to_owned(),
             )
             .await?;
 
-        // Create indexes for common queries
-        manager
-            .create_index(
-                Index::create()
-                    .if_not_exists()
-                    .name("idx_users_email")
-                    .table(Users::Table)
-                    .col(Users::Email)
-                    .to_owned(),
-            )
-            .await?;
-
-        manager
-            .create_index(
-                Index::create()
-                    .if_not_exists()
-                    .name("idx_users_username")
-                    .table(Users::Table)
-                    .col(Users::Username)
-                    .to_owned(),
-            )
-            .await?;
-
+        // Create index for status
         manager
             .create_index(
                 Index::create()
@@ -112,9 +82,8 @@ impl MigrationTrait for Migration {
             .drop_table(Table::drop().table(Users::Table).to_owned())
             .await?;
 
-        // Drop enum type
         manager
-            .drop_type(Type::drop().if_exists().name(UserStatus::Table).to_owned())
+            .drop_type(Type::drop().name(UserStatus::Table).to_owned())
             .await?;
 
         Ok(())

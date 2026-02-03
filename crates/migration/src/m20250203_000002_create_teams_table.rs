@@ -1,4 +1,4 @@
-use sea_orm_migration::prelude::*;
+use sea_orm_migration::{prelude::*, schema::*};
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -6,31 +6,29 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        // Create teams table
+        // Create teams table using schema helpers
         manager
             .create_table(
                 Table::create()
                     .table(Teams::Table)
                     .if_not_exists()
-                    .col(ColumnDef::new(Teams::Id).uuid().not_null().primary_key())
-                    .col(ColumnDef::new(Teams::Name).string().not_null())
-                    .col(ColumnDef::new(Teams::Slug).string().not_null().unique_key())
-                    .col(ColumnDef::new(Teams::Description).text().null())
-                    .col(ColumnDef::new(Teams::ParentTeamId).uuid().null())
-                    .col(ColumnDef::new(Teams::ManagerId).uuid().not_null())
+                    .col(pk_auto(Teams::Id))
+                    .col(string(Teams::Name).not_null())
+                    .col(string(Teams::Slug).not_null().unique_key())
+                    .col(text(Teams::Description).null())
+                    .col(uuid(Teams::ParentTeamId).null())
+                    .col(uuid(Teams::ManagerId).not_null())
                     .col(
-                        ColumnDef::new(Teams::CreatedAt)
-                            .timestamp()
+                        timestamp(Teams::CreatedAt)
                             .not_null()
                             .default(Expr::current_timestamp()),
                     )
                     .col(
-                        ColumnDef::new(Teams::UpdatedAt)
-                            .timestamp()
+                        timestamp(Teams::UpdatedAt)
                             .not_null()
                             .default(Expr::current_timestamp()),
                     )
-                    .col(ColumnDef::new(Teams::DeletedAt).timestamp().null())
+                    .col(timestamp(Teams::DeletedAt).null())
                     .to_owned(),
             )
             .await?;
@@ -47,21 +45,7 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // Add foreign key for manager (will reference users table after users migration)
-        // This is added in the next migration after users table is created
-
         // Create indexes
-        manager
-            .create_index(
-                Index::create()
-                    .if_not_exists()
-                    .name("idx_teams_slug")
-                    .table(Teams::Table)
-                    .col(Teams::Slug)
-                    .to_owned(),
-            )
-            .await?;
-
         manager
             .create_index(
                 Index::create()
