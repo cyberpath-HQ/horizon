@@ -7,5 +7,5 @@
 **/*.tmp
 **/coverage
 .docker
-!**/.gitkeep
+!.docker/**/.gitkeep
 .env
