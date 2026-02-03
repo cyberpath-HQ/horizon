@@ -1,48 +1,31 @@
 [package]
+edition      = "2024"
+name         = "migration"
+publish      = false
+rust-version = "1.85.0"
+version      = "0.1.0"
+
+[lib]
 name = "migration"
-authors.workspace = true
-edition.workspace = true
-rust-version.workspace = true
-version.workspace = true
-readme.workspace = true
-description.workspace = true
-license.workspace = true
-repository.workspace = true
-keywords.workspace = true
-categories.workspace = true
+path = "src/lib.rs"
 
 [dependencies]
-# Sea-ORM Migration
-sea-orm-migration = { version = "2.0.0-rc.30", features = ["runtime-tokio-rustls"] }
+tokio = { version = "1.49.0", features = ["macros", "rt", "rt-multi-thread"] }
+dotenvy = {version = "0.15.7", optional = true}
 
-# Workspace dependencies
-sea-orm = { workspace = true}
-tokio = { workspace = true, features = ["full"] }
-async-trait = "0.1.89"
+[dependencies.sea-orm-migration]
+features = [
+    # Enable at least one `ASYNC_RUNTIME` and `DATABASE_DRIVER` feature if you want to run migration via CLI.
+    # View the list of supported features at https://www.sea-ql.org/SeaORM/docs/install-and-config/database-and-async-runtime.
+    # e.g.
+    "runtime-tokio-rustls",  # `ASYNC_RUNTIME` feature
+    "sqlx-postgres",         # `DATABASE_DRIVER` feature
+]
+version = "2.0.0-rc.30"
 
-# Logging
-logging = { path = "../logging" }
-tracing = { workspace = true }
+[features]
+cli = ["dep:dotenvy"]
 
-# Error handling
-error = { path = "../error", features = ["migration"] }
-thiserror = { workspace = true }
-anyhow = { workspace = true }
-
-# Serialization
-serde = { workspace = true }
-serde_json = { workspace = true }
-
-# Time
-chrono = { workspace = true, features = ["serde"] }
-
-# Utilities
-uuid = { workspace = true, features = ["v4", "serde"] }
-url = { workspace = true }
-base64 = { workspace = true }
-
-[dev-dependencies]
-sea-orm-migration = { version = "2.0.0-rc.30", features = ["runtime-tokio-native-tls"] }
-tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros"] }
-rstest = { workspace = true }
-dotenvy = "0.15.7"
+[[bin]]
+name = "migration"
+required-features = ["cli"]
