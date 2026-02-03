@@ -4,6 +4,16 @@ use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize)]
+#[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "role_scope_type")]
+pub enum RoleScopeType {
+    #[sea_orm(string_value = "global")]
+    Global,
+    #[sea_orm(string_value = "team")]
+    Team,
+    #[sea_orm(string_value = "asset")]
+    Asset,
+}
+#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize)]
 #[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "team_member_role")]
 pub enum TeamMemberRole {
     #[sea_orm(string_value = "owner")]

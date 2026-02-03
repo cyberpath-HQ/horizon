@@ -27,9 +27,13 @@ pub struct Model {
     pub updated_at:        DateTime,
     pub deleted_at:        Option<DateTime>,
     #[sea_orm(has_many)]
+    pub api_keys:          HasMany<super::api_keys::Entity>,
+    #[sea_orm(has_many)]
     pub team_members:      HasMany<super::team_members::Entity>,
     #[sea_orm(has_many)]
     pub teams:             HasMany<super::teams::Entity>,
+    #[sea_orm(has_many)]
+    pub user_roles:        HasMany<super::user_roles::Entity>,
 }
 
 impl ActiveModelBehavior for ActiveModel {}
