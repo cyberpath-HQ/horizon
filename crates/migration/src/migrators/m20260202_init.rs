@@ -28,6 +28,6 @@ mod tests {
     fn test_migration_name() {
         let migration = M20260202Init;
         let migration_name = <M20260202Init as MigrationName>::name(&migration);
-        assert_eq!(migration_name, "m20230101_init");
+        assert_eq!(migration_name, "m20260202_init");
     }
 }
