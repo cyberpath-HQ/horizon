@@ -7,6 +7,7 @@ members = [
     "crates/migration",
     "crates/cli",
     "crates/auth",
+    "crates/server",
     "crates/ui/src-tauri"
 ]
 
