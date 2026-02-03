@@ -6,6 +6,7 @@ members = [
     "crates/entity",
     "crates/migration",
     "crates/cli",
+    "crates/auth",
     "crates/ui/src-tauri"
 ]
 
