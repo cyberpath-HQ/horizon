@@ -1,0 +1,58 @@
+[package]
+name = "server"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+description = "Horizon API server with Axum framework"
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+# ==================== WEB FRAMEWORK ====================
+axum = { workspace = true, features = ["multipart", "tokio"] }
+axum-extra = { version = "0.12.5", features = ["typed-header"] }
+tower = { workspace = true, features = ["util", "filter"] }
+tower-http = { workspace = true, features = ["cors", "trace", "timeout"] }
+http = { workspace = true }
+
+# ==================== DATABASE ====================
+sea-orm = { workspace = true, features = ["runtime-tokio-rustls", "sqlx-postgres"] }
+tokio-postgres = { workspace = true }
+
+# ==================== AUTHENTICATION ====================
+jsonwebtoken = { workspace = true }
+argon2 = { workspace = true }
+
+# ==================== SERIALIZATION ====================
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# ==================== ERROR HANDLING ====================
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# ==================== LOGGING ====================
+tracing = { workspace = true }
+
+# ==================== VALIDATION ====================
+validator = { workspace = true, features = ["derive"] }
+
+# ==================== INTERNAL ====================
+error = { path = "../error" }
+auth = { path = "../auth" }
+entity = { path = "../entity" }
+migration = { path = "../migration" }
+
+# ==================== UTILITIES ====================
+chrono = { workspace = true }
+uuid = { workspace = true, features = ["v4", "serde"] }
+secrecy = { workspace = true }
+base64 = { workspace = true }
+regex = { workspace = true }
+blake3 = { workspace = true }
+rand = { workspace = true }
+redis = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
