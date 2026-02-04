@@ -10,9 +10,13 @@
 //! horizon --help   # Show help
 //! ```
 
+use std::net::SocketAddr;
+
+use axum;
 use clap::{Args, CommandFactory as _, Parser, Subcommand};
 use error::{AppError, Result};
 use migration::{Migrator, MigratorTrait as _};
+use server::{router::create_app_router, AppState, JwtConfig};
 
 /// Database configuration for CLI
 #[derive(Debug, Clone)]
@@ -167,7 +171,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn serve(_args: &ServeArgs) -> Result<()> {
+async fn serve(args: &ServeArgs) -> Result<()> {
     logging::info!(target: "serve", "Starting API server...");
 
     // Build database URL from configuration
@@ -183,15 +187,39 @@ async fn serve(_args: &ServeArgs) -> Result<()> {
     // Run migrations automatically on startup
     logging::info!(target: "serve", "Running database migrations...");
     Migrator::up(&db, None).await.map_err(AppError::database)?;
-
     logging::info!(target: "serve", "Database migrations completed successfully");
 
-    // TODO: Implement server startup
-    // - Set up Axum router
-    // - Apply middleware
-    // - Start listening
+    // Initialize Redis client for token blacklisting
+    let redis_client = redis::Client::open("redis://127.0.0.1:6379")
+        .map_err(|e| anyhow::anyhow!("Failed to connect to Redis: {}", e))?;
 
-    logging::info!(target: "serve", "Server functionality to be implemented");
+    // Create application state
+    let jwt_config = JwtConfig::default();
+    let state = AppState {
+        db,
+        jwt_config,
+        redis: redis_client,
+    };
+
+    // Create the Axum router
+    let app = create_app_router(state.clone());
+
+    // Parse the bind address
+    let address: SocketAddr = format!("{}:{}", args.host, args.port)
+        .parse()
+        .map_err(|e| anyhow::anyhow!("Invalid address: {}", e))?;
+
+    // Start the server
+    logging::info!(target: "serve", %address, "Starting HTTP server...");
+    let listener = tokio::net::TcpListener::bind(&address)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to bind to {}: {}", address, e))?;
+
+    axum::serve(listener, app)
+        .await
+        .map_err(|e| anyhow::anyhow!("Server error: {}", e))?;
+
+    logging::info!(target: "serve", "Server stopped");
     Ok(())
 }
 

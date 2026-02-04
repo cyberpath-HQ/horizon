@@ -16,6 +16,9 @@ categories.workspace = true
 clap = { version = "4.5.56", features = ["derive", "env"] }
 clap_complete = "4.5.65"
 
+# Web framework
+axum = { workspace = true }
+
 # Logging
 logging = { path = "../logging" }
 
@@ -25,6 +28,12 @@ anyhow = { workspace = true }
 
 # Migration
 migration = { path = "../migration" }
+
+# Server
+server = { path = "../server" }
+
+# Redis for token blacklisting
+redis = { workspace = true }
 
 # Core dependencies
 tokio = { workspace = true, features = ["full"] }
