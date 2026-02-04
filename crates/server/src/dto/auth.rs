@@ -41,13 +41,6 @@ pub struct SetupRequest {
     pub display_name: String,
 }
 
-impl SetupRequest {
-    /// Regex for validating password strength
-    fn password_regex() -> regex::Regex {
-        regex::Regex::new(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{}':|,<>.?/]).+$").unwrap()
-    }
-}
-
 /// Request body for token refresh
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Validate)]
 pub struct RefreshRequest {
