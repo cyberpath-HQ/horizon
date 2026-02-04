@@ -16,3 +16,5 @@ pub mod user_roles;
 pub use user_roles::Entity as UserRoles;
 pub mod users;
 pub use users::Entity as Users;
+pub mod refresh_tokens;
+pub use refresh_tokens::Entity as RefreshTokens;
