@@ -54,27 +54,24 @@ tracing-log = { version = "0.2" }
 
 # ==================== ENCRYPTION (RustCrypto) ====================
 # Password Hashing
-argon2 = { version = "0.6.0-rc.7", features = ["kdf"] }
+argon2 = { version = "0.5.3" }
 
 # Symmetric Encryption
-chacha20poly1305 = { version = "0.11.0-rc.3" }
+chacha20poly1305 = { version = "0.10.1" }
 
 # Hashing
 blake3 = { version = "1.8.3" }
-sha3 = { version = "0.11.0-rc.7" }
+sha3 = { version = "0.10.8" }
 
 # MAC
-hmac = { version = "0.13.0-rc.5" }
+hmac = { version = "0.12.1" }
 
 # Digital Signatures
-ed25519 = { version = "3.0.0-rc.4" }
-ed25519-dalek = { version = "3.0.0-pre.5" }
-
-# Key Exchange
-x25519 = { version = "0.1" }
+ed25519 = { version = "2.2.3" }
+ed25519-dalek = { version = "2.2.0" }
 
 # Random
-rand = { version = "0.10.0-rc.8" }
+rand = { version = "0.9.2" }
 
 # Memory Clearing
 zeroize = { version = "1.8.2" }
@@ -86,7 +83,7 @@ secrecy = { version = "0.10.3" }
 subtle = { version = "2.6.1" }
 
 # ==================== AUTHENTICATION ====================
-jsonwebtoken = { version = "10.3.0" }
+jsonwebtoken = { version = "10.3.0", features = ["rust_crypto"] }
 totp-rs = { version = "5.7.0" }
 
 # ==================== AI PROVIDERS ====================
@@ -103,8 +100,11 @@ toml = { version = "0.9.11" }
 serde_with = { version = "3.16.1" }
 
 # ==================== VALIDATION ====================
-validator = { version = "0.20.0" }
-regex = { version = "1.12.2" }
+validator = { version = "0.20.0", features = ["derive"] }
+regex = { version = "1.12.3" }
+
+# ==================== ASYNC TRAITS ====================
+async-trait = { version = "0.1.89" }
 
 # ==================== UTILITIES ====================
 chrono = { version = "0.4.43", features = ["serde"] }
@@ -113,7 +113,7 @@ url = { version = "2.5.8" }
 base64 = { version = "0.22.1" }
 uuid = { version = "1.8.0", features = ["v4", "serde"] }
 indexmap = { version = "2.13.0" }
-dashmap = { version = "6.1.0" }
+dashmap = { version = "7.0.0-rc2" }
 parking_lot = { version = "0.12.5" }
 
 # ==================== TESTING ====================
