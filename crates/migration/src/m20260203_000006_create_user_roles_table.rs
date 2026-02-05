@@ -1,5 +1,4 @@
 use sea_orm_migration::{prelude::*, schema::*};
-
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
@@ -72,19 +71,10 @@ impl MigrationTrait for Migration {
             .await?;
 
         // Create unique constraint for user + role + scope combination
+        // Use COALESCE to handle NULL scope_id for global roles
         manager
-            .create_index(
-                Index::create()
-                    .if_not_exists()
-                    .name("idx_user_roles_user_role_scope_unique")
-                    .table(UserRoles::Table)
-                    .col(UserRoles::UserId)
-                    .col(UserRoles::RoleId)
-                    .col(UserRoles::ScopeType)
-                    .col(UserRoles::ScopeId)
-                    .unique()
-                    .to_owned(),
-            )
+            .get_connection()
+            .execute_unprepared(r#"CREATE UNIQUE INDEX IF NOT EXISTS "idx_user_roles_user_role_scope_unique" ON "user_roles" ("user_id", "role_id", "scope_type", COALESCE("scope_id", '00000000-0000-0000-0000-000000000000'))"#)
             .await?;
 
         // Create indexes for common queries

@@ -30,7 +30,7 @@ impl MigrationTrait for Migration {
                     )
                     .col(timestamp(ApiKeys::ExpiresAt).null())
                     .col(timestamp(ApiKeys::LastUsedAt).null())
-                    .col(timestamp(ApiKeys::LastUsedIp).null())
+                    .col(string(ApiKeys::LastUsedIp).null())
                     .col(
                         timestamp(ApiKeys::CreatedAt)
                             .not_null()
