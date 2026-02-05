@@ -10,6 +10,7 @@ use std::{
 use jsonwebtoken::{EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 use error::AppError;
+use cuid2::CuidConstructor;
 
 use crate::{JwtConfig, Result};
 
@@ -70,7 +71,7 @@ pub fn create_access_token(config: &JwtConfig, user_id: &str, email: &str, roles
         aud:   config.audience.clone(),
         exp:   exp_timestamp,
         iat:   issued_at,
-        jti:   uuid::Uuid::new_v4().to_string(),
+        jti:   CuidConstructor::new().with_length(32).create_id(),
     };
 
     let token = jsonwebtoken::encode(

@@ -108,7 +108,7 @@ pub async fn assign_role_to_user(
         id: Default::default(), // Auto-generated UUID
         user_id: Set(user_id.to_string()),
         role_id: Set(role.id),
-        scope_type: Set(scope_type),
+        scope: Set(Some(scope_type.to_string())),
         scope_id: Set(scope_id.map(|s| s.to_string())),
         expires_at: Set(expires_at.map(|dt| dt.naive_utc())),
         ..Default::default()

@@ -59,3 +59,4 @@ redis = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }
+sea-orm = { workspace = true, features = ["runtime-tokio-rustls", "sqlx-postgres", "sqlx-sqlite"] }

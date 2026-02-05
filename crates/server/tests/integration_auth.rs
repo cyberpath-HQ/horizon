@@ -131,6 +131,14 @@ async fn test_password_hashing() {
 /// Test AppState initialization with valid database and Redis connections
 #[tokio::test]
 async fn test_app_state_initialization() {
+    // Set required environment variable for JWT config
+    unsafe {
+        std::env::set_var(
+            "HORIZON_JWT_SECRET",
+            "test-jwt-secret-key-that-is-at-least-32-bytes-long-for-testing-purposes",
+        );
+    }
+
     // Use Redis for testing (local instance) - simpler to test
     let redis_url = "redis://127.0.0.1:6379";
     let redis_client = Client::open(redis_url).expect("Failed to connect to Redis");
