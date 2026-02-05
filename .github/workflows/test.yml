@@ -20,7 +20,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Install dependencies
-        run: apt install libglib2.0-dev
+        run: sudo apt install libglib2.0-dev
 
       - name: Run tests
         run: cargo test --workspace --verbose
