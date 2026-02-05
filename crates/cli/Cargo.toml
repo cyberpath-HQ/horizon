@@ -19,10 +19,15 @@ clap_complete = "4.5.65"
 # Web framework
 axum = { workspace = true }
 
-# TLS support (for future HTTPS implementation)
-rustls = "0.22"
-rustls-pemfile = "2"
-tokio-rustls = "0.26"
+# HTTP support for TLS
+hyper = { version = "1.8.1", features = ["full"] }
+hyper-util = { version = "0.1.20", features = ["full"] }
+
+# TLS support (for HTTPS implementation)
+rustls = "0.23.36"
+rustls-pemfile = "2.2.0"
+tokio-rustls = "0.26.4"
+axum-server = { version = "0.8.0", features = ["tls-rustls"] }
 
 # Logging
 logging = { path = "../logging" }
