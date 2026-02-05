@@ -232,10 +232,20 @@ async fn serve(args: &ServeArgs) -> Result<()> {
 
         logging::info!(target: "serve", %address, "Starting HTTPS server (TLS enabled)...");
 
-        axum_server::bind_rustls(address, tls_config)
-            .serve(app.into_make_service())
-            .await
-            .map_err(|e| anyhow::anyhow!("HTTPS server error: {}", e))?;
+        let handle = axum_server::Handle::new();
+        let server_future = axum_server::bind_rustls(address, tls_config)
+            .handle(handle.clone())
+            .serve(app.into_make_service());
+
+        tokio::select! {
+            result = server_future => {
+                result.map_err(|e| anyhow::anyhow!("HTTPS server error: {}", e))?;
+            }
+            _ = shutdown_signal() => {
+                logging::info!(target: "serve", "Received shutdown signal, stopping HTTPS server...");
+                handle.graceful_shutdown(None);
+            }
+        }
     }
     else {
         // HTTP mode
