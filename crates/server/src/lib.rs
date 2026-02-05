@@ -48,7 +48,7 @@ impl Default for JwtConfig {
     fn default() -> Self {
         Self {
             secret:             std::env::var("HORIZON_JWT_SECRET")
-                .unwrap_or_else(|_| "default-dev-secret-change-in-production".to_string()),
+                .expect("HORIZON_JWT_SECRET environment variable must be set"),
             expiration_seconds: 3600, // 1 hour
             issuer:             "horizon".to_string(),
             audience:           "horizon-api".to_string(),
