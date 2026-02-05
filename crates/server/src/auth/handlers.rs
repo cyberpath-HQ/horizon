@@ -2,7 +2,10 @@
 //!
 //! HTTP request handlers for authentication endpoints.
 
-use auth::password::{hash_password, validate_password_strength, verify_password};
+use auth::{
+    password::{hash_password, validate_password_strength, verify_password},
+    secrecy::ExposeSecret,
+};
 use entity::{
     user_sessions::Entity as UserSessionsEntity,
     users::{Column, Entity as UsersEntity},
@@ -58,15 +61,37 @@ pub async fn setup_handler_inner(state: &AppState, req: SetupRequest) -> Result<
 
     // Hash the password
     let password_secret = auth::secrecy::SecretString::from(req.password.clone());
-    let _hashed_password = hash_password(&password_secret, None)
+    let hashed_password = hash_password(&password_secret, None)
         .map_err(|e| AppError::unauthorized(format!("Failed to hash password: {}", e)))?;
 
-    // Create the user with admin role
-    // Note: This uses a simple insert. In production, you'd want to use transactions
-    // and handle this through a service layer.
+    // Create the admin user in the database
+    let name_parts: Vec<&str> = req.display_name.split(' ').collect();
+    let first_name = name_parts.first().map(|s| s.to_string());
+    let last_name = if name_parts.len() > 1 {
+        Some(name_parts[1 ..].join(" "))
+    }
+    else {
+        None
+    };
 
-    // For now, we'll return a success response indicating the setup would complete
-    // The actual database insert would happen here with the user's data
+    let admin_user = entity::users::ActiveModel {
+        id: Set(user_id),
+        email: Set(req.email.clone()),
+        username: Set(req.email.clone()), // Use email as username for now
+        password_hash: Set(hashed_password.expose_secret().to_string()),
+        first_name: Set(first_name),
+        last_name: Set(last_name),
+        status: Set(entity::sea_orm_active_enums::UserStatus::Active),
+        created_at: Set(Utc::now().naive_utc()),
+        updated_at: Set(Utc::now().naive_utc()),
+        ..Default::default()
+    };
+
+    use sea_orm::ActiveModelTrait;
+    admin_user
+        .insert(&state.db)
+        .await
+        .map_err(|e| AppError::database(format!("Failed to create admin user: {}", e)))?;
 
     info!(user_id = %user_id, email = %req.email, "Admin user created during setup");
 
@@ -148,10 +173,6 @@ pub async fn login_handler_inner(
     )
     .await?;
 
-    // Create user session linked to refresh token
-    let session_id = Uuid::new_v4();
-    let now = Utc::now().naive_utc();
-
     // Extract user agent and IP from headers
     let user_agent = headers
         .get("user-agent")
@@ -164,14 +185,19 @@ pub async fn login_handler_inner(
         .and_then(|h| h.to_str().ok())
         .map(|s| s.to_string());
 
+    // Create user session linked to refresh token
+    let session_id = Uuid::new_v4();
+    let now = Utc::now();
+    let now_fixed = now.with_timezone(&chrono::FixedOffset::east_opt(0).unwrap()); // UTC
+
     let session_model = entity::user_sessions::ActiveModel {
         id: Set(session_id),
         user_id: Set(user.id),
         refresh_token_id: Set(refresh_token.id),
         user_agent: Set(user_agent),
         ip_address: Set(ip_address),
-        created_at: Set(now),
-        last_used_at: Set(now),
+        created_at: Set(now_fixed),
+        last_used_at: Set(now_fixed),
         revoked_at: Set(None),
         ..Default::default()
     };

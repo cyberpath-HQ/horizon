@@ -53,8 +53,8 @@ pub async fn get_sessions_handler(
                 id:           session.id.to_string(),
                 user_agent:   session.user_agent,
                 ip_address:   session.ip_address,
-                created_at:   session.created_at.and_utc(),
-                last_used_at: session.last_used_at.and_utc(),
+                created_at:   session.created_at.with_timezone(&chrono::Utc),
+                last_used_at: session.last_used_at.with_timezone(&chrono::Utc),
             }
         })
         .collect();
