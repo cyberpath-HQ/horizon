@@ -32,7 +32,7 @@ impl MigrationTrait for Migration {
                         text(Roles::Id)
                             .not_null()
                             .primary_key()
-                            .default(Expr::cust("'h8ks3j2k9j3h8k2s3j4k5m6n7o8p9q0'")), // Default to super_admin CUID2
+                            .default(Expr::cust("cuid2(32, 'role_')")), // Default to super_admin CUID2
                     )
                     .col(string(Roles::Name).not_null())
                     .col(string(Roles::Slug).not_null().unique_key())
@@ -96,7 +96,7 @@ impl MigrationTrait for Migration {
                         Roles::IsSystem,
                     ])
                     .values_panic([
-                        "h8ks3j2k9j3h8k2s3j4k5m6n7o8p9q0".into(),
+                        "role_vwh7gf4nkx7n2uvuv16mu066ym1724v3".into(),
                         "Super Admin".into(),
                         "super_admin".into(),
                         "Full system access with all permissions".into(),
@@ -104,7 +104,7 @@ impl MigrationTrait for Migration {
                         true.into(),
                     ])
                     .values_panic([
-                        "i9lt4k3l0k4i9l3t4l5n7o9p0q1r2s3".into(),
+                        "role_stjlsdyjs9midgcsy8pajmd3mh7nmjc5".into(),
                         "Admin".into(),
                         "admin".into(),
                         "Full access to most features except system configuration".into(),
@@ -122,7 +122,7 @@ impl MigrationTrait for Migration {
                         true.into(),
                     ])
                     .values_panic([
-                        "j0mu5l4m1l5j0m4u5m6n8o0p1r2s3t4".into(),
+                        "role_k268xc9mfee2whasxl5c01k04roaqgim".into(),
                         "Manager".into(),
                         "manager".into(),
                         "Team management with read/write access to assigned resources".into(),
@@ -140,7 +140,7 @@ impl MigrationTrait for Migration {
                         true.into(),
                     ])
                     .values_panic([
-                        "k1nv6m5n2m6k1n5v6n7o9p2r3s4t5u6".into(),
+                        "role_ohw7nmg90132nmi0yecbfgs6sfnu0jxg".into(),
                         "Viewer".into(),
                         "viewer".into(),
                         "Read-only access to all resources".into(),

@@ -18,10 +18,9 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(
                         ColumnDef::new(RefreshTokens::Id)
-                            .integer()
-                            .not_null()
-                            .auto_increment()
-                            .primary_key(),
+                            .text()
+                            .primary_key()
+                            .default(Expr::cust("cuid2(32, 'rtok_')")),
                     )
                     .col(ColumnDef::new(RefreshTokens::UserId).text().not_null())
                     .col(

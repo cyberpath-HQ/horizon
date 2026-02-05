@@ -15,7 +15,7 @@ impl MigrationTrait for Migration {
                         text(UserRoles::Id)
                             .not_null()
                             .primary_key()
-                            .default(Expr::cust("'h8ks3j2k9j3h8k2s3j4k5m6n7o8p9q0'")), // Default to super_admin CUID2
+                            .default(Expr::cust("cuid2(32, 'urole_')")),
                     )
                     .col(text(UserRoles::UserId).not_null())
                     .col(text(UserRoles::RoleId).not_null())

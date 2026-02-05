@@ -21,12 +21,12 @@ impl MigrationTrait for Migration {
                             .text()
                             .not_null()
                             .primary_key()
-                            .default(Expr::cust("'h8ks3j2k9j3h8k2s3j4k5m6n7o8p9q0'")), // Default to super_admin CUID2
+                            .default(Expr::cust("cuid2(32, 'usess_')")),
                     )
                     .col(ColumnDef::new(UserSessions::UserId).text().not_null())
                     .col(
                         ColumnDef::new(UserSessions::RefreshTokenId)
-                            .integer()
+                            .text()
                             .not_null(),
                     )
                     .col(ColumnDef::new(UserSessions::UserAgent).string().null())
