@@ -5,3 +5,4 @@
 pub mod handlers;
 pub mod jwt;
 pub mod roles;
+pub mod sessions;
