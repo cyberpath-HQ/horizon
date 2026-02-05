@@ -209,18 +209,51 @@ async fn serve(args: &ServeArgs) -> Result<()> {
         .parse()
         .map_err(|e| anyhow::anyhow!("Invalid address: {}", e))?;
 
-    // Start the server
+    // Check if TLS is enabled
+    if args.tls {
+        // TLS is enabled
+        logging::warn!(target: "serve", "TLS support requires additional configuration. Using HTTP for now.");
+        logging::info!(target: "serve", "To enable HTTPS, configure a reverse proxy (nginx/caddy) in front of this server.");
+    }
+
+    // Start the server (HTTP)
     logging::info!(target: "serve", %address, "Starting HTTP server...");
     let listener = tokio::net::TcpListener::bind(&address)
         .await
         .map_err(|e| anyhow::anyhow!("Failed to bind to {}: {}", address, e))?;
 
-    axum::serve(listener, app)
+    let serve_future = axum::serve(listener, app).with_graceful_shutdown(shutdown_signal());
+
+    serve_future
         .await
         .map_err(|e| anyhow::anyhow!("Server error: {}", e))?;
 
     logging::info!(target: "serve", "Server stopped");
     Ok(())
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("Failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("Failed to install terminate handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
 }
 
 async fn migrate(args: &MigrateArgs) -> Result<()> {
