@@ -154,6 +154,8 @@ pub fn extract_bearer_token(auth_header: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+    use base64::Engine;
+
     use super::*;
     use crate::JwtConfig;
 
@@ -161,7 +163,7 @@ mod tests {
     fn test_create_and_validate_token() {
         let secret = "test-secret-key-that-is-at-least-32-bytes-long";
         let config = JwtConfig {
-            secret:             base64::encode(secret),
+            secret:             base64::engine::general_purpose::STANDARD.encode(secret),
             expiration_seconds: 3600,
             issuer:             "test-issuer".to_string(),
             audience:           "test-audience".to_string(),
