@@ -10,7 +10,12 @@ use axum::{
 };
 use serde_json::json;
 
-use crate::{auth::jwt::validate_token, token_blacklist::hash_token_for_blacklist, AppError, AppState};
+use crate::{
+    auth::jwt::{extract_bearer_token, validate_token},
+    token_blacklist::hash_token_for_blacklist,
+    AppError,
+    AppState,
+};
 
 /// User information extracted from JWT token
 #[derive(Debug, Clone)]
@@ -123,21 +128,6 @@ pub async fn auth_middleware(mut request: Request, next: Next) -> Response {
     next.run(request).await
 }
 
-/// Extract Bearer token from Authorization header
-fn extract_bearer_token(auth_header: &str) -> Option<String> {
-    if !auth_header.starts_with("Bearer ") {
-        return None;
-    }
-
-    let token = auth_header.trim_start_matches("Bearer ").trim();
-
-    if token.is_empty() {
-        return None;
-    }
-
-    Some(token.to_string())
-}
-
 /// Create standardized authentication error response
 fn create_auth_error_response(message: &str) -> Response {
     (
@@ -154,11 +144,11 @@ fn create_auth_error_response(message: &str) -> Response {
 
 #[cfg(test)]
 mod tests {
-    use axum::{body::Body, http::Request};
+    use axum::http::Request;
     use tower::ServiceExt;
 
     use super::*;
-    use crate::{auth::jwt::create_access_token, JwtConfig};
+    use crate::auth::jwt::extract_bearer_token;
 
     #[tokio::test]
     async fn test_extract_bearer_token() {
@@ -177,7 +167,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_auth_middleware_missing_header() {
-        // Test that the helper functions work correctly
+        // Verify extract_bearer_token works correctly
         assert!(extract_bearer_token("Bearer test").is_some());
         assert!(extract_bearer_token("Bearer").is_none());
         assert!(extract_bearer_token("").is_none());
