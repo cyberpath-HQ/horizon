@@ -121,23 +121,62 @@ impl TokenBlacklist {
 
     /// Cleanup expired blacklist entries
     ///
-    /// Note: Redis automatically expires keys with TTL, but this method
-    /// can be used for manual cleanup or monitoring purposes.
+    /// This method actively scans the blacklist for expired entries and removes them.
+    /// While Redis automatically handles TTL expiration, this method ensures
+    /// cleanup and returns the count of removed entries for monitoring purposes.
     ///
     /// # Errors
     ///
     /// Returns an error if Redis operation fails
     pub async fn cleanup_expired_tokens(&self) -> crate::Result<u64> {
-        // Note: Redis automatically handles TTL expiration, so this method
-        // is mainly for monitoring/reporting purposes. In production systems,
-        // you might want to run this periodically to ensure cleanup.
+        let mut conn = self.client.get_multiplexed_async_connection().await?;
 
-        // Since Redis handles TTL automatically, we'll just return the current count
-        // In a real implementation, you could scan for keys with TTL and manually delete
-        // if needed, but this is usually unnecessary.
+        let mut deleted_count = 0u64;
+        let pattern = "blacklist:token:*";
 
-        let stats = self.stats().await?;
-        Ok(stats.total_tokens as u64)
+        // Use Redis SCAN to iterate through all blacklist keys
+        let mut cursor = 0u64;
+
+        loop {
+            let (next_cursor, keys): (u64, Vec<String>) = redis::cmd("SCAN")
+                .arg(cursor)
+                .arg("MATCH")
+                .arg(pattern)
+                .arg("COUNT")
+                .arg(100)
+                .query_async(&mut conn)
+                .await?;
+
+            // Check each key and delete if expired
+            for key in &keys {
+                // Use TTL command to check remaining time
+                let ttl: RedisResult<i64> = conn.ttl(key).await;
+
+                match ttl {
+                    Ok(ttl_value) => {
+                        if ttl_value <= 0 {
+                            // TTL is 0 or negative, key should be expired
+                            let _: () = conn.del(key).await?;
+                            deleted_count += 1;
+                        }
+                        // If ttl_value > 0, key still has time remaining
+                    },
+                    Err(e) => {
+                        debug!(key = %key, error = %e, "Error checking TTL during cleanup");
+                        continue;
+                    },
+                }
+            }
+
+            cursor = next_cursor;
+            if cursor == 0 {
+                break;
+            }
+        }
+
+        tracing::info!(deleted_count = %deleted_count, "Expired tokens cleaned from blacklist");
+
+        Ok(deleted_count)
     }
 }
 
