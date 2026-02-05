@@ -14,7 +14,7 @@ use base64::prelude::*;
 #[derive(Debug, Error)]
 pub enum PasswordError {
     #[error("Hashing failed: {0}")]
-    HashingFailed(#[from] argon2::Error),
+    HashingFailed(String),
 
     #[error("Verification failed: password does not match")]
     VerificationFailed,
@@ -89,12 +89,15 @@ pub fn hash_password(password: &SecretString, config: Option<PasswordConfig>) ->
             config.time_cost,
             config.parallelism,
             Some(config.hash_length as usize),
-        )?,
+        )
+        .map_err(|e| PasswordError::HashingFailed(e.to_string()))?,
     );
 
     // Hash the password
     let mut output = vec![0u8; config.hash_length as usize];
-    argon2.hash_password_into(password.expose_secret().as_bytes(), &salt, &mut output)?;
+    argon2
+        .hash_password_into(password.expose_secret().as_bytes(), &salt, &mut output)
+        .map_err(|e| PasswordError::HashingFailed(e.to_string()))?;
 
     // Format: $argon2id$v=19$m=15360,t=3,p=2$<salt_base64>$<hash_base64>
     let salt_b64 = BASE64_STANDARD.encode(&salt);
@@ -188,16 +191,19 @@ pub fn verify_password(password: &SecretString, expected_hash: &str) -> Result<(
     let argon2 = Argon2::new(
         Algorithm::Argon2id,
         Version::V0x13,
-        Params::new(memory_cost, time_cost, parallelism, Some(stored_hash.len()))?,
+        Params::new(memory_cost, time_cost, parallelism, Some(stored_hash.len()))
+            .map_err(|e| PasswordError::HashingFailed(e.to_string()))?,
     );
 
     // Hash the provided password with the same salt
     let mut computed_hash = vec![0u8; stored_hash.len()];
-    argon2.hash_password_into(
-        password.expose_secret().as_bytes(),
-        &salt,
-        &mut computed_hash,
-    )?;
+    argon2
+        .hash_password_into(
+            password.expose_secret().as_bytes(),
+            &salt,
+            &mut computed_hash,
+        )
+        .map_err(|e| PasswordError::HashingFailed(e.to_string()))?;
 
     // Compare using constant-time comparison
     if computed_hash.len() != stored_hash.len() {
