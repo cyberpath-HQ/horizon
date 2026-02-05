@@ -54,12 +54,12 @@ log_step() {
 # Safe URL display - redact credentials
 safe_url() {
     local url="$1"
-    if [[ "$url" =~ ^([^:]+://[^@]+@)(.+)$ ]]; then
-        # Contains credentials - redact everything after ://
-        echo "${BASH_REMATCH[1]}[REDACTED]${BASH_REMATCH[2]}"
+    if [[ "$url" =~ ^([^:]+://)([^@]+@)(.+)$ ]]; then
+        # Contains credentials - redact the user:pass part
+        echo "${BASH_REMATCH[1]}[REDACTED]@${BASH_REMATCH[3]}"
     else
-        # No credentials, show as-is (or just show host)
-        echo "[REDACTED - contains credentials]"
+        # No credentials, show as-is
+        echo "$url"
     fi
 }
 
@@ -198,7 +198,10 @@ update_lib_rs() {
     done
 
     # Generate new lib.rs with correct format
-    local lib_content="//! Entity definitions for Horizon CMDB
+    local lib_content="#![recursion_limit = \"1024\"]
+#![allow(clippy::all)]
+
+//! Entity definitions for Horizon CMDB
 //!
 //! This crate contains Sea-ORM entity definitions for the database models.
 //! Entities are auto-generated from the database schema.
@@ -272,7 +275,7 @@ inject_security_attributes() {
     log_step "Injecting security attributes for sensitive fields..."
 
     # Define sensitive field patterns (field name only, pattern is built below)
-    local sensitive_fields=("password_hash" "totp_secret")
+    local sensitive_fields=("password_hash" "totp_secret" "key_hash")
 
     local modified_count=0
 
@@ -300,7 +303,7 @@ inject_security_attributes() {
                     log_info "Security attribute already present for ${field_name} in $(basename "$entity_file")"
                 fi
             fi
-        done < <(grep -l "pub ${field_name}:" "$ENTITY_DIR"/*.rs 2>/dev/null | head -1)
+        done < <(grep -l "pub ${field_name}:" "$ENTITY_DIR"/*.rs 2>/dev/null)
     done
 
     if [ "$DRY_RUN" = true ]; then
