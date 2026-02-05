@@ -10,21 +10,11 @@ name = "auth"
 path = "src/lib.rs"
 
 [dependencies]
-# Entity access
-entity = { path = "../entity" }
-error = { path = "../error" }
-logging = { path = "../logging" }
-serde = { workspace = true }
-serde_json = { workspace = true }
+# Error handling
 thiserror = { workspace = true }
-tokio = { workspace = true }
-tracing = { workspace = true }
 
 # Password hashing
 argon2 = { workspace = true }
-
-# Time handling
-chrono = { workspace = true }
 
 # Random generation
 rand = { workspace = true }
