@@ -192,8 +192,9 @@ async fn serve(args: &ServeArgs) -> Result<()> {
     logging::info!(target: "serve", "Database migrations completed successfully");
 
     // Initialize Redis client for token blacklisting
-    let redis_client = redis::Client::open("redis://127.0.0.1:6379")
-        .map_err(|e| anyhow::anyhow!("Failed to connect to Redis: {}", e))?;
+    let redis_url = std::env::var("HORIZON_REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
+    let redis_client =
+        redis::Client::open(redis_url).map_err(|e| anyhow::anyhow!("Failed to connect to Redis: {}", e))?;
 
     // Create application state
     let jwt_config = JwtConfig::default();
