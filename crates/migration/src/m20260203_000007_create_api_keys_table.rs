@@ -16,7 +16,7 @@ impl MigrationTrait for Migration {
                         text(ApiKeys::Id)
                             .not_null()
                             .primary_key()
-                            .default(Expr::cust("cuid2(32, 'apik_')")), 
+                            .default(Expr::cust("cuid2(32, 'apik_')")),
                     )
                     .col(text(ApiKeys::UserId).not_null())
                     .col(string(ApiKeys::Name).not_null())
