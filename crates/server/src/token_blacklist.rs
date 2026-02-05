@@ -110,13 +110,31 @@ impl TokenBlacklist {
     pub async fn stats(&self) -> Result<BlacklistStats> {
         let mut conn = self.client.get_multiplexed_async_connection().await?;
 
-        // Count keys matching the blacklist pattern
+        // Count keys matching the blacklist pattern using SCAN to avoid blocking
         let pattern = "blacklist:token:*";
-        let keys: Vec<String> = conn.keys(pattern).await?;
-        let total_tokens = keys.len();
+        let mut total_tokens = 0u64;
+        let mut cursor = 0u64;
+
+        loop {
+            let (next_cursor, keys): (u64, Vec<String>) = redis::cmd("SCAN")
+                .arg(cursor)
+                .arg("MATCH")
+                .arg(pattern)
+                .arg("COUNT")
+                .arg(100)
+                .query_async(&mut conn)
+                .await?;
+
+            total_tokens += keys.len() as u64;
+            cursor = next_cursor;
+
+            if cursor == 0 {
+                break;
+            }
+        }
 
         Ok(BlacklistStats {
-            total_tokens,
+            total_tokens: total_tokens as usize,
         })
     }
 
