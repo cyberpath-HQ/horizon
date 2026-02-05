@@ -5,6 +5,7 @@
 use chrono::{DateTime, Utc};
 use redis::{AsyncCommands, RedisResult};
 use tracing::debug;
+use error::Result;
 
 /// Token blacklist service for managing revoked tokens in Redis
 #[derive(Clone, Debug)]
@@ -32,7 +33,7 @@ impl TokenBlacklist {
     /// # Errors
     ///
     /// Returns an error if Redis operation fails
-    pub async fn blacklist_token(&self, token_hash: &str, expires_at: DateTime<Utc>) -> crate::Result<()> {
+    pub async fn blacklist_token(&self, token_hash: &str, expires_at: DateTime<Utc>) -> Result<()> {
         let mut conn = self.client.get_multiplexed_async_connection().await?;
 
         // Calculate TTL in seconds from now until token expires
@@ -63,7 +64,7 @@ impl TokenBlacklist {
     /// # Errors
     ///
     /// Returns an error if Redis operation fails
-    pub async fn is_blacklisted(&self, token_hash: &str) -> crate::Result<bool> {
+    pub async fn is_blacklisted(&self, token_hash: &str) -> Result<bool> {
         let mut conn = self.client.get_multiplexed_async_connection().await?;
 
         let key = format!("blacklist:token:{}", token_hash);
@@ -73,7 +74,7 @@ impl TokenBlacklist {
             Ok(Some(_)) => Ok(true),
             Ok(None) => Ok(false),
             Err(e) => {
-                Err(crate::AppError::database(format!(
+                Err(error::AppError::database(format!(
                     "Redis blacklist check failed: {}",
                     e
                 )))
@@ -90,7 +91,7 @@ impl TokenBlacklist {
     /// # Errors
     ///
     /// Returns an error if Redis operation fails
-    pub async fn remove_from_blacklist(&self, token_hash: &str) -> crate::Result<()> {
+    pub async fn remove_from_blacklist(&self, token_hash: &str) -> Result<()> {
         let mut conn = self.client.get_multiplexed_async_connection().await?;
 
         let key = format!("blacklist:token:{}", token_hash);
@@ -106,7 +107,7 @@ impl TokenBlacklist {
     /// # Errors
     ///
     /// Returns an error if Redis operation fails
-    pub async fn stats(&self) -> crate::Result<BlacklistStats> {
+    pub async fn stats(&self) -> Result<BlacklistStats> {
         let mut conn = self.client.get_multiplexed_async_connection().await?;
 
         // Count keys matching the blacklist pattern
@@ -128,7 +129,7 @@ impl TokenBlacklist {
     /// # Errors
     ///
     /// Returns an error if Redis operation fails
-    pub async fn cleanup_expired_tokens(&self) -> crate::Result<u64> {
+    pub async fn cleanup_expired_tokens(&self) -> Result<u64> {
         let mut conn = self.client.get_multiplexed_async_connection().await?;
 
         let mut deleted_count = 0u64;
