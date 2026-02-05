@@ -12,6 +12,7 @@ use chrono::Utc;
 use tracing::info;
 use uuid::Uuid;
 use axum::{extract::Request, Json};
+use error::{AppError, Result};
 
 use crate::{
     auth::jwt::create_access_token,
@@ -25,9 +26,7 @@ use crate::{
         SuccessResponse,
     },
     refresh_tokens::{generate_refresh_token, revoke_refresh_token, validate_refresh_token},
-    AppError,
     AppState,
-    Result,
 };
 
 /// Inner handler for setup endpoint
@@ -40,17 +39,18 @@ pub async fn setup_handler_inner(state: &AppState, req: SetupRequest) -> Result<
     let user_exists = count_result > 0;
 
     if user_exists {
-        return Err(AppError::Auth {
-            message: "System has already been configured. Use /login instead.".to_string(),
-        });
+        return Err(AppError::unauthorized(
+            "System has already been configured. Use /login instead.".to_string(),
+        ));
     }
 
     // Validate password strength
     if let Err(errors) = validate_password_strength(&req.password) {
         let messages: Vec<String> = errors.iter().map(|e| e.to_string()).collect();
-        return Err(AppError::Auth {
-            message: format!("Password validation failed: {}", messages.join(", ")),
-        });
+        return Err(AppError::unauthorized(format!(
+            "Password validation failed: {}",
+            messages.join(", ")
+        )));
     }
 
     // Generate UUID for the new user
@@ -58,11 +58,8 @@ pub async fn setup_handler_inner(state: &AppState, req: SetupRequest) -> Result<
 
     // Hash the password
     let password_secret = auth::secrecy::SecretString::from(req.password.clone());
-    let _hashed_password = hash_password(&password_secret, None).map_err(|e| {
-        AppError::Auth {
-            message: format!("Failed to hash password: {}", e),
-        }
-    })?;
+    let _hashed_password = hash_password(&password_secret, None)
+        .map_err(|e| AppError::unauthorized(format!("Failed to hash password: {}", e)))?;
 
     // Create the user with admin role
     // Note: This uses a simple insert. In production, you'd want to use transactions
@@ -126,25 +123,16 @@ pub async fn login_handler_inner(
         .one(&state.db)
         .await?;
 
-    let user = user_option.ok_or_else(|| {
-        AppError::Auth {
-            message: "Invalid email or password".to_string(),
-        }
-    })?;
+    let user = user_option.ok_or_else(|| AppError::unauthorized("Invalid email or password".to_string()))?;
 
     // Verify password
     let password_secret = auth::secrecy::SecretString::from(req.password);
-    verify_password(&password_secret, &user.password_hash).map_err(|_| {
-        AppError::Auth {
-            message: "Invalid email or password".to_string(),
-        }
-    })?;
+    verify_password(&password_secret, &user.password_hash)
+        .map_err(|_| AppError::unauthorized("Invalid email or password".to_string()))?;
 
     // Check if user is active
     if user.status != entity::sea_orm_active_enums::UserStatus::Active {
-        return Err(AppError::Auth {
-            message: "Account is not active".to_string(),
-        });
+        return Err(AppError::unauthorized("Account is not active".to_string()));
     }
 
     // Generate JWT tokens
@@ -236,11 +224,11 @@ pub async fn logout_handler_inner(state: &AppState, request: Request) -> Result<
     let authenticated_user = request
         .extensions()
         .get::<crate::middleware::auth::AuthenticatedUser>()
-        .ok_or_else(|| AppError::auth("No authenticated user found".to_string()))?;
+        .ok_or_else(|| AppError::unauthorized("No authenticated user found".to_string()))?;
 
     // Parse the user ID
     let user_id = uuid::Uuid::parse_str(&authenticated_user.id)
-        .map_err(|_| AppError::auth("Invalid user ID format".to_string()))?;
+        .map_err(|_| AppError::unauthorized("Invalid user ID format".to_string()))?;
 
     // Revoke all refresh tokens for this user
     if let Err(e) = crate::refresh_tokens::revoke_all_user_tokens(&state.db, user_id).await {
@@ -318,11 +306,13 @@ pub async fn refresh_handler_inner(state: &AppState, req: RefreshRequest) -> Res
     let user = UsersEntity::find_by_id(user_id)
         .one(&state.db)
         .await?
-        .ok_or_else(|| AppError::auth("User associated with refresh token not found".to_string()))?;
+        .ok_or_else(|| AppError::unauthorized("User associated with refresh token not found".to_string()))?;
 
     // Check if user is active
     if user.status != entity::sea_orm_active_enums::UserStatus::Active {
-        return Err(AppError::auth("User account is not active".to_string()));
+        return Err(AppError::unauthorized(
+            "User account is not active".to_string(),
+        ));
     }
 
     // Generate new access token

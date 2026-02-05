@@ -6,6 +6,7 @@ use entity::{roles::Entity as RolesEntity, sea_orm_active_enums::RoleScopeType, 
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 use uuid::Uuid;
 use tracing::info;
+use error::Result;
 
 /// Load roles for a specific user
 ///
@@ -25,7 +26,7 @@ use tracing::info;
 /// ```ignore
 /// let roles = get_user_roles(&db, user_id).await?;
 /// ```
-pub async fn get_user_roles(db: &DatabaseConnection, user_id: Uuid) -> crate::Result<Vec<String>> {
+pub async fn get_user_roles(db: &DatabaseConnection, user_id: Uuid) -> Result<Vec<String>> {
     use sea_orm::sea_query::Condition;
     use entity::user_roles::Column;
 
@@ -92,17 +93,13 @@ pub async fn assign_role_to_user(
     scope_type: RoleScopeType,
     scope_id: Option<Uuid>,
     expires_at: Option<chrono::DateTime<chrono::Utc>>,
-) -> crate::Result<()> {
+) -> Result<()> {
     // Find the role by slug
     let role = RolesEntity::find()
         .filter(entity::roles::Column::Slug.eq(role_slug))
         .one(db)
         .await?
-        .ok_or_else(|| {
-            crate::AppError::Database {
-                message: format!("Role '{}' not found", role_slug),
-            }
-        })?;
+        .ok_or_else(|| error::AppError::database(format!("Role '{}' not found", role_slug)))?;
 
     // Create user role assignment
     let active_model = entity::user_roles::ActiveModel {
@@ -116,11 +113,10 @@ pub async fn assign_role_to_user(
     };
 
     // Insert into database
-    active_model.insert(db).await.map_err(|e| {
-        crate::AppError::Database {
-            message: format!("Failed to assign role to user: {}", e),
-        }
-    })?;
+    active_model
+        .insert(db)
+        .await
+        .map_err(|e| error::AppError::database(format!("Failed to assign role to user: {}", e)))?;
 
     info!(
         user_id = %user_id,

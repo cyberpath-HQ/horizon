@@ -5,8 +5,7 @@
 use base64::{engine::general_purpose, Engine as _};
 use chrono::{DateTime, Utc};
 use sea_orm::{prelude::*, Set};
-
-use crate::AppError;
+use error::{AppError, Result};
 
 /// Refresh token model for database operations
 #[derive(Debug, Clone)]
@@ -44,7 +43,7 @@ pub async fn create_refresh_token(
     user_id: uuid::Uuid,
     token_value: &str,
     expires_in_seconds: u64,
-) -> crate::Result<RefreshToken> {
+) -> Result<RefreshToken> {
     // Hash the token using BLAKE3
     let token_hash = blake3::hash(token_value.as_bytes()).to_hex().to_string();
 
@@ -88,7 +87,7 @@ pub async fn create_refresh_token(
 /// # Errors
 ///
 /// Returns an error if the token is invalid, expired, or revoked.
-pub async fn validate_refresh_token(db: &sea_orm::DbConn, token_value: &str) -> crate::Result<uuid::Uuid> {
+pub async fn validate_refresh_token(db: &sea_orm::DbConn, token_value: &str) -> Result<uuid::Uuid> {
     // Hash the token to compare with stored hash
     let token_hash = blake3::hash(token_value.as_bytes()).to_hex().to_string();
 
@@ -99,12 +98,14 @@ pub async fn validate_refresh_token(db: &sea_orm::DbConn, token_value: &str) -> 
         .one(db)
         .await
         .map_err(|e| AppError::database(format!("Failed to query refresh token: {}", e)))?
-        .ok_or_else(|| AppError::auth("Invalid refresh token".to_string()))?;
+        .ok_or_else(|| AppError::unauthorized("Invalid refresh token".to_string()))?;
 
     // Check if token is expired
     let now = Utc::now().naive_utc();
     if token_model.expires_at < now {
-        return Err(AppError::auth("Refresh token has expired".to_string()));
+        return Err(AppError::unauthorized(
+            "Refresh token has expired".to_string(),
+        ));
     }
 
     Ok(token_model.user_id)
@@ -120,7 +121,7 @@ pub async fn validate_refresh_token(db: &sea_orm::DbConn, token_value: &str) -> 
 /// # Errors
 ///
 /// Returns an error if database operations fail.
-pub async fn revoke_refresh_token(db: &sea_orm::DbConn, token_value: &str) -> crate::Result<()> {
+pub async fn revoke_refresh_token(db: &sea_orm::DbConn, token_value: &str) -> Result<()> {
     // Hash the token to find it
     let token_hash = blake3::hash(token_value.as_bytes()).to_hex().to_string();
 
@@ -140,7 +141,9 @@ pub async fn revoke_refresh_token(db: &sea_orm::DbConn, token_value: &str) -> cr
         .map_err(|e| AppError::database(format!("Failed to revoke refresh token: {}", e)))?;
 
     if update_result.rows_affected == 0 {
-        return Err(AppError::auth("Refresh token not found".to_string()));
+        return Err(AppError::unauthorized(
+            "Refresh token not found".to_string(),
+        ));
     }
 
     Ok(())
@@ -156,7 +159,7 @@ pub async fn revoke_refresh_token(db: &sea_orm::DbConn, token_value: &str) -> cr
 /// # Errors
 ///
 /// Returns an error if database operations fail.
-pub async fn revoke_all_user_tokens(db: &sea_orm::DbConn, user_id: uuid::Uuid) -> crate::Result<()> {
+pub async fn revoke_all_user_tokens(db: &sea_orm::DbConn, user_id: uuid::Uuid) -> Result<()> {
     entity::refresh_tokens::Entity::update_many()
         .col_expr(
             entity::refresh_tokens::Column::RevokedAt,
@@ -184,7 +187,7 @@ pub async fn revoke_all_user_tokens(db: &sea_orm::DbConn, user_id: uuid::Uuid) -
 /// # Errors
 ///
 /// Returns an error if database operations fail.
-pub async fn cleanup_expired_tokens(db: &sea_orm::DbConn) -> crate::Result<u64> {
+pub async fn cleanup_expired_tokens(db: &sea_orm::DbConn) -> Result<u64> {
     let now = Utc::now().naive_utc();
 
     let delete_result = entity::refresh_tokens::Entity::delete_many()

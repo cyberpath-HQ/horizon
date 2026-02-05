@@ -176,6 +176,14 @@ impl IntoResponse for AppError {
     }
 }
 
+// Implement axum's IntoResponse trait for AppError
+impl axum::response::IntoResponse for AppError {
+    fn into_response(self) -> axum::response::Response {
+        let handler = ErrorHandler::new(false);
+        handler.to_response(&self)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

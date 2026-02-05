@@ -9,8 +9,9 @@ use std::{
 
 use jsonwebtoken::{EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
+use error::AppError;
 
-use crate::{AppError, JwtConfig, Result};
+use crate::{JwtConfig, Result};
 
 /// JWT claims structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -55,11 +56,7 @@ pub struct Claims {
 pub fn create_access_token(config: &JwtConfig, user_id: &str, email: &str, roles: &[String]) -> Result<String> {
     let now = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
-        .map_err(|e| {
-            AppError::Token {
-                message: format!("Failed to get current time: {}", e),
-            }
-        })?;
+        .map_err(|e| AppError::unauthorized(format!("Failed to get current time: {}", e)))?;
 
     let issued_at = now.as_secs();
     let expiration = now + Duration::from_secs(config.expiration_seconds);
@@ -79,17 +76,10 @@ pub fn create_access_token(config: &JwtConfig, user_id: &str, email: &str, roles
     let token = jsonwebtoken::encode(
         &Header::default(),
         &claims,
-        &EncodingKey::from_base64_secret(&config.secret).map_err(|e| {
-            AppError::Token {
-                message: format!("Invalid JWT secret: {}", e),
-            }
-        })?,
+        &EncodingKey::from_base64_secret(&config.secret)
+            .map_err(|e| AppError::unauthorized(format!("Invalid JWT secret: {}", e)))?,
     )
-    .map_err(|e| {
-        AppError::Token {
-            message: format!("Failed to encode token: {}", e),
-        }
-    })?;
+    .map_err(|e| AppError::unauthorized(format!("Failed to encode token: {}", e)))?;
 
     Ok(token)
 }
@@ -105,11 +95,8 @@ pub fn create_access_token(config: &JwtConfig, user_id: &str, email: &str, roles
 ///
 /// Returns an error if token validation fails.
 pub fn validate_token(config: &JwtConfig, token: &str) -> Result<Claims> {
-    let decoding_key = jsonwebtoken::DecodingKey::from_base64_secret(&config.secret).map_err(|e| {
-        AppError::Token {
-            message: format!("Invalid JWT secret: {}", e),
-        }
-    })?;
+    let decoding_key = jsonwebtoken::DecodingKey::from_base64_secret(&config.secret)
+        .map_err(|e| AppError::unauthorized(format!("Invalid JWT secret: {}", e)))?;
 
     let mut validation = Validation::default();
     let mut iss_set = HashSet::new();
@@ -120,11 +107,8 @@ pub fn validate_token(config: &JwtConfig, token: &str) -> Result<Claims> {
     validation.aud = Some(aud);
     validation.validate_exp = true;
 
-    let claims = jsonwebtoken::decode(token, &decoding_key, &validation).map_err(|e| {
-        AppError::Token {
-            message: format!("Token validation failed: {}", e),
-        }
-    })?;
+    let claims = jsonwebtoken::decode(token, &decoding_key, &validation)
+        .map_err(|e| AppError::unauthorized(format!("Token validation failed: {}", e)))?;
 
     Ok(claims.claims)
 }

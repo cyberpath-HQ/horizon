@@ -499,6 +499,15 @@ impl From<sea_orm::DbErr> for AppError {
     }
 }
 
+/// Convert Redis errors to AppError.
+impl From<redis::RedisError> for AppError {
+    fn from(err: redis::RedisError) -> Self {
+        Self::Internal {
+            message: format!("Redis error: {}", err),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
