@@ -30,7 +30,6 @@ serde_json = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 
 # Utilities
-uuid = { workspace = true, features = ["v4", "serde"] }
 tracing = { workspace = true }
 sea-orm = { workspace = true }
 redis = { workspace = true }
