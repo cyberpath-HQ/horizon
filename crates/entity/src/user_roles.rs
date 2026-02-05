@@ -10,15 +10,15 @@ use super::sea_orm_active_enums::RoleScopeType;
 #[sea_orm(table_name = "user_roles")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
-    pub id:          Uuid,
+    pub id:          String,
     #[sea_orm(unique_key = "idx_user_roles_user_role_scope_unique")]
-    pub user_id:     Uuid,
+    pub user_id:     String,
     #[sea_orm(unique_key = "idx_user_roles_user_role_scope_unique")]
-    pub role_id:     Uuid,
+    pub role_id:     String,
     #[sea_orm(unique_key = "idx_user_roles_user_role_scope_unique")]
     pub scope_type:  RoleScopeType,
     #[sea_orm(unique_key = "idx_user_roles_user_role_scope_unique")]
-    pub scope_id:    Option<Uuid>,
+    pub scope_id:    Option<String>,
     pub expires_at:  Option<DateTime>,
     pub assigned_at: DateTime,
     pub created_at:  DateTime,

@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 #[sea_orm(table_name = "user_sessions")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
-    pub id:               Uuid,
-    pub user_id:          Uuid,
+    pub id:               String,
+    pub user_id:          String,
     pub refresh_token_id: i32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user_agent:       Option<String>,

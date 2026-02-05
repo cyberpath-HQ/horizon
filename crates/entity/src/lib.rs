@@ -1,5 +1,8 @@
-#![recursion_limit = "1024"]
-#![allow(clippy::all)]
+#![recursion_limit = "2048"]
+#![allow(
+    clippy::all,
+    reason = "Sea-ORM generated entities require flexible linting"
+)]
 
 //! Entity definitions for Horizon CMDB
 //!

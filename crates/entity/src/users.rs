@@ -10,7 +10,7 @@ use super::sea_orm_active_enums::UserStatus;
 #[sea_orm(table_name = "users")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
-    pub id:                Uuid,
+    pub id:                String,
     #[sea_orm(unique)]
     pub email:             String,
     #[sea_orm(unique)]
