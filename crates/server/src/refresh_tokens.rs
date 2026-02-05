@@ -52,13 +52,12 @@ pub async fn create_refresh_token(
     let expires_at = Utc::now() + chrono::Duration::seconds(expires_in_seconds as i64);
 
     // Create the active model
+    // Note: created_at and updated_at are automatically managed by database defaults
     let active_model = entity::refresh_tokens::ActiveModel {
         user_id: Set(user_id),
         token_hash: Set(token_hash.clone()),
         expires_at: Set(expires_at.naive_utc()),
         revoked_at: Set(None),
-        created_at: Set(Utc::now().naive_utc()),
-        updated_at: Set(Utc::now().naive_utc()),
         ..Default::default()
     };
 
