@@ -55,7 +55,7 @@ pub async fn create_refresh_token(
     let active_model = entity::refresh_tokens::ActiveModel {
         user_id: Set(user_id),
         token_hash: Set(token_hash.clone()),
-        expires_at: Set(expires_at.naive_utc()),
+        expires_at: Set(expires_at.with_timezone(&chrono::FixedOffset::east_opt(0).unwrap())),
         revoked_at: Set(None),
         ..Default::default()
     };
@@ -72,8 +72,8 @@ pub async fn create_refresh_token(
         token_hash,
         expires_at,
         revoked_at: None,
-        created_at: model.created_at.and_utc(),
-        updated_at: model.updated_at.and_utc(),
+        created_at: model.created_at.with_timezone(&Utc),
+        updated_at: model.updated_at.with_timezone(&Utc),
     })
 }
 
@@ -101,8 +101,8 @@ pub async fn validate_refresh_token(db: &sea_orm::DbConn, token_value: &str) -> 
         .ok_or_else(|| AppError::unauthorized("Invalid refresh token".to_string()))?;
 
     // Check if token is expired
-    let now = Utc::now().naive_utc();
-    if token_model.expires_at < now {
+    let now = Utc::now();
+    if token_model.expires_at.with_timezone(&Utc) < now {
         return Err(AppError::unauthorized(
             "Refresh token has expired".to_string(),
         ));
