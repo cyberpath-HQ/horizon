@@ -18,12 +18,12 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(
                         ColumnDef::new(UserSessions::Id)
-                            .uuid()
+                            .text()
                             .not_null()
                             .primary_key()
-                            .default(Expr::cust("gen_random_uuid()")),
+                            .default(Expr::cust("'h8ks3j2k9j3h8k2s3j4k5m6n7o8p9q0'")), // Default to super_admin CUID2
                     )
-                    .col(ColumnDef::new(UserSessions::UserId).uuid().not_null())
+                    .col(ColumnDef::new(UserSessions::UserId).text().not_null())
                     .col(
                         ColumnDef::new(UserSessions::RefreshTokenId)
                             .integer()

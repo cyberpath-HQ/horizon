@@ -13,16 +13,16 @@ impl MigrationTrait for Migration {
                     .table(Teams::Table)
                     .if_not_exists()
                     .col(
-                        uuid(Teams::Id)
+                        text(Teams::Id)
                             .not_null()
                             .primary_key()
-                            .default(Expr::cust("gen_random_uuid()")),
+                            .default(Expr::cust("'h8ks3j2k9j3h8k2s3j4k5m6n7o8p9q0'")), // Default to super_admin CUID2
                     )
                     .col(string(Teams::Name).not_null())
                     .col(string(Teams::Slug).not_null().unique_key())
                     .col(text(Teams::Description).null())
-                    .col(uuid(Teams::ParentTeamId).null())
-                    .col(uuid(Teams::ManagerId).not_null())
+                    .col(text(Teams::ParentTeamId).null())
+                    .col(text(Teams::ManagerId).not_null())
                     .col(
                         timestamp(Teams::CreatedAt)
                             .not_null()

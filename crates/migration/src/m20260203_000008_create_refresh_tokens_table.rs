@@ -23,7 +23,7 @@ impl MigrationTrait for Migration {
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(RefreshTokens::UserId).uuid().not_null())
+                    .col(ColumnDef::new(RefreshTokens::UserId).text().not_null())
                     .col(
                         ColumnDef::new(RefreshTokens::TokenHash)
                             .string()

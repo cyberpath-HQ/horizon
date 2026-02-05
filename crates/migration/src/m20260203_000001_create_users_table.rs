@@ -24,10 +24,10 @@ impl MigrationTrait for Migration {
                     .table(Users::Table)
                     .if_not_exists()
                     .col(
-                        uuid(Users::Id)
+                        text(Users::Id)
                             .not_null()
                             .primary_key()
-                            .default(Expr::cust("gen_random_uuid()")),
+                            .default(Expr::cust("'h8ks3j2k9j3h8k2s3j4k5m6n7o8p9q0'")), // Default to super_admin CUID2
                     )
                     .col(string(Users::Email).not_null().unique_key())
                     .col(string(Users::Username).not_null().unique_key())

@@ -28,13 +28,13 @@ impl MigrationTrait for Migration {
                     .table(TeamMembers::Table)
                     .if_not_exists()
                     .col(
-                        uuid(TeamMembers::Id)
+                        text(TeamMembers::Id)
                             .not_null()
                             .primary_key()
-                            .default(Expr::cust("gen_random_uuid()")),
+                            .default(Expr::cust("'h8ks3j2k9j3h8k2s3j4k5m6n7o8p9q0'")), // Default to super_admin CUID2
                     )
-                    .col(uuid(TeamMembers::TeamId).not_null())
-                    .col(uuid(TeamMembers::UserId).not_null())
+                    .col(text(TeamMembers::TeamId).not_null())
+                    .col(text(TeamMembers::UserId).not_null())
                     .col(
                         enumeration(
                             TeamMembers::Role,

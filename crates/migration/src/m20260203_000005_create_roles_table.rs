@@ -29,10 +29,10 @@ impl MigrationTrait for Migration {
                     .table(Roles::Table)
                     .if_not_exists()
                     .col(
-                        uuid(Roles::Id)
+                        text(Roles::Id)
                             .not_null()
                             .primary_key()
-                            .default(Expr::cust("gen_random_uuid()")),
+                            .default(Expr::cust("'h8ks3j2k9j3h8k2s3j4k5m6n7o8p9q0'")), // Default to super_admin CUID2
                     )
                     .col(string(Roles::Name).not_null())
                     .col(string(Roles::Slug).not_null().unique_key())
@@ -96,7 +96,7 @@ impl MigrationTrait for Migration {
                         Roles::IsSystem,
                     ])
                     .values_panic([
-                        Expr::cust("'00000000-0000-0000-0000-000000000001'::uuid").into(),
+                        "h8ks3j2k9j3h8k2s3j4k5m6n7o8p9q0".into(),
                         "Super Admin".into(),
                         "super_admin".into(),
                         "Full system access with all permissions".into(),
@@ -104,7 +104,7 @@ impl MigrationTrait for Migration {
                         true.into(),
                     ])
                     .values_panic([
-                        Expr::cust("'00000000-0000-0000-0000-000000000002'::uuid").into(),
+                        "i9lt4k3l0k4i9l3t4l5n7o9p0q1r2s3".into(),
                         "Admin".into(),
                         "admin".into(),
                         "Full access to most features except system configuration".into(),
@@ -122,7 +122,7 @@ impl MigrationTrait for Migration {
                         true.into(),
                     ])
                     .values_panic([
-                        Expr::cust("'00000000-0000-0000-0000-000000000003'::uuid").into(),
+                        "j0mu5l4m1l5j0m4u5m6n8o0p1r2s3t4".into(),
                         "Manager".into(),
                         "manager".into(),
                         "Team management with read/write access to assigned resources".into(),
@@ -140,7 +140,7 @@ impl MigrationTrait for Migration {
                         true.into(),
                     ])
                     .values_panic([
-                        Expr::cust("'00000000-0000-0000-0000-000000000004'::uuid").into(),
+                        "k1nv6m5n2m6k1n5v6n7o9p2r3s4t5u6".into(),
                         "Viewer".into(),
                         "viewer".into(),
                         "Read-only access to all resources".into(),
