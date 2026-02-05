@@ -4,15 +4,12 @@
 //! column whenever a row is modified. This ensures data integrity without requiring
 //! application-level timestamp management.
 //!
-//! Tables affected:
-//! - users
-//! - roles
-//! - user_roles
-//! - teams
-//! - team_members
-//! - refresh_tokens
-//! - api_keys
-//! - user_sessions
+//! This migration dynamically discovers ALL tables in the 'public' schema that have
+//! an `updated_at` column and applies the trigger to each one. This ensures the
+//! trigger is applied to any new tables added in future migrations.
+//!
+//! IMPORTANT: This migration MUST run LAST to ensure it applies to all tables
+//! in their final state.
 
 use sea_orm_migration::prelude::*;
 
@@ -38,49 +35,56 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // Apply trigger to each table with updated_at
-        let tables = [
-            "users",
-            "roles",
-            "user_roles",
-            "teams",
-            "team_members",
-            "refresh_tokens",
-            "api_keys",
-            "user_sessions",
-        ];
-
-        for table in tables {
-            let trigger_name = format!("update_{}_updated_at", table);
-            let sql = format!(
-                "DROP TRIGGER IF EXISTS {} ON {}; CREATE TRIGGER {} BEFORE UPDATE ON {} FOR EACH ROW EXECUTE FUNCTION \
-                 update_updated_at_column()",
-                trigger_name, table, trigger_name, table
-            );
-            manager.get_connection().execute_unprepared(&sql).await?;
-        }
+        // Dynamically apply triggers to all tables with updated_at column using DO block
+        manager
+            .get_connection()
+            .execute_unprepared(
+                r#"
+                DO $$
+                DECLARE
+                    tbl text;
+                    trg text;
+                BEGIN
+                    FOR tbl IN
+                        SELECT table_name FROM information_schema.columns
+                        WHERE table_schema = 'public' AND column_name = 'updated_at'
+                        ORDER BY table_name
+                    LOOP
+                        trg := 'update_' || tbl || '_updated_at';
+                        EXECUTE format('DROP TRIGGER IF EXISTS %I ON %I', trg, tbl);
+                        EXECUTE format('CREATE TRIGGER %I BEFORE UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()', trg, tbl);
+                        RAISE NOTICE 'Applied updated_at trigger to table: %', tbl;
+                    END LOOP;
+                END $$;
+            "#,
+            )
+            .await?;
 
         Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        // Remove triggers from all tables
-        let tables = [
-            "users",
-            "roles",
-            "user_roles",
-            "teams",
-            "team_members",
-            "refresh_tokens",
-            "api_keys",
-            "user_sessions",
-        ];
-
-        for table in tables {
-            let trigger_name = format!("update_{}_updated_at", table);
-            let sql = format!("DROP TRIGGER IF EXISTS {} ON {}", trigger_name, table);
-            manager.get_connection().execute_unprepared(&sql).await?;
-        }
+        // Dynamically remove triggers from all tables with updated_at column using DO block
+        manager
+            .get_connection()
+            .execute_unprepared(
+                r#"
+                DO $$
+                DECLARE
+                    tbl text;
+                    trg text;
+                BEGIN
+                    FOR tbl IN
+                        SELECT table_name FROM information_schema.columns
+                        WHERE table_schema = 'public' AND column_name = 'updated_at'
+                    LOOP
+                        trg := 'update_' || tbl || '_updated_at';
+                        EXECUTE format('DROP TRIGGER IF EXISTS %I ON %I', trg, tbl);
+                    END LOOP;
+                END $$;
+            "#,
+            )
+            .await?;
 
         // Remove the trigger function
         manager
