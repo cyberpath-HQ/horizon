@@ -163,7 +163,7 @@ pub fn verify_password(password: &SecretString, expected_hash: &str) -> Result<(
     let memory_cost: u32 = params_str
         .split(',')
         .find(|p| p.starts_with('m'))
-        .and_then(|p| p.strip_prefix('m'))
+        .and_then(|p| p.strip_prefix("m="))
         .and_then(|p| p.split(',').next())
         .and_then(|p| p.parse().ok())
         .unwrap_or(15360);
@@ -171,7 +171,7 @@ pub fn verify_password(password: &SecretString, expected_hash: &str) -> Result<(
     let time_cost: u32 = params_str
         .split(',')
         .find(|p| p.starts_with('t'))
-        .and_then(|p| p.strip_prefix('t'))
+        .and_then(|p| p.strip_prefix("t="))
         .and_then(|p| p.split(',').next())
         .and_then(|p| p.parse().ok())
         .unwrap_or(3);
@@ -179,7 +179,7 @@ pub fn verify_password(password: &SecretString, expected_hash: &str) -> Result<(
     let parallelism: u32 = params_str
         .split(',')
         .find(|p| p.starts_with('p'))
-        .and_then(|p| p.strip_prefix('p'))
+        .and_then(|p| p.strip_prefix("p="))
         .and_then(|p| p.parse().ok())
         .unwrap_or(2);
 
