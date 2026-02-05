@@ -3,8 +3,11 @@
 //! HTTP request handlers for authentication endpoints.
 
 use auth::password::{hash_password, validate_password_strength, verify_password};
-use entity::users::{Column, Entity as UsersEntity};
-use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
+use entity::{
+    user_sessions::Entity as UserSessionsEntity,
+    users::{Column, Entity as UsersEntity},
+};
+use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
 use chrono::Utc;
 use tracing::info;
 use uuid::Uuid;
@@ -112,7 +115,11 @@ pub async fn setup_handler_inner(state: &AppState, req: SetupRequest) -> Result<
 ///
 /// This function doesn't use State extractor and accepts references to AppState.
 /// It's intended to be called by wrapper handlers that use State extractor.
-pub async fn login_handler_inner(state: &AppState, req: LoginRequest) -> Result<Json<AuthSuccessResponse>> {
+pub async fn login_handler_inner(
+    state: &AppState,
+    req: LoginRequest,
+    headers: axum::http::HeaderMap,
+) -> Result<Json<AuthSuccessResponse>> {
     // Find user by email
     let user_option = UsersEntity::find()
         .filter(Column::Email.eq(req.email.clone()))
@@ -145,13 +152,46 @@ pub async fn login_handler_inner(state: &AppState, req: LoginRequest) -> Result<
     let refresh_token_str = generate_refresh_token();
 
     // Store the refresh token in database
-    crate::refresh_tokens::create_refresh_token(
+    let refresh_token = crate::refresh_tokens::create_refresh_token(
         &state.db,
         user.id, // Use the actual UUID from user
         &refresh_token_str,
         30 * 24 * 60 * 60, // 30 days in seconds
     )
     .await?;
+
+    // Create user session linked to refresh token
+    let session_id = Uuid::new_v4();
+    let now = Utc::now().naive_utc();
+
+    // Extract user agent and IP from headers
+    let user_agent = headers
+        .get("user-agent")
+        .and_then(|h| h.to_str().ok())
+        .map(|s| s.to_string());
+
+    let ip_address = headers
+        .get("x-forwarded-for")
+        .or(headers.get("x-real-ip"))
+        .and_then(|h| h.to_str().ok())
+        .map(|s| s.to_string());
+
+    let session_model = entity::user_sessions::ActiveModel {
+        id: Set(session_id),
+        user_id: Set(user.id),
+        refresh_token_id: Set(refresh_token.id),
+        user_agent: Set(user_agent),
+        ip_address: Set(ip_address),
+        created_at: Set(now),
+        last_used_at: Set(now),
+        revoked_at: Set(None),
+        ..Default::default()
+    };
+
+    UserSessionsEntity::insert(session_model)
+        .exec(&state.db)
+        .await
+        .map_err(|e| AppError::database(format!("Failed to create user session: {}", e)))?;
 
     let tokens = AuthTokens {
         access_token:  create_access_token(
@@ -206,6 +246,21 @@ pub async fn logout_handler_inner(state: &AppState, request: Request) -> Result<
     if let Err(e) = crate::refresh_tokens::revoke_all_user_tokens(&state.db, user_id).await {
         // Log the error but don't fail the logout
         tracing::warn!("Failed to revoke refresh tokens on logout: {}", e);
+    }
+
+    // Delete all user sessions
+    let delete_result = entity::user_sessions::Entity::delete_many()
+        .filter(entity::user_sessions::Column::UserId.eq(user_id))
+        .exec(&state.db)
+        .await;
+
+    match delete_result {
+        Ok(result) => {
+            tracing::info!(user_id = %user_id, deleted_count = result.rows_affected, "Deleted user sessions on logout");
+        },
+        Err(e) => {
+            tracing::warn!("Failed to delete user sessions on logout: {}", e);
+        },
     }
 
     // Extract the access token from the Authorization header to blacklist it

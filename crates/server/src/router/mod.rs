@@ -4,6 +4,7 @@
 
 use axum::{
     extract::{Extension, Path, State as AxumState},
+    http::HeaderMap,
     middleware,
     routing::{delete, get, post},
     Json,
@@ -70,9 +71,10 @@ async fn setup_handler(
 /// Wrapper handler for login endpoint that uses State extractor
 async fn login_handler(
     AxumState(state): AxumState<AppState>,
+    headers: HeaderMap,
     Json(req): Json<crate::dto::auth::LoginRequest>,
 ) -> crate::Result<Json<crate::dto::auth::AuthSuccessResponse>> {
-    crate::auth::handlers::login_handler_inner(&state, req).await
+    crate::auth::handlers::login_handler_inner(&state, req, headers).await
 }
 
 /// Wrapper handler for logout endpoint that uses State extractor
