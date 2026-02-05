@@ -19,8 +19,6 @@ anyhow = { workspace = true }
 # HTTP types
 axum = { workspace = true }
 http = { workspace = true }
-tokio = { workspace = true, features = ["time"] }
-tower = { workspace = true }
 
 # Serialization
 serde = { workspace = true }
@@ -32,7 +30,6 @@ chrono = { workspace = true, features = ["serde"] }
 # Utilities
 tracing = { workspace = true }
 sea-orm = { workspace = true }
-redis = { workspace = true }
 
 [features]
 default = []
