@@ -33,6 +33,7 @@ chrono = { workspace = true, features = ["serde"] }
 uuid = { workspace = true, features = ["v4", "serde"] }
 tracing = { workspace = true }
 sea-orm = { workspace = true }
+redis = { workspace = true }
 
 [features]
 default = []
