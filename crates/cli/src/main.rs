@@ -13,10 +13,12 @@
 use std::net::SocketAddr;
 
 use axum;
+use axum_server::tls_rustls::RustlsConfig;
 use clap::{Args, CommandFactory as _, Parser, Subcommand};
 use error::{AppError, Result};
 use migration::{Migrator, MigratorTrait as _};
 use server::{router::create_app_router, AppState, JwtConfig};
+use tokio::net::TcpListener;
 
 /// Database configuration for CLI
 #[derive(Debug, Clone)]
@@ -209,26 +211,47 @@ async fn serve(args: &ServeArgs) -> Result<()> {
         .parse()
         .map_err(|e| anyhow::anyhow!("Invalid address: {}", e))?;
 
-    // Check if TLS is enabled
+    // Start the server (HTTP or HTTPS)
     if args.tls {
-        // TLS is enabled
-        logging::warn!(target: "serve", "TLS support requires additional configuration. Using HTTP for now.");
-        logging::info!(target: "serve", "To enable HTTPS, configure a reverse proxy (nginx/caddy) in front of this server.");
+        // TLS is enabled - require certificate and key paths
+        let tls_cert_path = args
+            .tls_cert
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("TLS certificate path is required when TLS is enabled"))?;
+        let tls_key_path = args
+            .tls_key
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("TLS key path is required when TLS is enabled"))?;
+
+        logging::info!(target: "serve", "Initializing TLS with cert={}, key={}", tls_cert_path, tls_key_path);
+
+        // Load TLS certificate and key
+        let tls_config = RustlsConfig::from_pem_file(tls_cert_path, tls_key_path)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to load TLS certificate/key: {}", e))?;
+
+        logging::info!(target: "serve", %address, "Starting HTTPS server (TLS enabled)...");
+
+        axum_server::bind_rustls(address, tls_config)
+            .serve(app.into_make_service())
+            .await
+            .map_err(|e| anyhow::anyhow!("HTTPS server error: {}", e))?;
+    }
+    else {
+        // HTTP mode
+        logging::info!(target: "serve", %address, "Starting HTTP server...");
+
+        let listener = TcpListener::bind(&address)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to bind to {}: {}", address, e))?;
+
+        let serve_future = axum::serve(listener, app).with_graceful_shutdown(shutdown_signal());
+
+        serve_future
+            .await
+            .map_err(|e| anyhow::anyhow!("HTTP server error: {}", e))?;
     }
 
-    // Start the server (HTTP)
-    logging::info!(target: "serve", %address, "Starting HTTP server...");
-    let listener = tokio::net::TcpListener::bind(&address)
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to bind to {}: {}", address, e))?;
-
-    let serve_future = axum::serve(listener, app).with_graceful_shutdown(shutdown_signal());
-
-    serve_future
-        .await
-        .map_err(|e| anyhow::anyhow!("Server error: {}", e))?;
-
-    logging::info!(target: "serve", "Server stopped");
     Ok(())
 }
 
