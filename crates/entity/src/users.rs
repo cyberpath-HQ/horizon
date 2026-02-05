@@ -31,11 +31,15 @@ pub struct Model {
     #[sea_orm(has_many)]
     pub api_keys:          HasMany<super::api_keys::Entity>,
     #[sea_orm(has_many)]
+    pub refresh_tokens:    HasMany<super::refresh_tokens::Entity>,
+    #[sea_orm(has_many)]
     pub team_members:      HasMany<super::team_members::Entity>,
     #[sea_orm(has_many)]
     pub teams:             HasMany<super::teams::Entity>,
     #[sea_orm(has_many)]
     pub user_roles:        HasMany<super::user_roles::Entity>,
+    #[sea_orm(has_many)]
+    pub user_sessions:     HasMany<super::user_sessions::Entity>,
 }
 
 impl ActiveModelBehavior for ActiveModel {}
