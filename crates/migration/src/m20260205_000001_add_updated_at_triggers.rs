@@ -75,9 +75,12 @@ impl MigrationTrait for Migration {
                     trg text;
                 BEGIN
                     FOR tbl IN
-                        SELECT table_name FROM information_schema.columns
-                        WHERE table_schema = 'public' AND column_name = 'updated_at'
-                    LOOP
+                        SELECT c.table_name FROM information_schema.columns c
+                        JOIN information_schema.tables t ON c.table_name = t.table_name AND c.table_schema = t.table_schema
+                         WHERE c.table_schema = 'public'
+                           AND c.column_name = 'updated_at'
+                           AND t.table_type = 'BASE TABLE'
+                     LOOP
                         trg := 'update_' || tbl || '_updated_at';
                         EXECUTE format('DROP TRIGGER IF EXISTS %I ON %I', trg, tbl);
                     END LOOP;
