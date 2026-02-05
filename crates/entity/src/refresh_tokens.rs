@@ -11,6 +11,7 @@ pub struct Model {
     pub id:            i32,
     pub user_id:       Uuid,
     #[sea_orm(column_type = "Text", unique)]
+    #[serde(skip_serializing)]
     pub token_hash:    String,
     pub expires_at:    DateTimeWithTimeZone,
     pub revoked_at:    Option<DateTimeWithTimeZone>,
