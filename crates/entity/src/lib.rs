@@ -1,3 +1,6 @@
+#![recursion_limit = "1024"]
+#![allow(clippy::all)]
+
 //! Entity definitions for Horizon CMDB
 //!
 //! This crate contains Sea-ORM entity definitions for the database models.
@@ -18,3 +21,5 @@ pub mod users;
 pub use users::Entity as Users;
 pub mod refresh_tokens;
 pub use refresh_tokens::Entity as RefreshTokens;
+pub mod user_sessions;
+pub use user_sessions::Entity as UserSessions;
