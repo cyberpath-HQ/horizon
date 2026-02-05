@@ -100,12 +100,10 @@ pub async fn auth_middleware(mut request: Request, next: Next) -> Response {
         Ok(false) => {
             // Token is not blacklisted, continue
         },
-        Err(_) => {
-            // If Redis is unavailable, we could either:
-            // 1. Allow the request (fail-open for availability)
-            // 2. Deny the request (fail-closed for security)
-            // For now, we'll fail-open to avoid blocking legitimate users
-            tracing::warn!("Failed to check token blacklist, allowing request");
+        Err(e) => {
+            // Fail-closed for security: deny request if we can't verify token status
+            tracing::error!("Failed to check token blacklist, denying request: {}", e);
+            return create_auth_error_response("Authentication service temporarily unavailable");
         },
     }
 
@@ -161,7 +159,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_auth_middleware_missing_header() {
+    async fn test_extract_bearer_token_edge_cases() {
         // Verify extract_bearer_token works correctly
         assert!(extract_bearer_token("Bearer test").is_some());
         assert!(extract_bearer_token("Bearer").is_none());
