@@ -7,10 +7,12 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize)]
 #[sea_orm(table_name = "user_sessions")]
 pub struct Model {
-    #[sea_orm(primary_key, auto_increment = false)]
+    #[sea_orm(primary_key, auto_increment = false, column_type = "Text")]
     pub id:               String,
+    #[sea_orm(column_type = "Text")]
     pub user_id:          String,
-    pub refresh_token_id: i32,
+    #[sea_orm(column_type = "Text")]
+    pub refresh_token_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user_agent:       Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]

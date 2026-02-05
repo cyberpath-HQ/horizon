@@ -7,16 +7,18 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize)]
 #[sea_orm(table_name = "api_keys")]
 pub struct Model {
-    #[sea_orm(primary_key, auto_increment = false)]
+    #[sea_orm(primary_key, auto_increment = false, column_type = "Text")]
     pub id:           String,
+    #[sea_orm(column_type = "Text")]
     pub user_id:      String,
     pub name:         String,
+    #[serde(skip_serializing)]
     pub key_hash:     String,
     pub key_prefix:   String,
     pub permissions:  Json,
     pub expires_at:   Option<DateTime>,
     pub last_used_at: Option<DateTime>,
-    pub last_used_ip: Option<DateTime>,
+    pub last_used_ip: Option<String>,
     pub created_at:   DateTime,
     pub updated_at:   DateTime,
     #[sea_orm(

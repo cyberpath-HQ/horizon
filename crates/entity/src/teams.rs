@@ -7,15 +7,17 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize)]
 #[sea_orm(table_name = "teams")]
 pub struct Model {
-    #[sea_orm(primary_key, auto_increment = false)]
+    #[sea_orm(primary_key, auto_increment = false, column_type = "Text")]
     pub id:             String,
     pub name:           String,
     #[sea_orm(unique)]
     pub slug:           String,
     #[sea_orm(column_type = "Text", nullable)]
     pub description:    Option<String>,
-    pub parent_team_id: Option<Uuid>,
-    pub manager_id:     Uuid,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub parent_team_id: Option<String>,
+    #[sea_orm(column_type = "Text")]
+    pub manager_id:     String,
     pub created_at:     DateTime,
     pub updated_at:     DateTime,
     pub deleted_at:     Option<DateTime>,

@@ -9,11 +9,11 @@ use super::sea_orm_active_enums::TeamMemberRole;
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize)]
 #[sea_orm(table_name = "team_members")]
 pub struct Model {
-    #[sea_orm(primary_key, auto_increment = false)]
+    #[sea_orm(primary_key, auto_increment = false, column_type = "Text")]
     pub id:         String,
-    #[sea_orm(unique_key = "idx_team_members_team_user_unique")]
+    #[sea_orm(column_type = "Text", unique_key = "idx_team_members_team_user_unique")]
     pub team_id:    String,
-    #[sea_orm(unique_key = "idx_team_members_team_user_unique")]
+    #[sea_orm(column_type = "Text", unique_key = "idx_team_members_team_user_unique")]
     pub user_id:    String,
     pub role:       TeamMemberRole,
     pub joined_at:  DateTime,

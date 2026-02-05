@@ -9,15 +9,21 @@ use super::sea_orm_active_enums::RoleScopeType;
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize)]
 #[sea_orm(table_name = "user_roles")]
 pub struct Model {
-    #[sea_orm(primary_key, auto_increment = false)]
+    #[sea_orm(primary_key, auto_increment = false, column_type = "Text")]
     pub id:          String,
-    #[sea_orm(unique_key = "idx_user_roles_user_role_scope_unique")]
+    #[sea_orm(
+        column_type = "Text",
+        unique_key = "idx_user_roles_user_role_scope_unique"
+    )]
     pub user_id:     String,
-    #[sea_orm(unique_key = "idx_user_roles_user_role_scope_unique")]
+    #[sea_orm(
+        column_type = "Text",
+        unique_key = "idx_user_roles_user_role_scope_unique"
+    )]
     pub role_id:     String,
     #[sea_orm(unique_key = "idx_user_roles_user_role_scope_unique")]
     pub scope_type:  RoleScopeType,
-    #[sea_orm(unique_key = "idx_user_roles_user_role_scope_unique")]
+    #[sea_orm(column_type = "Text", nullable)]
     pub scope_id:    Option<String>,
     pub expires_at:  Option<DateTime>,
     pub assigned_at: DateTime,

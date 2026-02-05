@@ -9,7 +9,7 @@ use super::sea_orm_active_enums::UserStatus;
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize)]
 #[sea_orm(table_name = "users")]
 pub struct Model {
-    #[sea_orm(primary_key, auto_increment = false)]
+    #[sea_orm(primary_key, auto_increment = false, column_type = "Text")]
     pub id:                String,
     #[sea_orm(unique)]
     pub email:             String,
