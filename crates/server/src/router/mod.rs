@@ -2,7 +2,13 @@
 //!
 //! Configures API routes for the Horizon application.
 
-use axum::{extract::State as AxumState, middleware, routing::post, Json, Router};
+use axum::{
+    extract::{Extension, Path, State as AxumState},
+    middleware,
+    routing::{delete, get, post},
+    Json,
+    Router,
+};
 
 use crate::AppState;
 
@@ -20,6 +26,9 @@ pub fn create_router(state: AppState) -> Router {
     let protected_routes = Router::new()
         .route("/api/v1/auth/logout", post(logout_handler))
         .route("/api/v1/auth/refresh", post(refresh_handler))
+        .route("/api/v1/auth/sessions", get(sessions_handler))
+        .route("/api/v1/auth/sessions/:id", delete(delete_session_handler))
+        .route("/api/v1/auth/sessions", delete(delete_all_sessions_handler))
         .layer(middleware::from_fn(
             crate::middleware::auth::auth_middleware,
         ));
@@ -80,4 +89,29 @@ async fn refresh_handler(
     Json(req): Json<crate::dto::auth::RefreshRequest>,
 ) -> crate::Result<Json<crate::dto::auth::AuthSuccessResponse>> {
     crate::auth::handlers::refresh_handler_inner(&state, req).await
+}
+
+/// Wrapper handler for getting user sessions
+async fn sessions_handler(
+    AxumState(state): AxumState<AppState>,
+    Extension(authenticated_user): Extension<crate::middleware::auth::AuthenticatedUser>,
+) -> crate::Result<Json<crate::auth::sessions::SessionsResponse>> {
+    crate::auth::sessions::get_sessions_handler(&state, authenticated_user).await
+}
+
+/// Wrapper handler for deleting a specific session
+async fn delete_session_handler(
+    AxumState(state): AxumState<AppState>,
+    Extension(authenticated_user): Extension<crate::middleware::auth::AuthenticatedUser>,
+    Path(session_id): Path<String>,
+) -> crate::Result<Json<crate::dto::auth::SuccessResponse>> {
+    crate::auth::sessions::delete_session_handler(&state, authenticated_user, Path(session_id)).await
+}
+
+/// Wrapper handler for deleting all user sessions (logout everywhere)
+async fn delete_all_sessions_handler(
+    AxumState(state): AxumState<AppState>,
+    Extension(authenticated_user): Extension<crate::middleware::auth::AuthenticatedUser>,
+) -> crate::Result<Json<crate::dto::auth::SuccessResponse>> {
+    crate::auth::sessions::delete_all_sessions_handler(&state, authenticated_user).await
 }

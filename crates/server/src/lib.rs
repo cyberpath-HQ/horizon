@@ -79,6 +79,7 @@ pub type Result<T> = std::result::Result<T, AppError>;
 
 /// Application error type for server operations
 #[derive(Debug, thiserror::Error)]
+#[error(transparent)]
 pub enum AppError {
     #[error("Configuration error: {message}")]
     Config {
@@ -97,6 +98,21 @@ pub enum AppError {
 
     #[error("Token error: {message}")]
     Token {
+        message: String,
+    },
+
+    #[error("Bad request: {message}")]
+    BadRequest {
+        message: String,
+    },
+
+    #[error("Not found: {message}")]
+    NotFound {
+        message: String,
+    },
+
+    #[error("Forbidden: {message}")]
+    Forbidden {
         message: String,
     },
 }
@@ -130,6 +146,30 @@ impl AppError {
     #[inline]
     pub fn token(message: impl ToString) -> Self {
         Self::Token {
+            message: message.to_string(),
+        }
+    }
+
+    /// Create a bad request error
+    #[inline]
+    pub fn bad_request(message: impl ToString) -> Self {
+        Self::BadRequest {
+            message: message.to_string(),
+        }
+    }
+
+    /// Create a not found error
+    #[inline]
+    pub fn not_found(message: impl ToString) -> Self {
+        Self::NotFound {
+            message: message.to_string(),
+        }
+    }
+
+    /// Create a forbidden error
+    #[inline]
+    pub fn forbidden(message: impl ToString) -> Self {
+        Self::Forbidden {
             message: message.to_string(),
         }
     }
@@ -174,6 +214,15 @@ impl axum::response::IntoResponse for AppError {
             AppError::Token {
                 ..
             } => http::StatusCode::UNAUTHORIZED,
+            AppError::BadRequest {
+                ..
+            } => http::StatusCode::BAD_REQUEST,
+            AppError::NotFound {
+                ..
+            } => http::StatusCode::NOT_FOUND,
+            AppError::Forbidden {
+                ..
+            } => http::StatusCode::FORBIDDEN,
         };
 
         let body = serde_json::json!({
@@ -183,6 +232,9 @@ impl axum::response::IntoResponse for AppError {
                 AppError::Database { .. } => "DATABASE_ERROR",
                 AppError::Auth { .. } => "AUTHENTICATION_ERROR",
                 AppError::Token { .. } => "TOKEN_ERROR",
+                AppError::BadRequest { .. } => "BAD_REQUEST",
+                AppError::NotFound { .. } => "NOT_FOUND",
+                AppError::Forbidden { .. } => "FORBIDDEN",
             },
             "message": self.to_string()
         });
