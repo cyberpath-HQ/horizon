@@ -27,7 +27,7 @@ jobs:
       - run: npm ci
 
       - name: Install dependencies
-        run: sudo apt install libglib2.0-dev
+        run: sudo apt update && sudo apt install -y  libglib2.0-dev
 
       - id: generate-token
         uses: actions/create-github-app-token@v2
