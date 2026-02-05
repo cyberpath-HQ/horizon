@@ -2,7 +2,7 @@
 //!
 //! Configures API routes for the Horizon application.
 
-use axum::{extract::State as AxumState, routing::post, Json, Router};
+use axum::{extract::State as AxumState, middleware, routing::post, Json, Router};
 
 use crate::AppState;
 
@@ -16,12 +16,20 @@ use crate::AppState;
 ///
 /// Configured Axum router with all routes
 pub fn create_router(state: AppState) -> Router {
-    Router::new()
-        .route("/api/v1/auth/setup", post(setup_handler))
-        .route("/api/v1/auth/login", post(login_handler))
+    // Protected routes that require authentication
+    let protected_routes = Router::new()
         .route("/api/v1/auth/logout", post(logout_handler))
         .route("/api/v1/auth/refresh", post(refresh_handler))
-        .with_state(state)
+        .layer(middleware::from_fn(
+            crate::middleware::auth::auth_middleware,
+        ));
+
+    // Public routes that don't require authentication
+    let public_routes = Router::new()
+        .route("/api/v1/auth/setup", post(setup_handler))
+        .route("/api/v1/auth/login", post(login_handler));
+
+    public_routes.merge(protected_routes).with_state(state)
 }
 
 /// Creates the health check router
