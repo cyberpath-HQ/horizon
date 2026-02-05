@@ -13,12 +13,36 @@
 use std::net::SocketAddr;
 
 use axum;
-use axum_server::tls_rustls::RustlsConfig;
 use clap::{Args, CommandFactory as _, Parser, Subcommand};
 use error::{AppError, Result};
 use migration::{Migrator, MigratorTrait as _};
 use server::{router::create_app_router, AppState, JwtConfig};
-use tokio::net::TcpListener;
+use tokio_rustls::TlsAcceptor;
+use rustls::pki_types::pem::PemObject;
+
+/// Load certificates from a PEM file
+fn load_certs(path: &str) -> std::io::Result<Vec<rustls::pki_types::CertificateDer<'static>>> {
+    let cert_pem = std::fs::read(path)?;
+    let mut certs = Vec::new();
+    for cert in rustls::pki_types::CertificateDer::pem_slice_iter(&cert_pem) {
+        certs.push(cert.map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?);
+    }
+    if certs.is_empty() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "No certificates found in file",
+        ));
+    }
+    Ok(certs)
+}
+
+/// Load private key from a PEM file
+fn load_private_key(path: &str) -> std::io::Result<rustls::pki_types::PrivateKeyDer<'static>> {
+    let key_pem = std::fs::read(path)?;
+    let key = rustls::pki_types::PrivateKeyDer::from_pem_slice(&key_pem)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+    Ok(key)
+}
 
 /// Database configuration for CLI
 #[derive(Debug, Clone)]
@@ -227,25 +251,52 @@ async fn serve(args: &ServeArgs) -> Result<()> {
         logging::info!(target: "serve", "Initializing TLS with cert={}, key={}", tls_cert_path, tls_key_path);
 
         // Load TLS certificate and key
-        let tls_config = RustlsConfig::from_pem_file(tls_cert_path, tls_key_path)
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to load TLS certificate/key: {}", e))?;
+        let certs = load_certs(tls_cert_path)?;
+        let key = load_private_key(tls_key_path)?;
+
+        let tls_config = rustls::ServerConfig::builder()
+            .with_no_client_auth()
+            .with_single_cert(certs, key)
+            .map_err(|e| anyhow::anyhow!("Failed to configure TLS: {}", e))?;
+
+        // Create TLS acceptor
+        let tls_acceptor = TlsAcceptor::from(std::sync::Arc::new(tls_config));
 
         logging::info!(target: "serve", %address, "Starting HTTPS server (TLS enabled)...");
 
-        let handle = axum_server::Handle::new();
-        let server_future = axum_server::bind_rustls(address, tls_config)
-            .handle(handle.clone())
-            .serve(app.into_make_service());
+        let listener = tokio::net::TcpListener::bind(address)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to bind address: {}", e))?;
 
-        tokio::select! {
-            result = server_future => {
-                result.map_err(|e| anyhow::anyhow!("HTTPS server error: {}", e))?;
-            }
-            _ = shutdown_signal() => {
-                logging::info!(target: "serve", "Received shutdown signal, stopping HTTPS server...");
-                handle.graceful_shutdown(None);
-            }
+        // Use hyper to serve with TLS
+        loop {
+            let (tcp_stream, _) = listener.accept().await?;
+            let tls_acceptor = tls_acceptor.clone();
+            let app = app.clone();
+
+            tokio::spawn(async move {
+                let tls_stream = match tls_acceptor.accept(tcp_stream).await {
+                    Ok(stream) => stream,
+                    Err(e) => {
+                        tracing::warn!("TLS handshake failed: {}", e);
+                        return;
+                    },
+                };
+
+                let tower_service = app.clone();
+                let hyper_service =
+                    hyper::service::service_fn(move |request: hyper::Request<hyper::body::Incoming>| {
+                        let tower_service = tower_service.clone();
+                        async move { tower_service.call(request).await }
+                    });
+
+                if let Err(err) = hyper::server::conn::http1::Builder::new()
+                    .serve_connection(tls_stream, hyper_service)
+                    .await
+                {
+                    tracing::warn!("Error serving connection: {}", err);
+                }
+            });
         }
     }
     else {
@@ -256,9 +307,8 @@ async fn serve(args: &ServeArgs) -> Result<()> {
             .await
             .map_err(|e| anyhow::anyhow!("Failed to bind to {}: {}", address, e))?;
 
-        let serve_future = axum::serve(listener, app).with_graceful_shutdown(shutdown_signal());
-
-        serve_future
+        axum::serve(listener, app)
+            .with_graceful_shutdown(shutdown_signal())
             .await
             .map_err(|e| anyhow::anyhow!("HTTP server error: {}", e))?;
     }
