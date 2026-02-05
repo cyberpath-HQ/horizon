@@ -163,6 +163,7 @@ pub enum Roles {
 
 // Reference for scope type enum
 #[derive(DeriveIden)]
+#[allow(dead_code)]
 pub enum RoleScopeType {
     Table,
     #[sea_orm(string_value = "global")]

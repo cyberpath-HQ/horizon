@@ -38,6 +38,7 @@ impl MigrationTrait for Migration {
 #[derive(DeriveIden)]
 pub enum Teams {
     Table,
+    #[allow(dead_code)]
     Id,
     ManagerId,
 }
