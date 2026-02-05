@@ -8,7 +8,6 @@ use entity::user_sessions::{Column, Entity as UserSessionsEntity};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde::Serialize;
 use tracing::info;
-use uuid::Uuid;
 use error::Result;
 
 use crate::middleware::auth::AuthenticatedUser;
@@ -35,12 +34,11 @@ pub async fn get_sessions_handler(
     state: &crate::AppState,
     authenticated_user: AuthenticatedUser,
 ) -> Result<Json<SessionsResponse>> {
-    let user_id = Uuid::parse_str(&authenticated_user.id)
-        .map_err(|_| error::AppError::unauthorized("Invalid user ID format".to_string()))?;
+    let user_id = authenticated_user.id.clone();
 
     // Query all sessions for this user
     let sessions = UserSessionsEntity::find()
-        .filter(Column::UserId.eq(user_id))
+        .filter(Column::UserId.eq(&user_id))
         .all(&state.db)
         .await
         .map_err(|e| error::AppError::database(format!("Failed to fetch sessions: {}", e)))?;
@@ -77,15 +75,11 @@ pub async fn delete_session_handler(
     authenticated_user: AuthenticatedUser,
     Path(session_id): Path<String>,
 ) -> Result<Json<crate::dto::auth::SuccessResponse>> {
-    let user_id = Uuid::parse_str(&authenticated_user.id)
-        .map_err(|_| error::AppError::unauthorized("Invalid user ID format".to_string()))?;
-
-    let session_uuid = Uuid::parse_str(&session_id)
-        .map_err(|_| error::AppError::bad_request("Invalid session ID format".to_string()))?;
+    let user_id = authenticated_user.id.clone();
 
     // Find the session
     let session = UserSessionsEntity::find()
-        .filter(Column::Id.eq(session_uuid))
+        .filter(Column::Id.eq(session_id.clone()))
         .one(&state.db)
         .await
         .map_err(|e| error::AppError::database(format!("Failed to find session: {}", e)))?
@@ -99,7 +93,7 @@ pub async fn delete_session_handler(
     }
 
     // Delete the session
-    UserSessionsEntity::delete_by_id(session_uuid)
+    UserSessionsEntity::delete_by_id(session_id.clone())
         .exec(&state.db)
         .await
         .map_err(|e| error::AppError::database(format!("Failed to delete session: {}", e)))?;
@@ -121,12 +115,11 @@ pub async fn delete_all_sessions_handler(
     state: &crate::AppState,
     authenticated_user: AuthenticatedUser,
 ) -> Result<Json<crate::dto::auth::SuccessResponse>> {
-    let user_id = Uuid::parse_str(&authenticated_user.id)
-        .map_err(|_| error::AppError::unauthorized("Invalid user ID format".to_string()))?;
+    let user_id = authenticated_user.id.clone();
 
     // Delete all sessions
     let delete_result = UserSessionsEntity::delete_many()
-        .filter(Column::UserId.eq(user_id))
+        .filter(Column::UserId.eq(&user_id))
         .exec(&state.db)
         .await
         .map_err(|e| error::AppError::database(format!("Failed to delete sessions: {}", e)))?;

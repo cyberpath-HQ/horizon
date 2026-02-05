@@ -12,13 +12,13 @@ use entity::{
 };
 use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
 use chrono::Utc;
+use cuid2;
 use tracing::info;
-use uuid::Uuid;
 use axum::{extract::Request, Json};
 use error::{AppError, Result};
 
 use crate::{
-    auth::jwt::create_access_token,
+    auth::{jwt::create_access_token, roles::get_user_roles},
     dto::auth::{
         AuthSuccessResponse,
         AuthTokens,
@@ -56,8 +56,8 @@ pub async fn setup_handler_inner(state: &AppState, req: SetupRequest) -> Result<
         )));
     }
 
-    // Generate UUID for the new user
-    let user_id = Uuid::new_v4();
+    // Generate CUID2 for the new user
+    let user_id = cuid2::CuidConstructor::new().with_length(32).create_id();
 
     // Hash the password
     let password_secret = auth::secrecy::SecretString::from(req.password.clone());
@@ -75,7 +75,7 @@ pub async fn setup_handler_inner(state: &AppState, req: SetupRequest) -> Result<
     };
 
     let admin_user = entity::users::ActiveModel {
-        id: Set(user_id),
+        id: Set(user_id.clone()),
         email: Set(req.email.clone()),
         username: Set(req.email.clone()), // Use email as username for now
         password_hash: Set(hashed_password.expose_secret().to_string()),
@@ -103,12 +103,12 @@ pub async fn setup_handler_inner(state: &AppState, req: SetupRequest) -> Result<
     };
 
     // Generate tokens for the newly created admin
-    let refresh_token_str = Uuid::new_v4().to_string();
+    let refresh_token_str = cuid2::CuidConstructor::new().with_length(32).create_id();
 
     // Store the refresh token in database
     crate::refresh_tokens::create_refresh_token(
         &state.db,
-        user_id,
+        &user_id,
         &refresh_token_str,
         30 * 24 * 60 * 60, // 30 days in seconds
     )
@@ -160,14 +160,17 @@ pub async fn login_handler_inner(
         return Err(AppError::unauthorized("Account is not active".to_string()));
     }
 
+    // Load user roles from database
+    let user_roles = get_user_roles(&state.db, &user.id).await?;
+
     // Generate JWT tokens
-    let user_id = user.id.to_string();
+    let user_id = user.id.clone();
     let refresh_token_str = generate_refresh_token();
 
     // Store the refresh token in database
     let refresh_token = crate::refresh_tokens::create_refresh_token(
         &state.db,
-        user.id, // Use the actual UUID from user
+        &user.id, // Use the actual UUID from user
         &refresh_token_str,
         30 * 24 * 60 * 60, // 30 days in seconds
     )
@@ -186,13 +189,13 @@ pub async fn login_handler_inner(
         .map(|s| s.to_string());
 
     // Create user session linked to refresh token
-    let session_id = Uuid::new_v4();
+    let session_id = cuid2::CuidConstructor::new().with_length(32).create_id();
     let now = Utc::now();
     let now_fixed = now.with_timezone(&chrono::FixedOffset::east_opt(0).unwrap()); // UTC
 
     let session_model = entity::user_sessions::ActiveModel {
         id: Set(session_id),
-        user_id: Set(user.id),
+        user_id: Set(user.id.clone()),
         refresh_token_id: Set(refresh_token.id),
         user_agent: Set(user_agent),
         ip_address: Set(ip_address),
@@ -208,12 +211,7 @@ pub async fn login_handler_inner(
         .map_err(|e| AppError::database(format!("Failed to create user session: {}", e)))?;
 
     let tokens = AuthTokens {
-        access_token:  create_access_token(
-            &state.jwt_config,
-            &user_id,
-            &user.email,
-            &["user".to_string()],
-        )?,
+        access_token:  create_access_token(&state.jwt_config, &user_id, &user.email, &user_roles)?,
         refresh_token: refresh_token_str,
         expires_in:    state.jwt_config.expiration_seconds,
         token_type:    "Bearer".to_string(),
@@ -231,7 +229,7 @@ pub async fn login_handler_inner(
         )
         .trim()
         .to_string(),
-        roles:        vec!["user".to_string()],
+        roles:        user_roles,
     };
 
     Ok(Json(AuthSuccessResponse {
@@ -253,18 +251,17 @@ pub async fn logout_handler_inner(state: &AppState, request: Request) -> Result<
         .ok_or_else(|| AppError::unauthorized("No authenticated user found".to_string()))?;
 
     // Parse the user ID
-    let user_id = uuid::Uuid::parse_str(&authenticated_user.id)
-        .map_err(|_| AppError::unauthorized("Invalid user ID format".to_string()))?;
+    let user_id = authenticated_user.id.clone();
 
     // Revoke all refresh tokens for this user
-    if let Err(e) = crate::refresh_tokens::revoke_all_user_tokens(&state.db, user_id).await {
+    if let Err(e) = crate::refresh_tokens::revoke_all_user_tokens(&state.db, &user_id).await {
         // Log the error but don't fail the logout
         tracing::warn!("Failed to revoke refresh tokens on logout: {}", e);
     }
 
     // Delete all user sessions
     let delete_result = entity::user_sessions::Entity::delete_many()
-        .filter(entity::user_sessions::Column::UserId.eq(user_id))
+        .filter(entity::user_sessions::Column::UserId.eq(&user_id))
         .exec(&state.db)
         .await;
 
@@ -341,22 +338,20 @@ pub async fn refresh_handler_inner(state: &AppState, req: RefreshRequest) -> Res
         ));
     }
 
+    // Load user roles from database
+    let user_roles = get_user_roles(&state.db, &user.id).await?;
+
     // Generate new access token
-    let user_id_str = user.id.to_string();
-    let access_token = create_access_token(
-        &state.jwt_config,
-        &user_id_str,
-        &user.email,
-        &["user".to_string()], // TODO: Load actual roles from database
-    )?;
+    let user_id_str = user.id.clone();
+    let access_token = create_access_token(&state.jwt_config, &user_id_str, &user.email, &user_roles)?;
 
     // Generate new refresh token (token rotation for security)
-    let new_refresh_token = generate_refresh_token();
+    let new_refresh_token = cuid2::CuidConstructor::new().with_length(32).create_id();
 
     // Store the new refresh token in database
     crate::refresh_tokens::create_refresh_token(
         &state.db,
-        user.id, // Use the actual UUID from user
+        &user.id, // Use the actual UUID from user
         &new_refresh_token,
         30 * 24 * 60 * 60, // 30 days in seconds
     )
@@ -386,7 +381,7 @@ pub async fn refresh_handler_inner(state: &AppState, req: RefreshRequest) -> Res
         )
         .trim()
         .to_string(),
-        roles:        vec!["user".to_string()], // TODO: Load actual roles from database
+        roles:        user_roles,
     };
 
     info!(user_id = %user_id_str, "Refresh token successfully used");

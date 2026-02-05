@@ -4,7 +4,6 @@
 
 use entity::{roles::Entity as RolesEntity, sea_orm_active_enums::RoleScopeType, user_roles::Entity as UserRoleEntity};
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
-use uuid::Uuid;
 use tracing::info;
 use error::Result;
 
@@ -26,7 +25,7 @@ use error::Result;
 /// ```ignore
 /// let roles = get_user_roles(&db, user_id).await?;
 /// ```
-pub async fn get_user_roles(db: &DatabaseConnection, user_id: Uuid) -> Result<Vec<String>> {
+pub async fn get_user_roles(db: &DatabaseConnection, user_id: &str) -> Result<Vec<String>> {
     use sea_orm::sea_query::Condition;
     use entity::user_roles::Column;
 
@@ -91,10 +90,10 @@ pub async fn get_user_roles(db: &DatabaseConnection, user_id: Uuid) -> Result<Ve
 /// - Database operations fail
 pub async fn assign_role_to_user(
     db: &DatabaseConnection,
-    user_id: Uuid,
+    user_id: &str,
     role_slug: &str,
     scope_type: RoleScopeType,
-    scope_id: Option<Uuid>,
+    scope_id: Option<&str>,
     expires_at: Option<chrono::DateTime<chrono::Utc>>,
 ) -> Result<()> {
     // Find the role by slug
@@ -107,10 +106,10 @@ pub async fn assign_role_to_user(
     // Create user role assignment
     let active_model = entity::user_roles::ActiveModel {
         id: Default::default(), // Auto-generated UUID
-        user_id: Set(user_id),
+        user_id: Set(user_id.to_string()),
         role_id: Set(role.id),
         scope_type: Set(scope_type),
-        scope_id: Set(scope_id),
+        scope_id: Set(scope_id.map(|s| s.to_string())),
         expires_at: Set(expires_at.map(|dt| dt.naive_utc())),
         ..Default::default()
     };
@@ -141,7 +140,6 @@ pub async fn assign_role_to_user(
 #[cfg(test)]
 mod tests {
     use sea_orm::{Database, DatabaseConnection};
-    use uuid::Uuid;
 
     use super::*;
 
@@ -156,11 +154,11 @@ mod tests {
     #[tokio::test]
     async fn test_get_user_roles_no_roles_returns_empty() {
         let db = setup_test_db().await;
-        let user_id = Uuid::new_v4();
+        let user_id = cuid2::CuidConstructor::new().with_length(32).create_id();
 
         // Note: In a real test, you'd set up the database schema and ensure no roles exist
         // For this basic test, we expect it to return empty vec
-        let result = get_user_roles(&db, user_id).await;
+        let result = get_user_roles(&db, &user_id).await;
 
         // This will fail in current implementation due to no database setup
         // but demonstrates the expected behavior
@@ -170,10 +168,10 @@ mod tests {
     #[tokio::test]
     async fn test_assign_role_to_user_nonexistent_role() {
         let db = setup_test_db().await;
-        let user_id = Uuid::new_v4();
+        let user_id = cuid2::CuidConstructor::new().with_length(32).create_id();
         let scope_type = RoleScopeType::Global;
 
-        let result = assign_role_to_user(&db, user_id, "nonexistent_role", scope_type, None, None).await;
+        let result = assign_role_to_user(&db, &user_id, "nonexistent_role", scope_type, None, None).await;
 
         // Should fail because role doesn't exist
         assert!(result.is_err());

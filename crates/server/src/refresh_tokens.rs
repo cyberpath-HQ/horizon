@@ -13,7 +13,7 @@ pub struct RefreshToken {
     /// Database ID
     pub id:         i32,
     /// User ID this token belongs to
-    pub user_id:    uuid::Uuid,
+    pub user_id:    String,
     /// Hashed token value
     pub token_hash: String,
     /// When this token expires
@@ -40,7 +40,7 @@ pub struct RefreshToken {
 /// Returns an error if database operations fail.
 pub async fn create_refresh_token(
     db: &sea_orm::DbConn,
-    user_id: uuid::Uuid,
+    user_id: &str,
     token_value: &str,
     expires_in_seconds: u64,
 ) -> Result<RefreshToken> {
@@ -53,7 +53,7 @@ pub async fn create_refresh_token(
     // Create the active model
     // Note: created_at and updated_at are automatically managed by database defaults
     let active_model = entity::refresh_tokens::ActiveModel {
-        user_id: Set(user_id),
+        user_id: Set(user_id.to_string()),
         token_hash: Set(token_hash.clone()),
         expires_at: Set(expires_at.with_timezone(&chrono::FixedOffset::east_opt(0).unwrap())),
         revoked_at: Set(None),
@@ -87,7 +87,7 @@ pub async fn create_refresh_token(
 /// # Errors
 ///
 /// Returns an error if the token is invalid, expired, or revoked.
-pub async fn validate_refresh_token(db: &sea_orm::DbConn, token_value: &str) -> Result<uuid::Uuid> {
+pub async fn validate_refresh_token(db: &sea_orm::DbConn, token_value: &str) -> Result<String> {
     // Hash the token to compare with stored hash
     let token_hash = blake3::hash(token_value.as_bytes()).to_hex().to_string();
 
@@ -159,7 +159,7 @@ pub async fn revoke_refresh_token(db: &sea_orm::DbConn, token_value: &str) -> Re
 /// # Errors
 ///
 /// Returns an error if database operations fail.
-pub async fn revoke_all_user_tokens(db: &sea_orm::DbConn, user_id: uuid::Uuid) -> Result<()> {
+pub async fn revoke_all_user_tokens(db: &sea_orm::DbConn, user_id: &str) -> Result<()> {
     entity::refresh_tokens::Entity::update_many()
         .col_expr(
             entity::refresh_tokens::Column::RevokedAt,
