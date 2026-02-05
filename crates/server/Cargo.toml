@@ -7,6 +7,9 @@ authors.workspace = true
 description = "Horizon API server with Axum framework"
 license.workspace = true
 repository.workspace = true
+readme = "../../README.md"
+keywords = ["cmdb", "api", "server", "axum", "horizon"]
+categories = ["network-programming", "web-programming"]
 
 [dependencies]
 # ==================== WEB FRAMEWORK ====================
