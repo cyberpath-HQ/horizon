@@ -1,6 +1,5 @@
 pub use sea_orm_migration::prelude::*;
 
-mod m20260203_000000_enable_pgcrypto;
 mod m20260203_000001_create_users_table;
 mod m20260203_0000025_add_teams_parent_fk;
 mod m20260203_000002_create_teams_table;
@@ -19,7 +18,6 @@ pub struct Migrator;
 impl MigratorTrait for Migrator {
     fn migrations() -> Vec<Box<dyn MigrationTrait>> {
         vec![
-            Box::new(m20260203_000000_enable_pgcrypto::Migration),
             Box::new(m20260203_000001_create_users_table::Migration),
             Box::new(m20260203_000002_create_teams_table::Migration),
             Box::new(m20260203_0000025_add_teams_parent_fk::Migration),
