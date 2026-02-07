@@ -1,6 +1,7 @@
-// Minimal auth service implementation for Phase B-03
-// This provides the core password hashing functionality
+// Auth service implementation
+// Provides password hashing and MFA functionality
 
+pub mod mfa;
 pub mod password;
 
 pub use secrecy;
