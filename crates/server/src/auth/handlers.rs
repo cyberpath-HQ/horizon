@@ -10,7 +10,7 @@ use entity::{
     user_sessions::Entity as UserSessionsEntity,
     users::{Column, Entity as UsersEntity},
 };
-use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
 use chrono::Utc;
 use tracing::info;
 use axum::{extract::Request, Json};
@@ -129,7 +129,18 @@ pub async fn setup_handler_inner(state: &AppState, req: SetupRequest) -> Result<
     }))
 }
 
+/// Maximum failed login attempts before account lockout
+const MAX_FAILED_LOGIN_ATTEMPTS: i32 = 5;
+
+/// Account lockout duration in minutes
+const LOCKOUT_DURATION_MINUTES: i64 = 15;
+
 /// Inner handler for login endpoint
+///
+/// This function supports:
+/// - Account lockout after multiple failed attempts
+/// - MFA challenge when MFA is enabled
+/// - Automatic lockout reset on successful login
 ///
 /// This function doesn't use State extractor and accepts references to AppState.
 /// It's intended to be called by wrapper handlers that use State extractor.
@@ -146,14 +157,107 @@ pub async fn login_handler_inner(
 
     let user = user_option.ok_or_else(|| AppError::unauthorized("Invalid email or password".to_string()))?;
 
+    // Check account lockout
+    if let Some(locked_until) = user.locked_until {
+        let now_tz = Utc::now().with_timezone(&chrono::FixedOffset::east_opt(0).unwrap());
+        if locked_until > now_tz {
+            let remaining = (locked_until - now_tz).num_minutes() + 1;
+            return Err(AppError::unauthorized(format!(
+                "Account is temporarily locked due to too many failed login attempts. Try again in {} minute(s).",
+                remaining
+            )));
+        }
+        // Lockout has expired, will reset on successful login
+    }
+
     // Verify password
     let password_secret = auth::secrecy::SecretString::from(req.password);
-    verify_password(&password_secret, &user.password_hash)
-        .map_err(|_| AppError::unauthorized("Invalid email or password".to_string()))?;
+    let password_valid = verify_password(&password_secret, &user.password_hash).is_ok();
+
+    if !password_valid {
+        // Increment failed login attempts
+        let new_attempts = user.failed_login_attempts + 1;
+        let mut active_model: entity::users::ActiveModel = user.clone().into();
+        active_model.failed_login_attempts = Set(new_attempts);
+
+        if new_attempts >= MAX_FAILED_LOGIN_ATTEMPTS {
+            let locked_until = Utc::now() + chrono::Duration::minutes(LOCKOUT_DURATION_MINUTES);
+            let locked_tz = locked_until.with_timezone(&chrono::FixedOffset::east_opt(0).unwrap());
+            active_model.locked_until = Set(Some(locked_tz));
+            tracing::warn!(
+                user_id = %user.id,
+                email = %user.email,
+                attempts = new_attempts,
+                "Account locked after {} failed login attempts",
+                MAX_FAILED_LOGIN_ATTEMPTS
+            );
+        }
+        active_model.updated_at = Set(Utc::now().naive_utc());
+        let _ = active_model.update(&state.db).await;
+
+        return Err(AppError::unauthorized(
+            "Invalid email or password".to_string(),
+        ));
+    }
 
     // Check if user is active
     if user.status != entity::sea_orm_active_enums::UserStatus::Active {
         return Err(AppError::unauthorized("Account is not active".to_string()));
+    }
+
+    // Reset failed login attempts and lockout on successful login
+    if user.failed_login_attempts > 0 || user.locked_until.is_some() {
+        let mut active_model: entity::users::ActiveModel = user.clone().into();
+        active_model.failed_login_attempts = Set(0);
+        active_model.locked_until = Set(None);
+        active_model.updated_at = Set(Utc::now().naive_utc());
+        let _ = active_model.update(&state.db).await;
+    }
+
+    // Check MFA requirement
+    if user.mfa_enabled {
+        // Issue a short-lived MFA pending token
+        let mfa_token = create_access_token(
+            &crate::JwtConfig {
+                secret:             state.jwt_config.secret.clone(),
+                expiration_seconds: 300, // 5 minutes for MFA verification
+                issuer:             state.jwt_config.issuer.clone(),
+                audience:           state.jwt_config.audience.clone(),
+            },
+            &user.id,
+            &user.email,
+            &["mfa_pending".to_string()],
+        )?;
+
+        info!(user_id = %user.id, email = %req.email, "MFA verification required");
+
+        // Return a response indicating MFA is needed
+        // We use AuthSuccessResponse with success=false and no tokens
+        // The mfa_token is sent via the user field
+        let user_response = AuthenticatedUser {
+            id:           user.id.clone(),
+            email:        user.email.clone(),
+            display_name: format!(
+                "{} {}",
+                user.first_name.clone().unwrap_or_default(),
+                user.last_name.clone().unwrap_or_default()
+            )
+            .trim()
+            .to_string(),
+            roles:        vec!["mfa_pending".to_string()],
+        };
+
+        // Embed the MFA token as the access token, with no refresh token
+        return Ok(Json(AuthSuccessResponse {
+            success: false,
+            user:    user_response,
+            tokens:  Some(AuthTokens {
+                access_token:  mfa_token,
+                refresh_token: String::new(),
+                expires_in:    300,
+                token_type:    "MfaPending".to_string(),
+            }),
+        }));
     }
 
     // Load user roles from database
@@ -204,6 +308,12 @@ pub async fn login_handler_inner(
         .exec(&state.db)
         .await
         .map_err(|e| AppError::database(format!("Failed to create user session: {}", e)))?;
+
+    // Update last_login_at
+    let mut login_update: entity::users::ActiveModel = user.clone().into();
+    login_update.last_login_at = Set(Some(Utc::now().naive_utc()));
+    login_update.updated_at = Set(Utc::now().naive_utc());
+    let _ = login_update.update(&state.db).await;
 
     let tokens = AuthTokens {
         access_token:  create_access_token(&state.jwt_config, &user_id, &user.email, &user_roles)?,
@@ -386,4 +496,243 @@ pub async fn refresh_handler_inner(state: &AppState, req: RefreshRequest) -> Res
         user:    user_response,
         tokens:  Some(tokens),
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use entity::sea_orm_active_enums::UserStatus;
+
+    use super::*;
+
+    /// Helper to create a test user model for handlers
+    fn make_test_user_model(
+        id: &str,
+        email: &str,
+        mfa_enabled: bool,
+        failed_attempts: i32,
+        locked_until: Option<chrono::DateTime<chrono::FixedOffset>>,
+    ) -> entity::users::Model {
+        entity::users::Model {
+            id: id.to_string(),
+            email: email.to_string(),
+            username: email.to_string(),
+            password_hash: "hashed".to_string(),
+            totp_secret: if mfa_enabled {
+                Some("test_secret".to_string())
+            }
+            else {
+                None
+            },
+            first_name: Some("Test".to_string()),
+            last_name: Some("User".to_string()),
+            avatar_url: None,
+            status: UserStatus::Active,
+            email_verified_at: None,
+            last_login_at: None,
+            created_at: chrono::NaiveDateTime::default(),
+            updated_at: chrono::NaiveDateTime::default(),
+            deleted_at: None,
+            backup_codes: None,
+            failed_login_attempts: failed_attempts,
+            locked_until,
+            mfa_enabled,
+        }
+    }
+
+    #[test]
+    fn test_max_failed_login_attempts_value() {
+        assert_eq!(MAX_FAILED_LOGIN_ATTEMPTS, 5);
+    }
+
+    #[test]
+    fn test_lockout_duration_value() {
+        assert_eq!(LOCKOUT_DURATION_MINUTES, 15);
+    }
+
+    #[test]
+    fn test_lockout_duration_is_reasonable() {
+        // Lockout should be between 5 and 60 minutes
+        assert!(LOCKOUT_DURATION_MINUTES >= 5);
+        assert!(LOCKOUT_DURATION_MINUTES <= 60);
+    }
+
+    #[test]
+    fn test_max_attempts_is_reasonable() {
+        // Should be between 3 and 10
+        assert!(MAX_FAILED_LOGIN_ATTEMPTS >= 3);
+        assert!(MAX_FAILED_LOGIN_ATTEMPTS <= 10);
+    }
+
+    #[test]
+    fn test_user_model_with_active_lockout() {
+        let future_time = chrono::Utc::now().with_timezone(&chrono::FixedOffset::east_opt(0).unwrap()) +
+            chrono::Duration::minutes(10);
+        let user = make_test_user_model("usr_lock", "locked@test.com", false, 5, Some(future_time));
+
+        assert_eq!(user.failed_login_attempts, MAX_FAILED_LOGIN_ATTEMPTS);
+        assert!(user.locked_until.is_some());
+        let locked = user.locked_until.unwrap();
+        assert!(locked > chrono::Utc::now().with_timezone(&chrono::FixedOffset::east_opt(0).unwrap()));
+    }
+
+    #[test]
+    fn test_user_model_with_expired_lockout() {
+        let past_time = chrono::Utc::now().with_timezone(&chrono::FixedOffset::east_opt(0).unwrap()) -
+            chrono::Duration::minutes(20);
+        let user = make_test_user_model(
+            "usr_unlocked",
+            "unlocked@test.com",
+            false,
+            5,
+            Some(past_time),
+        );
+
+        assert!(user.locked_until.is_some());
+        let locked = user.locked_until.unwrap();
+        assert!(locked < chrono::Utc::now().with_timezone(&chrono::FixedOffset::east_opt(0).unwrap()));
+    }
+
+    #[test]
+    fn test_user_model_no_lockout() {
+        let user = make_test_user_model("usr_free", "free@test.com", false, 0, None);
+
+        assert_eq!(user.failed_login_attempts, 0);
+        assert!(user.locked_until.is_none());
+    }
+
+    #[test]
+    fn test_user_model_mfa_enabled() {
+        let user = make_test_user_model("usr_mfa", "mfa@test.com", true, 0, None);
+
+        assert!(user.mfa_enabled);
+        assert!(user.totp_secret.is_some());
+    }
+
+    #[test]
+    fn test_user_model_mfa_disabled() {
+        let user = make_test_user_model("usr_nomfa", "nomfa@test.com", false, 0, None);
+
+        assert!(!user.mfa_enabled);
+        assert!(user.totp_secret.is_none());
+    }
+
+    #[test]
+    fn test_setup_request_structure() {
+        let req = SetupRequest {
+            email:        "admin@example.com".to_string(),
+            password:     "strongpassword123".to_string(),
+            display_name: "admin".to_string(),
+        };
+        assert_eq!(req.email, "admin@example.com");
+        assert_eq!(req.display_name, "admin");
+    }
+
+    #[test]
+    fn test_login_request_structure() {
+        let req = LoginRequest {
+            email:    "user@example.com".to_string(),
+            password: "password123".to_string(),
+        };
+        assert_eq!(req.email, "user@example.com");
+    }
+
+    #[test]
+    fn test_auth_success_response_structure() {
+        let response = AuthSuccessResponse {
+            success: true,
+            user:    AuthenticatedUser {
+                id:           "usr_123".to_string(),
+                email:        "test@example.com".to_string(),
+                display_name: "Test User".to_string(),
+                roles:        vec!["admin".to_string()],
+            },
+            tokens:  Some(AuthTokens {
+                access_token:  "access".to_string(),
+                refresh_token: "refresh".to_string(),
+                expires_in:    3600,
+                token_type:    "Bearer".to_string(),
+            }),
+        };
+        assert!(response.success);
+        assert_eq!(response.user.id, "usr_123");
+        assert!(response.tokens.is_some());
+    }
+
+    #[test]
+    fn test_auth_success_response_mfa_pending() {
+        let response = AuthSuccessResponse {
+            success: false,
+            user:    AuthenticatedUser {
+                id:           "usr_mfa".to_string(),
+                email:        "mfa@example.com".to_string(),
+                display_name: "MFA User".to_string(),
+                roles:        vec!["mfa_pending".to_string()],
+            },
+            tokens:  Some(AuthTokens {
+                access_token:  "mfa_token".to_string(),
+                refresh_token: String::new(),
+                expires_in:    300,
+                token_type:    "MfaPending".to_string(),
+            }),
+        };
+        // MFA pending: success is false, token_type is MfaPending
+        assert!(!response.success);
+        let tokens = response.tokens.unwrap();
+        assert_eq!(tokens.token_type, "MfaPending");
+        assert_eq!(tokens.expires_in, 300);
+        assert!(tokens.refresh_token.is_empty());
+    }
+
+    #[test]
+    fn test_refresh_request_structure() {
+        let req = RefreshRequest {
+            refresh_token: "some_refresh_token".to_string(),
+        };
+        assert_eq!(req.refresh_token, "some_refresh_token");
+    }
+
+    #[test]
+    fn test_display_name_formatting() {
+        let user = make_test_user_model("usr_1", "test@test.com", false, 0, None);
+        let display_name = format!(
+            "{} {}",
+            user.first_name.unwrap_or_default(),
+            user.last_name.unwrap_or_default()
+        )
+        .trim()
+        .to_string();
+
+        assert_eq!(display_name, "Test User");
+    }
+
+    #[test]
+    fn test_display_name_no_last_name() {
+        let mut user = make_test_user_model("usr_1", "test@test.com", false, 0, None);
+        user.last_name = None;
+        let display_name = format!(
+            "{} {}",
+            user.first_name.unwrap_or_default(),
+            user.last_name.unwrap_or_default()
+        )
+        .trim()
+        .to_string();
+
+        assert_eq!(display_name, "Test");
+    }
+
+    #[test]
+    fn test_display_name_no_names() {
+        let mut user = make_test_user_model("usr_1", "test@test.com", false, 0, None);
+        user.first_name = None;
+        user.last_name = None;
+        let display_name = format!(
+            "{} {}",
+            user.first_name.unwrap_or_default(),
+            user.last_name.unwrap_or_default()
+        )
+        .trim()
+        .to_string();
+
+        assert!(display_name.is_empty());
+    }
 }
