@@ -57,7 +57,7 @@ pub struct Claims {
 pub fn create_access_token(config: &JwtConfig, user_id: &str, email: &str, roles: &[String]) -> Result<String> {
     let now = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
-        .map_err(|e| AppError::unauthorized(format!("Failed to get current time: {}", e)))?;
+        .map_err(|e| AppError::internal(format!("Failed to get current time: {}", e)))?;
 
     let issued_at = now.as_secs();
     let expiration = now + Duration::from_secs(config.expiration_seconds);
@@ -78,9 +78,9 @@ pub fn create_access_token(config: &JwtConfig, user_id: &str, email: &str, roles
         &Header::default(),
         &claims,
         &EncodingKey::from_base64_secret(&config.secret)
-            .map_err(|e| AppError::unauthorized(format!("Invalid JWT secret: {}", e)))?,
+            .map_err(|e| AppError::internal(format!("Invalid JWT secret: {}", e)))?,
     )
-    .map_err(|e| AppError::unauthorized(format!("Failed to encode token: {}", e)))?;
+    .map_err(|e| AppError::internal(format!("Failed to encode token: {}", e)))?;
 
     Ok(token)
 }
@@ -97,7 +97,7 @@ pub fn create_access_token(config: &JwtConfig, user_id: &str, email: &str, roles
 /// Returns an error if token validation fails.
 pub fn validate_token(config: &JwtConfig, token: &str) -> Result<Claims> {
     let decoding_key = jsonwebtoken::DecodingKey::from_base64_secret(&config.secret)
-        .map_err(|e| AppError::unauthorized(format!("Invalid JWT secret: {}", e)))?;
+        .map_err(|e| AppError::internal(format!("Invalid JWT secret: {}", e)))?;
 
     let mut validation = Validation::default();
     let mut iss_set = HashSet::new();
