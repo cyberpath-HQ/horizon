@@ -11,6 +11,35 @@
 # Environment Variables:
 #   DATABASE_URL: PostgreSQL connection string
 #
+# ============================================================================
+# CUSTOM EDITS PRESERVATION
+# ============================================================================
+# This script supports preserving custom code edits across regenerations using
+# special tags. Wrap your custom code in entity files with these tags:
+#
+#   // ===== START CUSTOM EDIT: <name> =====
+#   ... your custom code here ...
+#   // ===== END CUSTOM EDIT: <name> =====
+#
+# Example:
+#   impl Entity {
+#       pub fn custom_method(&self) -> bool {
+#           true
+#       }
+#       // ===== START CUSTOM EDIT: my_custom_impl =====
+#       // Add your custom impl blocks here
+#       // ===== END CUSTOM EDIT: my_custom_impl =====
+#   }
+#
+# The <name> identifier must be unique within each file. When you run this script
+# to regenerate entities, your custom edits will be:
+# 1. Extracted from existing files
+# 2. Preserved during regeneration
+# 3. Re-applied to the new generated files
+#
+# Note: Custom edits are restored by name. If you change the edit name, it will
+# be treated as a new edit and tags will be added.
+# ============================================================================
 
 set -euo pipefail
 
@@ -243,6 +272,196 @@ format_code() {
 }
 
 # Validate generated entities
+# ============================================================================
+# CUSTOM EDIT PRESERVATION
+# This system allows users to add custom code to generated entities that will
+# be preserved across regenerations. Custom edits are marked with special tags.
+#
+# Tag Format:
+#   // ===== START CUSTOM EDIT: <name> =====
+#   ... your custom code ...
+#   // ===== END CUSTOM EDIT: <name> =====
+#
+# The <name> identifier is used to match and restore edits. Multiple edits
+# with the same name will be merged.
+# ============================================================================
+
+readonly CUSTOM_EDIT_START_TAG='// ===== START CUSTOM EDIT:'
+readonly CUSTOM_EDIT_END_TAG='// ===== END CUSTOM EDIT:'
+readonly CUSTOM_EDIT_TAG_SUFFIX='====='
+readonly TEMP_CUSTOM_EDITS_DIR=$(mktemp -d)
+
+cleanup_temp_dir() {
+    if [ -d "$TEMP_CUSTOM_EDITS_DIR" ]; then
+        rm -rf "$TEMP_CUSTOM_EDITS_DIR"
+    fi
+}
+trap cleanup_temp_dir EXIT
+
+extract_custom_edits() {
+    log_step "Extracting custom edits from existing entities..."
+
+    rm -rf "$TEMP_CUSTOM_EDITS_DIR"/*
+    local edit_count=0
+
+    for entity_file in "$ENTITY_DIR"/*.rs; do
+        [ -f "$entity_file" ] || continue
+        local filename
+        filename=$(basename "$entity_file")
+
+        # Skip special files
+        case "$filename" in
+            lib.rs|mod.rs|prelude.rs)
+                continue
+                ;;
+        esac
+
+        # Extract all custom edits from this file
+        local current_edit_name=""
+        local current_content=""
+
+        while IFS= read -r line; do
+            if [[ "$line" == "$CUSTOM_EDIT_START_TAG"* ]]; then
+                # Extract edit name from: // ===== START CUSTOM EDIT: <name> =====
+                current_edit_name=$(echo "$line" | sed "s/$CUSTOM_EDIT_START_TAG \\(.*\\) $CUSTOM_EDIT_TAG_SUFFIX/\\1/")
+                current_content=""
+            elif [[ "$line" == "$CUSTOM_EDIT_END_TAG"* ]]; then
+                # Validate the edit name matches
+                local end_edit_name
+                end_edit_name=$(echo "$line" | sed "s/$CUSTOM_EDIT_END_TAG \\(.*\\) $CUSTOM_EDIT_TAG_SUFFIX/\\1/")
+
+                if [ "$current_edit_name" == "$end_edit_name" ] && [ -n "$current_edit_name" ]; then
+                    # Save the extracted edit
+                    local edit_file="$TEMP_CUSTOM_EDITS_DIR/${filename}_${current_edit_name}.edit"
+                    echo "$current_content" > "$edit_file"
+                    [ "$VERBOSE" = true ] && log_info "  Extracted: ${filename}::${current_edit_name}"
+                    ((edit_count++)) || true
+                else
+                    log_warning "Mismatched edit tags in $filename: '$current_edit_name' vs '$end_edit_name'"
+                fi
+                current_edit_name=""
+                current_content=""
+            elif [ -n "$current_edit_name" ]; then
+                # Accumulate content between tags
+                current_content="${current_content}${line}"$'\n'
+            fi
+        done < "$entity_file"
+
+        # Warn about unclosed tags
+        if [ -n "$current_edit_name" ]; then
+            log_warning "Unclosed custom edit tag in $filename: '$current_edit_name'"
+        fi
+    done
+
+    if [ "$edit_count" -gt 0 ]; then
+        log_success "Extracted $edit_count custom edit(s)"
+    else
+        log_info "No custom edits found"
+    fi
+}
+
+restore_custom_edits() {
+    log_step "Restoring custom edits..."
+
+    local restored_count=0
+
+    for edit_file in "$TEMP_CUSTOM_EDITS_DIR"/*.edit; do
+        [ -f "$edit_file" ] || continue
+
+        local edit_basename
+        edit_basename=$(basename "$edit_file")
+        local filename="${edit_basename%.edit}"
+
+        # Handle multiple edits per file by looking for _ separator
+        # Format: filename_editname.edit
+        local entity_file="$ENTITY_DIR/${filename%%_*}.rs"
+
+        if [ ! -f "$entity_file" ]; then
+            log_warning "Target file not found for edit: $filename"
+            continue
+        fi
+
+        local edit_name="${edit_basename#${filename}_}"
+        edit_name="${edit_name%.edit}"
+        local custom_content
+        custom_content=$(cat "$edit_file")
+
+        # Find and replace the custom edit section in the entity file
+        local start_pattern="^${CUSTOM_EDIT_START_TAG} ${edit_name} ${CUSTOM_EDIT_TAG_SUFFIX}$"
+        local end_pattern="^${CUSTOM_EDIT_END_TAG} ${edit_name} ${CUSTOM_EDIT_TAG_SUFFIX}$"
+
+        # Check if the tags exist in the file
+        if grep -q "$start_pattern" "$entity_file" && grep -q "$end_pattern" "$entity_file"; then
+            # Use awk to replace content between tags
+            awk -v start_pat="$start_pattern" -v end_pat="$end_pattern" -v replacement="$custom_content" '
+                $0 ~ start_pat {
+                    print
+                    print replacement
+                    found=1
+                    next
+                }
+                $0 ~ end_pat {
+                    if (found) {
+                        print
+                        found=0
+                    }
+                    next
+                }
+                found { next }
+                { print }
+            ' "$entity_file" > "${entity_file}.tmp" && mv "${entity_file}.tmp" "$entity_file"
+
+            log_info "Restored edit: ${filename}::${edit_name}"
+            ((restored_count++)) || true
+        else
+            # Tags don't exist yet - add them
+            log_info "Adding new edit tag: ${filename}::${edit_name}"
+            add_custom_edit_tag "$entity_file" "$edit_name" "$custom_content"
+            ((restored_count++)) || true
+        fi
+    done
+
+    if [ "$restored_count" -gt 0 ]; then
+        log_success "Restored $restored_count custom edit(s)"
+    else
+        log_info "No custom edits to restore"
+    fi
+}
+
+add_custom_edit_tag() {
+    local entity_file="$1"
+    local edit_name="$2"
+    local custom_content="$3"
+
+    local escaped_content
+    escaped_content=$(echo "$custom_content" | sed 's/[\/&]/\\&/g')
+
+    # Find the last closing brace of the struct and insert before it
+    # This is a simple heuristic - the edit will be added at the end of the struct
+    local last_brace_line
+    last_brace_line=$(awk '/^}$/ { line=NR } END { print line }' "$entity_file")
+
+    if [ -z "$last_brace_line" ] || [ "$last_brace_line" -eq 0 ]; then
+        log_warning "Could not find struct end in $entity_file"
+        return 1
+    fi
+
+    # Create a temp file with the inserted tags
+    local temp_file
+    temp_file=$(mktemp)
+    {
+        head -n "$((last_brace_line - 1))" "$entity_file"
+        echo ""
+        echo "$CUSTOM_EDIT_START_TAG $edit_name $CUSTOM_EDIT_TAG_SUFFIX"
+        echo "$custom_content"
+        echo "$CUSTOM_EDIT_END_TAG $edit_name $CUSTOM_EDIT_TAG_SUFFIX"
+        echo ""
+        tail -n +"$last_brace_line" "$entity_file"
+    } > "$temp_file"
+
+    mv "$temp_file" "$entity_file"
+}
+
 validate_entities() {
     log_step "Validating generated entities..."
 
@@ -337,6 +556,9 @@ main() {
 
     check_prerequisites
 
+    # Extract custom edits before regenerating
+    extract_custom_edits
+
     # Generate entities
     generate_entities || exit 1
 
@@ -345,6 +567,9 @@ main() {
 
     # Inject security attributes for sensitive fields
     inject_security_attributes
+
+    # Restore any custom edits that were preserved
+    restore_custom_edits
 
     # Format code
     format_code
