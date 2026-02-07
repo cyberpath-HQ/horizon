@@ -10,36 +10,41 @@ use super::sea_orm_active_enums::UserStatus;
 #[sea_orm(table_name = "users")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false, column_type = "Text")]
-    pub id:                String,
+    pub id:                    String,
     #[sea_orm(unique)]
-    pub email:             String,
+    pub email:                 String,
     #[sea_orm(unique)]
-    pub username:          String,
+    pub username:              String,
     #[serde(skip_serializing)]
-    pub password_hash:     String,
+    pub password_hash:         String,
     #[serde(skip_serializing)]
-    pub totp_secret:       Option<String>,
-    pub first_name:        Option<String>,
-    pub last_name:         Option<String>,
-    pub avatar_url:        Option<String>,
-    pub status:            UserStatus,
-    pub email_verified_at: Option<DateTime>,
-    pub last_login_at:     Option<DateTime>,
-    pub created_at:        DateTime,
-    pub updated_at:        DateTime,
-    pub deleted_at:        Option<DateTime>,
+    pub totp_secret:           Option<String>,
+    pub first_name:            Option<String>,
+    pub last_name:             Option<String>,
+    pub avatar_url:            Option<String>,
+    pub status:                UserStatus,
+    pub email_verified_at:     Option<DateTime>,
+    pub last_login_at:         Option<DateTime>,
+    pub created_at:            DateTime,
+    pub updated_at:            DateTime,
+    pub deleted_at:            Option<DateTime>,
+    #[sea_orm(column_type = "JsonBinary", nullable)]
+    pub backup_codes:          Option<Json>,
+    pub failed_login_attempts: i32,
+    pub locked_until:          Option<DateTimeWithTimeZone>,
+    pub mfa_enabled:           bool,
     #[sea_orm(has_many)]
-    pub api_keys:          HasMany<super::api_keys::Entity>,
+    pub api_keys:              HasMany<super::api_keys::Entity>,
     #[sea_orm(has_many)]
-    pub refresh_tokens:    HasMany<super::refresh_tokens::Entity>,
+    pub refresh_tokens:        HasMany<super::refresh_tokens::Entity>,
     #[sea_orm(has_many)]
-    pub team_members:      HasMany<super::team_members::Entity>,
+    pub team_members:          HasMany<super::team_members::Entity>,
     #[sea_orm(has_many)]
-    pub teams:             HasMany<super::teams::Entity>,
+    pub teams:                 HasMany<super::teams::Entity>,
     #[sea_orm(has_many)]
-    pub user_roles:        HasMany<super::user_roles::Entity>,
+    pub user_roles:            HasMany<super::user_roles::Entity>,
     #[sea_orm(has_many)]
-    pub user_sessions:     HasMany<super::user_sessions::Entity>,
+    pub user_sessions:         HasMany<super::user_sessions::Entity>,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

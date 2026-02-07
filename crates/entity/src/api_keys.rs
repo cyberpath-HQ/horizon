@@ -8,19 +8,21 @@ use serde::{Deserialize, Serialize};
 #[sea_orm(table_name = "api_keys")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false, column_type = "Text")]
-    pub id:           String,
+    pub id:                 String,
     #[sea_orm(column_type = "Text")]
-    pub user_id:      String,
-    pub name:         String,
+    pub user_id:            String,
+    pub name:               String,
     #[serde(skip_serializing)]
-    pub key_hash:     String,
-    pub key_prefix:   String,
-    pub permissions:  Json,
-    pub expires_at:   Option<DateTime>,
-    pub last_used_at: Option<DateTime>,
-    pub last_used_ip: Option<String>,
-    pub created_at:   DateTime,
-    pub updated_at:   DateTime,
+    pub key_hash:           String,
+    pub key_prefix:         String,
+    pub permissions:        Json,
+    pub expires_at:         Option<DateTime>,
+    pub last_used_at:       Option<DateTime>,
+    pub last_used_ip:       Option<String>,
+    pub created_at:         DateTime,
+    pub updated_at:         DateTime,
+    #[sea_orm(has_many)]
+    pub api_key_usage_logs: HasMany<super::api_key_usage_log::Entity>,
     #[sea_orm(
         belongs_to,
         from = "user_id",
@@ -28,7 +30,7 @@ pub struct Model {
         on_update = "NoAction",
         on_delete = "Cascade"
     )]
-    pub users:        HasOne<super::users::Entity>,
+    pub users:              HasOne<super::users::Entity>,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

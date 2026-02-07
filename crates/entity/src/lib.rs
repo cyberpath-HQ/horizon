@@ -9,6 +9,8 @@
 pub mod api_keys;
 pub mod sea_orm_active_enums;
 pub use api_keys::Entity as ApiKeys;
+pub mod api_key_usage_log;
+pub use api_key_usage_log::Entity as ApiKeyUsageLog;
 pub mod refresh_tokens;
 pub use refresh_tokens::Entity as RefreshTokens;
 pub mod roles;
