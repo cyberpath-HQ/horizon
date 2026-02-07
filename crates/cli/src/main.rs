@@ -10,21 +10,21 @@
 //! horizon --help   # Show help
 //! ```
 
-use std::net::SocketAddr;
-use std::sync::Arc;
-use tokio::sync::Mutex;
+use std::{net::SocketAddr, sync::Arc};
 
+use tokio::{net::TcpListener, sync::Mutex};
 use axum;
 use clap::{Args, CommandFactory as _, Parser, Subcommand};
 use error::{AppError, Result};
 use migration::{Migrator, MigratorTrait as _};
 use server::{router::create_app_router, AppState, JwtConfig};
-use tokio::net::TcpListener;
 use tokio_rustls::TlsAcceptor;
 use rustls::pki_types::pem::PemObject;
 use tower::Service;
-use hyper_util::server::conn::auto::Builder;
-use hyper_util::rt::{TokioExecutor, TokioIo};
+use hyper_util::{
+    rt::{TokioExecutor, TokioIo},
+    server::conn::auto::Builder,
+};
 
 /// Load certificates from a PEM file
 fn load_certs(path: &str) -> std::io::Result<Vec<rustls::pki_types::CertificateDer<'static>>> {
