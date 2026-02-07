@@ -22,7 +22,9 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Install dependencies
-        run: sudo apt update && sudo apt install -y  libglib2.0-dev
+        run:
+          sudo apt update && sudo apt install -y  libglib2.0-dev libwebkit2gtk-4.1-dev build-essential curl wget file
+          libxdo-dev libssl-dev  libayatana-appindicator3-dev librsvg2-dev
 
       - name: Install grcov
         run: cargo install grcov
