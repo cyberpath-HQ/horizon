@@ -30,6 +30,7 @@ chrono = { workspace = true, features = ["serde"] }
 # Utilities
 tracing = { workspace = true }
 sea-orm = { workspace = true }
+redis = { workspace = true }
 
 [features]
 default = []
