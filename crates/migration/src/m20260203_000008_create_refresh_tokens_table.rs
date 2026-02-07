@@ -25,8 +25,7 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(RefreshTokens::UserId).text().not_null())
                     .col(
                         ColumnDef::new(RefreshTokens::TokenHash)
-                            .string()
-                            .string_len(128)
+                            .text()
                             .not_null()
                             .unique_key(),
                     )
