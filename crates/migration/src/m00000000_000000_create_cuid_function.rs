@@ -57,7 +57,8 @@ impl MigrationTrait for Migration {
                 r#"
                 DROP FUNCTION IF EXISTS cuid2(integer, text) CASCADE;
                 DROP FUNCTION IF EXISTS cuid2_slug(text) CASCADE;
-                DROP FUNCTION IF EXISTS is_cuid2(text, integer) CASCADE;
+                DROP FUNCTION IF EXISTS is_cuid2(text, integer, text) CASCADE;
+                DROP FUNCTION IF EXISTS cuid2_prefixed(text, integer) CASCADE;
                 DROP FUNCTION IF EXISTS bytes_to_base36(bytea, integer) CASCADE;
                 DROP FUNCTION IF EXISTS base36_encode(bigint) CASCADE;
                 DROP FUNCTION IF EXISTS generate_entropy(integer) CASCADE;
