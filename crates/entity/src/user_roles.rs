@@ -23,7 +23,11 @@ pub struct Model {
     pub role_id:     String,
     #[sea_orm(unique_key = "idx_user_roles_user_role_scope_unique")]
     pub scope_type:  RoleScopeType,
-    #[sea_orm(column_type = "Text", nullable)]
+    #[sea_orm(
+        column_type = "Text",
+        nullable,
+        unique_key = "idx_user_roles_user_role_scope_unique"
+    )]
     pub scope_id:    Option<String>,
     pub expires_at:  Option<DateTime>,
     pub assigned_at: DateTime,
