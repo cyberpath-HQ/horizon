@@ -77,7 +77,7 @@ pub async fn auth_middleware(mut request: Request, next: Next) -> Response {
         Ok(claims) => claims,
         Err(e) => {
             // Map specific JWT errors to appropriate responses
-            let error_msg = e.to_string();
+            let error_msg = e.to_string().to_lowercase();
             if error_msg.contains("expired") {
                 return create_auth_error_response("Token has expired");
             }

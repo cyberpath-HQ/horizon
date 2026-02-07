@@ -121,15 +121,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a23eb6b1614318a8071c9b2521f36b424b2c83db5eb3a0fead4a6c0809af6e61"
 
 [[package]]
-name = "arc-swap"
-version = "1.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ded5f9a03ac8f24d1b8a25101ee812cd32cdc8c50a4c50237de2c4915850e73"
-dependencies = [
- "rustversion",
-]
-
-[[package]]
 name = "arcstr"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -356,19 +347,11 @@ version = "0.1.0"
 dependencies = [
  "argon2",
  "base64 0.22.1",
- "chrono",
- "entity",
- "error",
- "logging",
  "rand 0.9.2",
  "secrecy",
- "serde",
- "serde_json",
  "subtle",
  "tempfile",
  "thiserror 2.0.18",
- "tokio",
- "tracing",
 ]
 
 [[package]]
@@ -484,28 +467,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.114",
-]
-
-[[package]]
-name = "axum-server"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1df331683d982a0b9492b38127151e6453639cd34926eb9c07d4cd8c6d22bfc"
-dependencies = [
- "arc-swap",
- "bytes",
- "either",
- "fs-err",
- "http",
- "http-body",
- "hyper",
- "hyper-util",
- "pin-project-lite",
- "rustls",
- "rustls-pki-types",
- "tokio",
- "tokio-rustls",
- "tower-service",
 ]
 
 [[package]]
@@ -907,7 +868,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
- "axum-server",
  "clap",
  "clap_complete",
  "error",
@@ -918,11 +878,13 @@ dependencies = [
  "redis",
  "rustls",
  "rustls-pemfile",
+ "rustls-pki-types",
  "serde",
  "serde_json",
  "server",
  "tokio",
  "tokio-rustls",
+ "tower",
  "tracing",
  "tracing-subscriber",
 ]
@@ -1565,6 +1527,7 @@ name = "entity"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "cuid2",
  "sea-orm",
  "serde",
  "uuid",
@@ -1633,9 +1596,7 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.18",
  "tokio",
- "tower",
  "tracing",
- "uuid",
 ]
 
 [[package]]
@@ -1669,12 +1630,6 @@ dependencies = [
  "event-listener",
  "pin-project-lite",
 ]
-
-[[package]]
-name = "fallible-iterator"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4443176a9f2c162692bd3d352d745ef9413eec5782a80d8fd6f8a1ac692a07f7"
 
 [[package]]
 name = "fastrand"
@@ -1790,16 +1745,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb4cb245038516f5f85277875cdaa4f7d2c9a0fa0468de06ed190163b1581fcf"
 dependencies = [
  "percent-encoding",
-]
-
-[[package]]
-name = "fs-err"
-version = "3.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "baf68cef89750956493a66a10f512b9e58d9db21f2a573c079c0bdf1207a54a7"
-dependencies = [
- "autocfg",
- "tokio",
 ]
 
 [[package]]
@@ -2940,6 +2885,7 @@ version = "0.30.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2e99fb7a497b1e3339bc746195567ed8d3e24945ecd636e3619d20b9de9e9149"
 dependencies = [
+ "cc",
  "pkg-config",
  "vcpkg",
 ]
@@ -2975,11 +2921,9 @@ checksum = "5e5032e24019045c762d3c0f28f5b6b8bbf38563a65908389bf7978758920897"
 name = "logging"
 version = "0.1.0"
 dependencies = [
- "blake3",
  "cuid2",
  "rstest",
  "serde",
- "tokio",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
@@ -3757,16 +3701,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "phf"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c1562dc717473dbaa4c1f85a36410e03c047b2e7df7f45ee938fbef64ae7fadf"
-dependencies = [
- "phf_shared 0.13.1",
- "serde",
-]
-
-[[package]]
 name = "phf_codegen"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3871,15 +3805,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "phf_shared"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e57fef6bc5981e38c2ce2d63bfa546861309f875b8a75f092d1d54ae2d64f266"
-dependencies = [
- "siphasher 1.0.2",
-]
-
-[[package]]
 name = "pin-project-lite"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3977,35 +3902,6 @@ dependencies = [
  "pin-project-lite",
  "rustix",
  "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "postgres-protocol"
-version = "0.6.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ee9dd5fe15055d2b6806f4736aa0c9637217074e224bbec46d4041b91bb9491"
-dependencies = [
- "base64 0.22.1",
- "byteorder",
- "bytes",
- "fallible-iterator",
- "hmac",
- "md-5",
- "memchr",
- "rand 0.9.2",
- "sha2",
- "stringprep",
-]
-
-[[package]]
-name = "postgres-types"
-version = "0.2.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54b858f82211e84682fecd373f68e1ceae642d8d751a1ebd13f33de6257b3e20"
-dependencies = [
- "bytes",
- "fallible-iterator",
- "postgres-protocol",
 ]
 
 [[package]]
@@ -5180,6 +5076,7 @@ dependencies = [
  "base64 0.22.1",
  "blake3",
  "chrono",
+ "cuid2",
  "entity",
  "error",
  "http",
@@ -5187,18 +5084,15 @@ dependencies = [
  "migration",
  "rand 0.9.2",
  "redis",
- "regex",
  "sea-orm",
  "secrecy",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
  "tokio",
- "tokio-postgres",
  "tower",
  "tower-http",
  "tracing",
- "uuid",
  "validator",
 ]
 
@@ -5547,7 +5441,7 @@ dependencies = [
  "time",
  "tracing",
  "uuid",
- "whoami 1.6.1",
+ "whoami",
 ]
 
 [[package]]
@@ -5588,7 +5482,7 @@ dependencies = [
  "time",
  "tracing",
  "uuid",
- "whoami 1.6.1",
+ "whoami",
 ]
 
 [[package]]
@@ -6246,32 +6140,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tokio-postgres"
-version = "0.7.16"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dcea47c8f71744367793f16c2db1f11cb859d28f436bdb4ca9193eb1f787ee42"
-dependencies = [
- "async-trait",
- "byteorder",
- "bytes",
- "fallible-iterator",
- "futures-channel",
- "futures-util",
- "log",
- "parking_lot",
- "percent-encoding",
- "phf 0.13.1",
- "pin-project-lite",
- "postgres-protocol",
- "postgres-types",
- "rand 0.9.2",
- "socket2",
- "tokio",
- "tokio-util",
- "whoami 2.1.0",
-]
-
-[[package]]
 name = "tokio-rustls"
 version = "0.26.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6846,15 +6714,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ccf3ec651a847eb01de73ccad15eb7d99f80485de043efb2f370cd654f4ea44b"
 
 [[package]]
-name = "wasi"
-version = "0.14.7+wasi-0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "883478de20367e224c0090af9cf5f9fa85bed63a95c1abf3afc5c083ebc06e8c"
-dependencies = [
- "wasip2",
-]
-
-[[package]]
 name = "wasip2"
 version = "1.0.1+wasi-0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6868,15 +6727,6 @@ name = "wasite"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b8dad83b4f25e74f184f64c43b150b91efe7647395b42289f38e50566d82855b"
-
-[[package]]
-name = "wasite"
-version = "1.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "66fe902b4a6b8028a753d5424909b764ccf79b7a209eac9bf97e59cda9f71a42"
-dependencies = [
- "wasi 0.14.7+wasi-0.2.4",
-]
 
 [[package]]
 name = "wasm-bindgen"
@@ -7075,18 +6925,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d4a4db5077702ca3015d3d02d74974948aba2ad9e12ab7df718ee64ccd7e97d"
 dependencies = [
  "libredox",
- "wasite 0.1.0",
-]
-
-[[package]]
-name = "whoami"
-version = "2.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8fae98cf96deed1b7572272dfc777713c249ae40aa1cf8862e091e8b745f5361"
-dependencies = [
- "libredox",
- "wasite 1.0.2",
- "web-sys",
+ "wasite",
 ]
 
 [[package]]
