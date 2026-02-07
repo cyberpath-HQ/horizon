@@ -117,7 +117,8 @@ pub async fn assign_role_to_user(
     // Insert into database
     active_model.insert(db).await.map_err(|e| {
         // Check if this is a unique constraint violation (duplicate assignment)
-        if e.to_string().contains("unique constraint") || e.to_string().contains("duplicate") {
+        let error_msg = e.to_string().to_lowercase();
+        if error_msg.contains("unique constraint") || error_msg.contains("duplicate") {
             error::AppError::conflict(format!(
                 "Role '{}' is already assigned to this user",
                 role_slug
@@ -152,7 +153,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_get_user_roles_no_roles_returns_empty() {
+    async fn test_get_user_roles_fails_without_schema() {
         let db = setup_test_db().await;
         let user_id = cuid2::CuidConstructor::new().with_length(32).create_id();
 
