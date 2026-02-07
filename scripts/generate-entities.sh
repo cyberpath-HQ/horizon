@@ -329,6 +329,12 @@ extract_custom_edits() {
                 local suffix=" ${CUSTOM_EDIT_TAG_SUFFIX}"
                 current_edit_name="${line#"$prefix"}"
                 current_edit_name="${current_edit_name%"$suffix"}"
+                # Validate edit name for security (prevent path traversal)
+                if [[ "$current_edit_name" =~ [/\.\.] ]] || [ -z "$current_edit_name" ]; then
+                    log_warning "Invalid custom edit name in $filename: '$current_edit_name' (contains invalid characters or is empty)"
+                    current_edit_name=""
+                    continue
+                fi
                 current_content=""
             elif [[ "$line" == "$CUSTOM_EDIT_END_TAG"* ]]; then
                 # Validate the edit name matches
