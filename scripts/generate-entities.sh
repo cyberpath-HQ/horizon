@@ -323,12 +323,18 @@ extract_custom_edits() {
         while IFS= read -r line; do
             if [[ "$line" == "$CUSTOM_EDIT_START_TAG"* ]]; then
                 # Extract edit name from: // ===== START CUSTOM EDIT: <name> =====
-                current_edit_name=$(echo "$line" | sed "s/$CUSTOM_EDIT_START_TAG \\(.*\\) $CUSTOM_EDIT_TAG_SUFFIX/\\1/")
+                local prefix="${CUSTOM_EDIT_START_TAG} "
+                local suffix=" ${CUSTOM_EDIT_TAG_SUFFIX}"
+                current_edit_name="${line#"$prefix"}"
+                current_edit_name="${current_edit_name%"$suffix"}"
                 current_content=""
             elif [[ "$line" == "$CUSTOM_EDIT_END_TAG"* ]]; then
                 # Validate the edit name matches
                 local end_edit_name
-                end_edit_name=$(echo "$line" | sed "s/$CUSTOM_EDIT_END_TAG \\(.*\\) $CUSTOM_EDIT_TAG_SUFFIX/\\1/")
+                local prefix="${CUSTOM_EDIT_END_TAG} "
+                local suffix=" ${CUSTOM_EDIT_TAG_SUFFIX}"
+                end_edit_name="${line#"$prefix"}"
+                end_edit_name="${end_edit_name%"$suffix"}"
 
                 if [ "$current_edit_name" == "$end_edit_name" ] && [ -n "$current_edit_name" ]; then
                     # Save the extracted edit
@@ -392,11 +398,14 @@ restore_custom_edits() {
 
         # Check if the tags exist in the file
         if grep -q "$start_pattern" "$entity_file" && grep -q "$end_pattern" "$entity_file"; then
-            # Use awk to replace content between tags
-            awk -v start_pat="$start_pattern" -v end_pat="$end_pattern" -v replacement="$custom_content" '
+            # Use awk to replace content between tags - read replacement from temp file
+            awk -v start_pat="$start_pattern" -v end_pat="$end_pattern" '
                 $0 ~ start_pat {
                     print
-                    print replacement
+                    while ((getline line < "'"$edit_file"'") > 0) {
+                        print line
+                    }
+                    close("'"$edit_file"'")
                     found=1
                     next
                 }
@@ -433,9 +442,6 @@ add_custom_edit_tag() {
     local edit_name="$2"
     local custom_content="$3"
 
-    local escaped_content
-    escaped_content=$(echo "$custom_content" | sed 's/[\/&]/\\&/g')
-
     # Find the last closing brace of the struct and insert before it
     # This is a simple heuristic - the edit will be added at the end of the struct
     local last_brace_line
@@ -453,7 +459,8 @@ add_custom_edit_tag() {
         head -n "$((last_brace_line - 1))" "$entity_file"
         echo ""
         echo "$CUSTOM_EDIT_START_TAG $edit_name $CUSTOM_EDIT_TAG_SUFFIX"
-        echo "$custom_content"
+        printf '%s' "$custom_content"
+        echo ""
         echo "$CUSTOM_EDIT_END_TAG $edit_name $CUSTOM_EDIT_TAG_SUFFIX"
         echo ""
         tail -n +"$last_brace_line" "$entity_file"
