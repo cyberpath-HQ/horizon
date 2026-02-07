@@ -32,7 +32,7 @@ impl MigrationTrait for Migration {
                         text(Roles::Id)
                             .not_null()
                             .primary_key()
-                            .default(Expr::cust("cuid2(32, 'role_')")), // Default to super_admin CUID2
+                            .default(Expr::cust("cuid2(32, 'role_')")), // Generate a prefixed CUID2 as default ID
                     )
                     .col(string(Roles::Name).not_null())
                     .col(string(Roles::Slug).not_null().unique_key())
