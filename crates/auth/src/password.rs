@@ -241,7 +241,7 @@ pub fn validate_password_strength(password: &str) -> Result<(), Vec<PasswordVali
 
     let has_uppercase = password.chars().any(|c| c.is_uppercase());
     let has_lowercase = password.chars().any(|c| c.is_lowercase());
-    let has_digit = password.chars().any(|c| c.is_digit(10));
+    let has_digit = password.chars().any(|c| c.is_ascii_digit());
     let has_special = password
         .chars()
         .any(|c| !c.is_alphanumeric() && !c.is_whitespace());
