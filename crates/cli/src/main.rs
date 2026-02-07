@@ -11,14 +11,20 @@
 //! ```
 
 use std::net::SocketAddr;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 use axum;
 use clap::{Args, CommandFactory as _, Parser, Subcommand};
 use error::{AppError, Result};
 use migration::{Migrator, MigratorTrait as _};
 use server::{router::create_app_router, AppState, JwtConfig};
+use tokio::net::TcpListener;
 use tokio_rustls::TlsAcceptor;
 use rustls::pki_types::pem::PemObject;
+use tower::Service;
+use hyper_util::server::conn::auto::Builder;
+use hyper_util::rt::{TokioExecutor, TokioIo};
 
 /// Load certificates from a PEM file
 fn load_certs(path: &str) -> std::io::Result<Vec<rustls::pki_types::CertificateDer<'static>>> {
@@ -270,33 +276,41 @@ async fn serve(args: &ServeArgs) -> Result<()> {
 
         // Use hyper to serve with TLS
         loop {
-            let (tcp_stream, _) = listener.accept().await?;
-            let tls_acceptor = tls_acceptor.clone();
-            let app = app.clone();
-
-            tokio::spawn(async move {
-                let tls_stream = match tls_acceptor.accept(tcp_stream).await {
-                    Ok(stream) => stream,
-                    Err(e) => {
-                        tracing::warn!("TLS handshake failed: {}", e);
-                        return;
-                    },
-                };
-
-                let tower_service = app.clone();
-                let hyper_service =
-                    hyper::service::service_fn(move |request: hyper::Request<hyper::body::Incoming>| {
-                        let tower_service = tower_service.clone();
-                        async move { tower_service.call(request).await }
-                    });
-
-                if let Err(err) = hyper::server::conn::http1::Builder::new()
-                    .serve_connection(tls_stream, hyper_service)
-                    .await
-                {
-                    tracing::warn!("Error serving connection: {}", err);
+            tokio::select! {
+                _ = shutdown_signal() => {
+                    logging::info!(target: "serve", "Received shutdown signal, stopping HTTPS server...");
+                    break;
                 }
-            });
+                result = listener.accept() => {
+                    let (tcp_stream, _) = result?;
+                    let tls_acceptor = tls_acceptor.clone();
+                    let app = app.clone();
+
+                    tokio::spawn(async move {
+                        let tls_stream = match tls_acceptor.accept(tcp_stream).await {
+                            Ok(stream) => stream,
+                            Err(e) => {
+                                tracing::warn!("TLS handshake failed: {}", e);
+                                return;
+                            },
+                        };
+
+                        let tower_service = Arc::new(Mutex::new(app.clone()));
+                        let hyper_service =
+                            hyper::service::service_fn(move |request: hyper::Request<hyper::body::Incoming>| {
+                                let tower_service = tower_service.clone();
+                                async move { tower_service.lock().await.call(request).await }
+                            });
+
+                        if let Err(err) = Builder::new(TokioExecutor::new())
+                            .serve_connection(TokioIo::new(tls_stream), hyper_service)
+                            .await
+                        {
+                            tracing::warn!("Error serving connection: {}", err);
+                        }
+                    });
+                }
+            }
         }
     }
     else {
