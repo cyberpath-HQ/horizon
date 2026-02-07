@@ -243,7 +243,7 @@ BEGIN
         substring(cuid_part from 2) ~ '^[0-9a-z]*$'
     );
 END;
-$$ LANGUAGE plpgsql IMMUTABLE STRICT PARALLEL SAFE;
+$$ LANGUAGE plpgsql IMMUTABLE PARALLEL SAFE;
 
 -- Create helper function for common prefixes
 CREATE OR REPLACE FUNCTION cuid2_prefixed(
