@@ -28,6 +28,17 @@ secrecy = { workspace = true }
 # Constant-time comparison
 subtle = { workspace = true }
 
+# TOTP MFA
+totp-rs = { workspace = true }
+
+# Hashing
+blake3 = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
 [dev-dependencies]
 # Test utilities
 tempfile = { workspace = true }
+tokio = { workspace = true, features = ["full"] }

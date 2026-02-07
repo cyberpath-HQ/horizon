@@ -25,6 +25,7 @@ sea-orm = { workspace = true, features = ["runtime-tokio-rustls", "sqlx-postgres
 # ==================== AUTHENTICATION ====================
 jsonwebtoken = { workspace = true }
 argon2 = { workspace = true }
+totp-rs = { workspace = true }
 
 # ==================== SERIALIZATION ====================
 serde = { workspace = true }
@@ -54,6 +55,10 @@ base64 = { workspace = true }
 blake3 = { workspace = true }
 rand = { workspace = true }
 redis = { workspace = true }
+sha3 = { workspace = true }
+hmac = { workspace = true }
+subtle = { workspace = true }
+tokio = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }

@@ -84,7 +84,8 @@ subtle = { version = "2.6.1" }
 
 # ==================== AUTHENTICATION ====================
 jsonwebtoken = { version = "10.3.0", features = ["rust_crypto"] }
-totp-rs = { version = "5.7.0" }
+totp-rs = { version = "5.7.0", features = ["gen_secret", "qr", "otpauth", "serde_support", "zeroize"] }
+urlencoding = { version = "2.1.3" }
 
 # ==================== AI PROVIDERS ====================
 reqwest = { version = "0.13.1", default-features = false, features = ["rustls-native-certs", "json", "charset", "http2", "system-proxy"] }
