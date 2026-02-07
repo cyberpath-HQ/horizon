@@ -13,19 +13,6 @@ pub enum RoleScopeType {
     #[sea_orm(string_value = "asset")]
     Asset,
 }
-
-// ===== START CUSTOM EDIT: display_for_role_scope_type =====
-impl std::fmt::Display for RoleScopeType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            RoleScopeType::Global => write!(f, "global"),
-            RoleScopeType::Team => write!(f, "team"),
-            RoleScopeType::Asset => write!(f, "asset"),
-        }
-    }
-}
-// ===== END CUSTOM EDIT: display_for_role_scope_type =====
-
 #[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize)]
 #[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "team_member_role")]
 pub enum TeamMemberRole {
@@ -50,3 +37,15 @@ pub enum UserStatus {
     #[sea_orm(string_value = "pending_verification")]
     PendingVerification,
 }
+
+// ===== START CUSTOM EDIT: display_for_role_scope_type =====
+impl std::fmt::Display for RoleScopeType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RoleScopeType::Global => write!(f, "global"),
+            RoleScopeType::Team => write!(f, "team"),
+            RoleScopeType::Asset => write!(f, "asset"),
+        }
+    }
+}
+// ===== END CUSTOM EDIT: display_for_role_scope_type =====
