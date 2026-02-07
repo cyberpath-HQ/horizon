@@ -39,6 +39,8 @@
 #
 # Note: Custom edits are restored by name. If you change the edit name, it will
 # be treated as a new edit and tags will be added.
+# Important: The edit name cannot contain double underscore (__) characters as
+# this is used internally as a separator.
 # ============================================================================
 
 set -euo pipefail
@@ -337,8 +339,9 @@ extract_custom_edits() {
                 end_edit_name="${end_edit_name%"$suffix"}"
 
                 if [ "$current_edit_name" == "$end_edit_name" ] && [ -n "$current_edit_name" ]; then
-                    # Save the extracted edit
-                    local edit_file="$TEMP_CUSTOM_EDITS_DIR/${filename}_${current_edit_name}.edit"
+                    # Save the extracted edit using __ as separator to handle filenames with underscores
+                    local module_name="${filename%.rs}"
+                    local edit_file="$TEMP_CUSTOM_EDITS_DIR/${module_name}__${current_edit_name}.edit"
                     echo "$current_content" > "$edit_file"
                     [ "$VERBOSE" = true ] && log_info "  Extracted: ${filename}::${current_edit_name}"
                     ((edit_count++)) || true
@@ -376,57 +379,64 @@ restore_custom_edits() {
 
         local edit_basename
         edit_basename=$(basename "$edit_file")
-        local filename="${edit_basename%.edit}"
 
-        # Handle multiple edits per file by looking for _ separator
-        # Format: filename_editname.edit
-        local entity_file="$ENTITY_DIR/${filename%%_*}.rs"
+        # Format: modulename__editname.edit (using __ separator to handle underscores in names)
+        local module_name="${edit_basename%.edit}"
 
-        if [ ! -f "$entity_file" ]; then
-            log_warning "Target file not found for edit: $filename"
-            continue
-        fi
+        # Split on __ separator
+        local filename="${module_name%%__*}"
+        local edit_name="${module_name#*__}"
 
-        local edit_name="${edit_basename#${filename}_}"
-        edit_name="${edit_name%.edit}"
-        local custom_content
-        custom_content=$(cat "$edit_file")
+        # Validate we got a proper split
+        if [[ "$module_name" == *__* ]] && [ "$filename" != "$edit_name" ]; then
+            local entity_file="$ENTITY_DIR/${filename}.rs"
 
-        # Find and replace the custom edit section in the entity file
-        local start_pattern="^${CUSTOM_EDIT_START_TAG} ${edit_name} ${CUSTOM_EDIT_TAG_SUFFIX}$"
-        local end_pattern="^${CUSTOM_EDIT_END_TAG} ${edit_name} ${CUSTOM_EDIT_TAG_SUFFIX}$"
+            if [ ! -f "$entity_file" ]; then
+                log_warning "Target file not found for edit: $filename"
+                continue
+            fi
 
-        # Check if the tags exist in the file
-        if grep -q "$start_pattern" "$entity_file" && grep -q "$end_pattern" "$entity_file"; then
-            # Use awk to replace content between tags - read replacement from temp file
-            awk -v start_pat="$start_pattern" -v end_pat="$end_pattern" '
-                $0 ~ start_pat {
-                    print
-                    while ((getline line < "'"$edit_file"'") > 0) {
-                        print line
-                    }
-                    close("'"$edit_file"'")
-                    found=1
-                    next
-                }
-                $0 ~ end_pat {
-                    if (found) {
+            local custom_content
+            custom_content=$(cat "$edit_file")
+
+            # Find and replace the custom edit section in the entity file
+            local start_pattern="^${CUSTOM_EDIT_START_TAG} ${edit_name} ${CUSTOM_EDIT_TAG_SUFFIX}$"
+            local end_pattern="^${CUSTOM_EDIT_END_TAG} ${edit_name} ${CUSTOM_EDIT_TAG_SUFFIX}$"
+
+            # Check if the tags exist in the file
+            if grep -q "$start_pattern" "$entity_file" && grep -q "$end_pattern" "$entity_file"; then
+                # Use awk to replace content between tags - read replacement from temp file
+                awk -v start_pat="$start_pattern" -v end_pat="$end_pattern" '
+                    $0 ~ start_pat {
                         print
-                        found=0
+                        while ((getline line < "'"$edit_file"'") > 0) {
+                            print line
+                        }
+                        close("'"$edit_file"'")
+                        found=1
+                        next
                     }
-                    next
-                }
-                found { next }
-                { print }
-            ' "$entity_file" > "${entity_file}.tmp" && mv "${entity_file}.tmp" "$entity_file"
+                    $0 ~ end_pat {
+                        if (found) {
+                            print
+                            found=0
+                        }
+                        next
+                    }
+                    found { next }
+                    { print }
+                ' "$entity_file" > "${entity_file}.tmp" && mv "${entity_file}.tmp" "$entity_file"
 
-            log_info "Restored edit: ${filename}::${edit_name}"
-            ((restored_count++)) || true
+                log_info "Restored edit: ${filename}::${edit_name}"
+                ((restored_count++)) || true
+            else
+                # Tags don't exist yet - add them
+                log_info "Adding new edit tag: ${filename}::${edit_name}"
+                add_custom_edit_tag "$entity_file" "$edit_name" "$custom_content"
+                ((restored_count++)) || true
+            fi
         else
-            # Tags don't exist yet - add them
-            log_info "Adding new edit tag: ${filename}::${edit_name}"
-            add_custom_edit_tag "$entity_file" "$edit_name" "$custom_content"
-            ((restored_count++)) || true
+            log_warning "Invalid edit file format: $edit_basename (expected modulename__editname.edit)"
         fi
     done
 
@@ -442,31 +452,41 @@ add_custom_edit_tag() {
     local edit_name="$2"
     local custom_content="$3"
 
-    # Find the last closing brace of the struct and insert before it
-    # This is a simple heuristic - the edit will be added at the end of the struct
-    local last_brace_line
-    last_brace_line=$(awk '/^}$/ { line=NR } END { print line }' "$entity_file")
+    # Check if this is an enum file (contains pub enum declarations)
+    if grep -q "^pub enum " "$entity_file"; then
+        # For enum files, append the custom edit at the end of the file
+        echo "" >> "$entity_file"
+        echo "$CUSTOM_EDIT_START_TAG $edit_name $CUSTOM_EDIT_TAG_SUFFIX" >> "$entity_file"
+        printf '%s' "$custom_content" >> "$entity_file"
+        echo "" >> "$entity_file"
+        echo "$CUSTOM_EDIT_END_TAG $edit_name $CUSTOM_EDIT_TAG_SUFFIX" >> "$entity_file"
+        echo "" >> "$entity_file"
+    else
+        # For struct files, use the original logic to find the last closing brace
+        local last_brace_line
+        last_brace_line=$(awk '/^}$/ { line=NR } END { print line }' "$entity_file")
 
-    if [ -z "$last_brace_line" ] || [ "$last_brace_line" -eq 0 ]; then
-        log_warning "Could not find struct end in $entity_file"
-        return 1
+        if [ -z "$last_brace_line" ] || [ "$last_brace_line" -eq 0 ]; then
+            log_warning "Could not find struct end in $entity_file"
+            return 1
+        fi
+
+        # Create a temp file with the inserted tags
+        local temp_file
+        temp_file=$(mktemp)
+        {
+            head -n "$((last_brace_line - 1))" "$entity_file"
+            echo ""
+            echo "$CUSTOM_EDIT_START_TAG $edit_name $CUSTOM_EDIT_TAG_SUFFIX"
+            printf '%s' "$custom_content"
+            echo ""
+            echo "$CUSTOM_EDIT_END_TAG $edit_name $CUSTOM_EDIT_TAG_SUFFIX"
+            echo ""
+            tail -n +"$last_brace_line" "$entity_file"
+        } > "$temp_file"
+
+        mv "$temp_file" "$entity_file"
     fi
-
-    # Create a temp file with the inserted tags
-    local temp_file
-    temp_file=$(mktemp)
-    {
-        head -n "$((last_brace_line - 1))" "$entity_file"
-        echo ""
-        echo "$CUSTOM_EDIT_START_TAG $edit_name $CUSTOM_EDIT_TAG_SUFFIX"
-        printf '%s' "$custom_content"
-        echo ""
-        echo "$CUSTOM_EDIT_END_TAG $edit_name $CUSTOM_EDIT_TAG_SUFFIX"
-        echo ""
-        tail -n +"$last_brace_line" "$entity_file"
-    } > "$temp_file"
-
-    mv "$temp_file" "$entity_file"
 }
 
 validate_entities() {
