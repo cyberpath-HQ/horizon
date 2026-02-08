@@ -206,14 +206,14 @@ fn generate_all_permission_check(permissions: &[Expr]) -> proc_macro2::TokenStre
                 },
                 Ok(auth::permissions::PermissionCheckResult::Denied) => {
                     return Err(error::AppError::forbidden(
-                        format!("Missing required permission: {}", perm.as_string())
+                        format!("Missing required permission: {}", perm.to_string())
                     ));
                 },
                 Ok(auth::permissions::PermissionCheckResult::RequiresContext { scope_type, scope_id }) => {
                     return Err(error::AppError::forbidden(
                         format!(
                             "Permission '{}' requires context: {} {}",
-                            perm.as_string(),
+                            perm.to_string(),
                             scope_type,
                             scope_id.unwrap_or_else(|| "unspecified".to_string())
                         )
@@ -258,16 +258,14 @@ fn generate_any_permission_check(permissions: &[Expr]) -> proc_macro2::TokenStre
                     break; // Found one allowed permission, we're done
                 },
                 Ok(auth::permissions::PermissionCheckResult::Denied) => {
-                    denied_permissions.push(perm.as_string());
+                    denied_permissions.push(perm.to_string());
                 },
                 Ok(auth::permissions::PermissionCheckResult::RequiresContext { scope_type, scope_id }) => {
-                    return Err(error::AppError::forbidden(
-                        format!(
-                            "Permission '{}' requires context: {} {}",
-                            perm.as_string(),
-                            scope_type,
-                            scope_id.unwrap_or_else(|| "unspecified".to_string())
-                        )
+                    denied_permissions.push(format!(
+                        "{} requires context: {} {}",
+                        perm.to_string(),
+                        scope_type,
+                        scope_id.unwrap_or_else(|| "unspecified".to_string())
                     ));
                 },
                 Ok(auth::permissions::PermissionCheckResult::Unauthenticated) => {
