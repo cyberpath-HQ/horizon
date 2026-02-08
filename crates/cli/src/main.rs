@@ -428,8 +428,6 @@ fn completions(args: &CompletionsArgs) -> Result<()> {
 }
 
 fn validate() -> Result<()> {
-    logging::info!(target: "validate", "Validating configuration...");
-
     // Check required environment variables
     let required_vars = [
         "HORIZON_DATABASE_HOST",
@@ -447,14 +445,12 @@ fn validate() -> Result<()> {
     }
 
     if !missing.is_empty() {
-        logging::error!(target: "validate", missing_vars = ?missing, "Missing required environment variables");
         return Err(AppError::validation(format!(
             "Missing required environment variables: {:?}",
             missing
         )));
     }
 
-    logging::info!(target: "validate", "Configuration validation passed");
     Ok(())
 }
 
