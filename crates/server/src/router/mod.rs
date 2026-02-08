@@ -410,13 +410,13 @@ async fn get_api_key_usage_handler(
 /// Returns overall system health status based on component status.
 /// If any critical component is unhealthy, the overall status becomes "unhealthy".
 async fn health_check_handler(State(state): State<AppState>) -> Result<Json<serde_json::Value>> {
-    let start_time = std::time::Instant::now();
+    let request_start = std::time::Instant::now();
     let mut status = "healthy";
     let mut checks = serde_json::json!({
         "status": status,
         "timestamp": chrono::Utc::now().to_rfc3339(),
         "checks": {},
-        "uptime": start_time.elapsed().as_millis()
+        "uptime_seconds": state.start_time.elapsed().as_secs()
     });
 
     let checks_obj = checks["checks"].as_object_mut().unwrap();
@@ -548,6 +548,7 @@ mod tests {
             db,
             jwt_config,
             redis,
+            start_time: std::time::Instant::now(),
         };
 
         Router::new()
@@ -634,7 +635,7 @@ mod tests {
         assert!(json["checks"]["database"].is_object());
         assert!(json["checks"]["redis"].is_object());
         assert!(json["checks"]["system"].is_object());
-        assert!(json["uptime"].is_number()); // uptime in milliseconds
+        assert!(json["uptime_seconds"].is_number()); // uptime in seconds
     }
 
     #[tokio::test]
