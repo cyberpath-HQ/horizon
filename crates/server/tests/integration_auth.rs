@@ -160,6 +160,7 @@ async fn test_app_state_initialization() {
         db,
         jwt_config,
         redis: redis_client.clone(),
+        start_time: std::time::Instant::now(),
     };
 
     // Verify state was created successfully
