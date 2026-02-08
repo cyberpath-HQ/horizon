@@ -3,7 +3,10 @@
 //! Redis-backed sliding window rate limiter using sorted sets.
 //! Supports per-endpoint rate limits based on sensitivity levels.
 
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    net::SocketAddr,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use axum::{
     extract::Request,
@@ -17,7 +20,30 @@ use tracing::{debug, warn};
 
 use crate::AppState;
 
-/// Rate limit configuration for different endpoint sensitivity levels
+/// Lua script for atomic rate limiting
+static RATE_LIMIT_SCRIPT: &str = r#"
+    local key = KEYS[1]
+    local window_start = ARGV[1]
+    local max_requests = ARGV[2]
+    local member = ARGV[3]
+    local score = ARGV[4]
+    local ttl = ARGV[5]
+
+    -- Remove old entries
+    redis.call('ZREMRANGEBYSCORE', key, '-inf', window_start)
+
+    -- Get current count
+    local count = redis.call('ZCARD', key)
+
+    -- If under limit, add new entry
+    if count < tonumber(max_requests) then
+        redis.call('ZADD', key, score, member)
+        redis.call('EXPIRE', key, ttl)
+        return count
+    else
+        return count
+    end
+"#;
 #[derive(Debug, Clone)]
 pub struct RateLimitConfig {
     /// Maximum number of requests allowed in the window
@@ -90,7 +116,7 @@ fn rate_limit_for_path(path: &str) -> &'static RateLimitConfig {
 /// # Returns
 ///
 /// The client IP address string
-fn extract_client_ip(request: &Request) -> String {
+fn extract_client_ip(request: &Request, peer_addr: &SocketAddr) -> String {
     request
         .headers()
         .get("x-forwarded-for")
@@ -103,7 +129,7 @@ fn extract_client_ip(request: &Request) -> String {
                 .and_then(|v| v.to_str().ok())
                 .map(|s| s.to_string())
         })
-        .unwrap_or_else(|| "unknown".to_string())
+        .unwrap_or_else(|| peer_addr.ip().to_string())
 }
 
 /// Rate limiting middleware using Redis sorted sets (sliding window)
@@ -114,7 +140,11 @@ fn extract_client_ip(request: &Request) -> String {
 /// 3. Uses Redis ZRANGEBYSCORE + ZADD for sliding window counting
 /// 4. Returns 429 Too Many Requests when the limit is exceeded
 /// 5. Adds rate limit headers (X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After)
-pub async fn rate_limit_middleware(request: Request, next: Next) -> Response {
+pub async fn rate_limit_middleware(
+    axum::extract::ConnectInfo(peer_addr): axum::extract::ConnectInfo<SocketAddr>,
+    request: Request,
+    next: Next,
+) -> Response {
     let app_state = match request.extensions().get::<AppState>() {
         Some(state) => state.clone(),
         None => {
@@ -124,7 +154,7 @@ pub async fn rate_limit_middleware(request: Request, next: Next) -> Response {
     };
 
     let path = request.uri().path().to_string();
-    let client_ip = extract_client_ip(&request);
+    let client_ip = extract_client_ip(&request, &peer_addr);
     let config = rate_limit_for_path(&path);
 
     // Build rate limit key: rate_limit:{ip}:{path_category}
@@ -209,15 +239,22 @@ async fn check_rate_limit(
 
     let window_start = now - (config.window_seconds as f64 * 1000.0);
 
-    // Remove old entries outside the window
-    let _: () = conn
-        .zrembyscore(key, f64::NEG_INFINITY, window_start)
+    // Use Lua script for atomic operation
+    let script = redis::Script::new(RATE_LIMIT_SCRIPT);
+    let member = format!("{}:{}", now, rand::random::<u32>());
+    let ttl = config.window_seconds as i64 + 1;
+
+    let count: i64 = script
+        .key(key)
+        .arg(window_start)
+        .arg(config.max_requests)
+        .arg(&member)
+        .arg(now)
+        .arg(ttl)
+        .invoke_async(&mut conn)
         .await?;
 
-    // Count current entries
-    let count: u64 = conn.zcard(key).await?;
-
-    if count >= config.max_requests {
+    if count >= config.max_requests as i64 {
         // Get the oldest entry to calculate retry_after
         let oldest: Vec<(String, f64)> = conn.zrange_withscores(key, 0, 0).await?;
         let retry_after = if let Some((_, score)) = oldest.first() {
@@ -233,14 +270,7 @@ async fn check_rate_limit(
         });
     }
 
-    // Add the current request to the sorted set (score = timestamp, member = unique id)
-    let member = format!("{}:{}", now, rand::random::<u32>());
-    let _: () = conn.zadd(key, &member, now).await?;
-
-    // Set TTL to automatically expire the key after the window
-    let _: () = conn.expire(key, config.window_seconds as i64 + 1).await?;
-
-    let remaining = config.max_requests - count - 1;
+    let remaining = config.max_requests - count as u64 - 1;
 
     debug!(
         key = %key,
@@ -380,7 +410,8 @@ mod tests {
             .header("x-forwarded-for", "192.168.1.1, 10.0.0.1")
             .body(axum::body::Body::empty())
             .unwrap();
-        assert_eq!(extract_client_ip(&request), "192.168.1.1");
+        let peer_addr = "127.0.0.1:8080".parse().unwrap();
+        assert_eq!(extract_client_ip(&request, &peer_addr), "192.168.1.1");
     }
 
     #[test]
@@ -390,7 +421,8 @@ mod tests {
             .header("x-real-ip", "10.0.0.5")
             .body(axum::body::Body::empty())
             .unwrap();
-        assert_eq!(extract_client_ip(&request), "10.0.0.5");
+        let peer_addr = "127.0.0.1:8080".parse().unwrap();
+        assert_eq!(extract_client_ip(&request, &peer_addr), "10.0.0.5");
     }
 
     #[test]
@@ -399,7 +431,8 @@ mod tests {
             .uri("/test")
             .body(axum::body::Body::empty())
             .unwrap();
-        assert_eq!(extract_client_ip(&request), "unknown");
+        let peer_addr = "127.0.0.1:8080".parse().unwrap();
+        assert_eq!(extract_client_ip(&request, &peer_addr), "127.0.0.1");
     }
 
     #[test]
@@ -410,6 +443,7 @@ mod tests {
             .header("x-real-ip", "5.6.7.8")
             .body(axum::body::Body::empty())
             .unwrap();
-        assert_eq!(extract_client_ip(&request), "1.2.3.4");
+        let peer_addr = "127.0.0.1:8080".parse().unwrap();
+        assert_eq!(extract_client_ip(&request, &peer_addr), "1.2.3.4");
     }
 }
