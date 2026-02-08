@@ -232,6 +232,7 @@ async fn serve(args: &ServeArgs) -> Result<()> {
         db,
         jwt_config,
         redis: redis_client,
+        start_time: std::time::Instant::now(),
     };
 
     // Create the Axum router
