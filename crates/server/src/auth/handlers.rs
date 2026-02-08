@@ -12,7 +12,7 @@ use entity::{
 };
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
 use chrono::Utc;
-use tracing::info;
+use tracing::{info, warn};
 use axum::{extract::Request, Json};
 use error::{AppError, Result};
 
@@ -193,7 +193,9 @@ pub async fn login_handler_inner(
             );
         }
         active_model.updated_at = Set(Utc::now().naive_utc());
-        let _ = active_model.update(&state.db).await;
+        if let Err(e) = active_model.update(&state.db).await {
+            warn!(user_id = %user.id, error = %e, "Failed to update failed login attempts");
+        }
 
         return Err(AppError::unauthorized(
             "Invalid email or password".to_string(),
@@ -313,7 +315,9 @@ pub async fn login_handler_inner(
     let mut login_update: entity::users::ActiveModel = user.clone().into();
     login_update.last_login_at = Set(Some(Utc::now().naive_utc()));
     login_update.updated_at = Set(Utc::now().naive_utc());
-    let _ = login_update.update(&state.db).await;
+    if let Err(e) = login_update.update(&state.db).await {
+        warn!(user_id = %user_id, error = %e, "Failed to update last_login_at");
+    }
 
     let tokens = AuthTokens {
         access_token:  create_access_token(&state.jwt_config, &user_id, &user.email, &user_roles)?,

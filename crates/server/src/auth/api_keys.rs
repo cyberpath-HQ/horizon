@@ -14,11 +14,6 @@ use error::{AppError, Result};
 use sea_orm::{ActiveModelTrait, ColumnTrait, Condition, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set};
 use tracing::info;
 
-/// Escape LIKE wildcards (% and _) in a search string
-fn escape_like_wildcards(s: &str) -> String {
-    s.replace('%', "\\%").replace('_', "\\_")
-}
-
 use crate::{
     dto::{
         api_keys::{
@@ -37,6 +32,7 @@ use crate::{
         users::PaginationInfo,
     },
     middleware::auth::AuthenticatedUser,
+    utils::escape_like_wildcards,
     AppState,
 };
 

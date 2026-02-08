@@ -2,6 +2,8 @@
 //!
 //! HTTP request handlers for Multi-Factor Authentication endpoints.
 
+const REFRESH_TOKEN_TTL_SECONDS: u64 = 30 * 24 * 60 * 60;
+
 use auth::{
     mfa::{
         check_backup_code_valid,
@@ -84,14 +86,14 @@ pub async fn mfa_enable_handler(
         .map_err(|e| AppError::internal(format!("Failed to generate MFA setup: {}", e)))?;
 
     // Hash backup codes for storage
-    let hashed_codes = hash_backup_codes(&setup.backup_codes);
+    let hashed_codes = hash_backup_codes(&setup.backup_codes, &db_user.id);
     let codes_json = serialize_backup_codes(&hashed_codes)
         .map_err(|e| AppError::internal(format!("Failed to serialize backup codes: {}", e)))?;
 
     // Store the TOTP secret and backup codes (but don't enable MFA yet - user must verify first)
     let mut active_model: entity::users::ActiveModel = db_user.into();
     active_model.totp_secret = Set(Some(setup.secret.clone()));
-    active_model.backup_codes = Set(Some(serde_json::Value::String(codes_json)));
+    active_model.backup_codes = Set(Some(codes_json));
     active_model.updated_at = Set(Utc::now().naive_utc());
     active_model
         .update(&state.db)
@@ -225,7 +227,7 @@ pub async fn mfa_verify_login_handler(
         &state.db,
         &db_user.id,
         &refresh_token_str,
-        30 * 24 * 60 * 60,
+        REFRESH_TOKEN_TTL_SECONDS,
     )
     .await?;
 
@@ -297,7 +299,7 @@ pub async fn mfa_verify_backup_code_handler(
     let hashed_codes = deserialize_backup_codes(&codes_json)
         .map_err(|e| AppError::internal(format!("Failed to parse backup codes: {}", e)))?;
 
-    let remaining_codes = verify_and_consume_backup_code(&req.backup_code, hashed_codes)
+    let remaining_codes = verify_and_consume_backup_code(&req.backup_code, hashed_codes, &db_user.id)
         .map_err(|_| AppError::unauthorized("Invalid backup code"))?;
 
     // Update the backup codes in database
@@ -305,7 +307,7 @@ pub async fn mfa_verify_backup_code_handler(
         .map_err(|e| AppError::internal(format!("Failed to serialize backup codes: {}", e)))?;
 
     let mut active_model: entity::users::ActiveModel = db_user.clone().into();
-    active_model.backup_codes = Set(Some(serde_json::Value::String(updated_codes_json)));
+    active_model.backup_codes = Set(Some(updated_codes_json));
     active_model.updated_at = Set(Utc::now().naive_utc());
     active_model
         .update(&state.db)
@@ -407,7 +409,7 @@ pub async fn mfa_disable_handler(
 
         let backup_valid = if let Some(json) = codes_json {
             if let Ok(hashed_codes) = deserialize_backup_codes(&json) {
-                auth::mfa::check_backup_code_valid(&req.code, &hashed_codes)
+                auth::mfa::check_backup_code_valid(&req.code, &hashed_codes, &db_user.id)
             }
             else {
                 false
@@ -485,13 +487,13 @@ pub async fn mfa_regenerate_backup_codes_handler(
 
     // Generate new backup codes
     let new_codes = generate_backup_codes();
-    let hashed = hash_backup_codes(&new_codes);
+    let hashed = hash_backup_codes(&new_codes, &db_user.id);
     let codes_json = serialize_backup_codes(&hashed)
         .map_err(|e| AppError::internal(format!("Failed to serialize backup codes: {}", e)))?;
 
     // Update in database
     let mut active_model: entity::users::ActiveModel = db_user.into();
-    active_model.backup_codes = Set(Some(serde_json::Value::String(codes_json)));
+    active_model.backup_codes = Set(Some(codes_json));
     active_model.updated_at = Set(Utc::now().naive_utc());
     active_model
         .update(&state.db)

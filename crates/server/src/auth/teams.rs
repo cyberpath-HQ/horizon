@@ -32,8 +32,19 @@ use crate::{
         users::PaginationInfo,
     },
     middleware::auth::AuthenticatedUser,
+    utils::escape_like_wildcards,
     AppState,
 };
+
+/// Convert TeamMemberRole to string
+fn role_to_string(role: &entity::sea_orm_active_enums::TeamMemberRole) -> String {
+    match role {
+        entity::sea_orm_active_enums::TeamMemberRole::Owner => "owner".to_string(),
+        entity::sea_orm_active_enums::TeamMemberRole::Admin => "admin".to_string(),
+        entity::sea_orm_active_enums::TeamMemberRole::Member => "member".to_string(),
+        entity::sea_orm_active_enums::TeamMemberRole::Viewer => "viewer".to_string(),
+    }
+}
 
 /// Create a new team
 ///
@@ -145,7 +156,8 @@ pub async fn list_teams_handler(
     let mut base_query = TeamsEntity::find().filter(TeamColumn::DeletedAt.is_null());
 
     if let Some(ref search) = query.search {
-        let pattern = format!("%{}%", search);
+        let escaped_search = escape_like_wildcards(search);
+        let pattern = format!("%{}%", escaped_search);
         base_query = base_query.filter(
             Condition::any()
                 .add(TeamColumn::Name.like(&pattern))
@@ -454,7 +466,7 @@ pub async fn update_team_member_handler(
         user_id: updated.user_id,
         email: member_user.email,
         display_name,
-        role: format!("{:?}", role).to_lowercase(),
+        role: role_to_string(&role),
         joined_at: updated.joined_at.to_string(),
     }))
 }

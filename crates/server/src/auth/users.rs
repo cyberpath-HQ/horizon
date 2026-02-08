@@ -154,7 +154,7 @@ pub async fn list_users_handler(
 
     let mut user_responses = Vec::with_capacity(users.len());
     for u in &users {
-        let roles = get_user_roles(&state.db, &u.id).await.unwrap_or_default();
+        let roles = get_user_roles(&state.db, &u.id).await?;
         user_responses.push(user_model_to_response(u, roles));
     }
 
