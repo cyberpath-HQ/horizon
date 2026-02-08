@@ -541,21 +541,95 @@ mod tests {
 
     #[test]
     fn test_validate_returns_ok() {
+        // Save original env vars
+        let orig_host = std::env::var("HORIZON_DATABASE_HOST").ok();
+        let orig_port = std::env::var("HORIZON_DATABASE_PORT").ok();
+        let orig_name = std::env::var("HORIZON_DATABASE_NAME").ok();
+        let orig_user = std::env::var("HORIZON_DATABASE_USER").ok();
+        let orig_pass = std::env::var("HORIZON_DATABASE_PASSWORD").ok();
+
         // Set required env vars
         unsafe {
             std::env::set_var("HORIZON_DATABASE_HOST", "localhost");
+        }
+        unsafe {
             std::env::set_var("HORIZON_DATABASE_PORT", "5432");
+        }
+        unsafe {
             std::env::set_var("HORIZON_DATABASE_NAME", "horizon");
+        }
+        unsafe {
             std::env::set_var("HORIZON_DATABASE_USER", "horizon");
+        }
+        unsafe {
             std::env::set_var("HORIZON_DATABASE_PASSWORD", "password");
         }
 
         let result = validate();
         assert!(result.is_ok());
+
+        // Restore original env vars
+        if let Some(v) = orig_host {
+            unsafe {
+                std::env::set_var("HORIZON_DATABASE_HOST", v);
+            }
+        }
+        else {
+            unsafe {
+                std::env::remove_var("HORIZON_DATABASE_HOST");
+            }
+        }
+        if let Some(v) = orig_port {
+            unsafe {
+                std::env::set_var("HORIZON_DATABASE_PORT", v);
+            }
+        }
+        else {
+            unsafe {
+                std::env::remove_var("HORIZON_DATABASE_PORT");
+            }
+        }
+        if let Some(v) = orig_name {
+            unsafe {
+                std::env::set_var("HORIZON_DATABASE_NAME", v);
+            }
+        }
+        else {
+            unsafe {
+                std::env::remove_var("HORIZON_DATABASE_NAME");
+            }
+        }
+        if let Some(v) = orig_user {
+            unsafe {
+                std::env::set_var("HORIZON_DATABASE_USER", v);
+            }
+        }
+        else {
+            unsafe {
+                std::env::remove_var("HORIZON_DATABASE_USER");
+            }
+        }
+        if let Some(v) = orig_pass {
+            unsafe {
+                std::env::set_var("HORIZON_DATABASE_PASSWORD", v);
+            }
+        }
+        else {
+            unsafe {
+                std::env::remove_var("HORIZON_DATABASE_PASSWORD");
+            }
+        }
     }
 
     #[test]
     fn test_validate_missing_vars() {
+        // Save original env vars
+        let orig_host = std::env::var("HORIZON_DATABASE_HOST").ok();
+        let orig_port = std::env::var("HORIZON_DATABASE_PORT").ok();
+        let orig_name = std::env::var("HORIZON_DATABASE_NAME").ok();
+        let orig_user = std::env::var("HORIZON_DATABASE_USER").ok();
+        let orig_pass = std::env::var("HORIZON_DATABASE_PASSWORD").ok();
+
         // Clear env vars
         unsafe {
             std::env::remove_var("HORIZON_DATABASE_HOST");
@@ -567,6 +641,33 @@ mod tests {
 
         let result = validate();
         assert!(result.is_err());
+
+        // Restore original env vars
+        if let Some(v) = orig_host {
+            unsafe {
+                std::env::set_var("HORIZON_DATABASE_HOST", v);
+            }
+        }
+        if let Some(v) = orig_port {
+            unsafe {
+                std::env::set_var("HORIZON_DATABASE_PORT", v);
+            }
+        }
+        if let Some(v) = orig_name {
+            unsafe {
+                std::env::set_var("HORIZON_DATABASE_NAME", v);
+            }
+        }
+        if let Some(v) = orig_user {
+            unsafe {
+                std::env::set_var("HORIZON_DATABASE_USER", v);
+            }
+        }
+        if let Some(v) = orig_pass {
+            unsafe {
+                std::env::set_var("HORIZON_DATABASE_PASSWORD", v);
+            }
+        }
     }
 
     #[test]
