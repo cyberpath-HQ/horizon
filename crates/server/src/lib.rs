@@ -29,6 +29,8 @@ pub struct AppState {
     pub jwt_config: JwtConfig,
     /// Redis connection for token blacklisting
     pub redis:      redis::Client,
+    /// Server start time for uptime calculation
+    pub start_time: std::time::Instant,
 }
 
 /// JWT configuration for token generation and validation
