@@ -10,9 +10,9 @@
 //! horizon --help   # Show help
 //! ```
 
-use std::{net::SocketAddr, sync::Arc};
+use std::net::SocketAddr;
 
-use tokio::{net::TcpListener, sync::Mutex};
+use tokio::net::TcpListener;
 use axum;
 use clap::{Args, CommandFactory as _, Parser, Subcommand};
 use error::{AppError, Result};
@@ -297,11 +297,10 @@ async fn serve(args: &ServeArgs) -> Result<()> {
                             },
                         };
 
-                        let tower_service = Arc::new(Mutex::new(app.clone()));
                         let hyper_service =
                             hyper::service::service_fn(move |request: hyper::Request<hyper::body::Incoming>| {
-                                let tower_service = tower_service.clone();
-                                async move { tower_service.lock().await.call(request).await }
+                                let mut app = app.clone();
+                                async move { app.call(request).await }
                             });
 
                         if let Err(err) = Builder::new(TokioExecutor::new())
