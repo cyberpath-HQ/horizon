@@ -77,9 +77,10 @@ pub async fn api_key_auth_middleware(mut request: Request, next: Next) -> Respon
     }
 
     // Load user roles for the authenticated user extension
-    let user_roles = auth::roles::get_user_roles(&app_state.db, &user_model.id)
-        .await
-        .unwrap_or_default();
+    let user_roles = match auth::roles::get_user_roles(&app_state.db, &user_model.id).await {
+        Ok(roles) => roles,
+        Err(_) => return create_api_key_error_response("Failed to load user roles"),
+    };
 
     // Insert authenticated user into request extensions
     let authenticated_user = AuthenticatedUser {
