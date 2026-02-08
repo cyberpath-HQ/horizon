@@ -39,8 +39,8 @@ pub struct MfaVerifyRequest {
 /// Request to verify MFA using a backup code
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Validate)]
 pub struct MfaBackupCodeRequest {
-    /// The backup code (format: XXXX-XXXX)
-    #[validate(length(min = 8, max = 9, message = "Invalid backup code format"))]
+    /// The backup code (format: XXXX-XXXX-XXXX-XXXX)
+    #[validate(length(equal = 19, message = "Backup code must be in format XXXX-XXXX-XXXX-XXXX"))]
     pub backup_code: String,
 }
 
