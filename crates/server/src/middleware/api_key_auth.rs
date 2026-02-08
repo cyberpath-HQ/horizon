@@ -187,6 +187,19 @@ mod tests {
     }
 
     #[test]
+    fn test_extract_ip_single_xforwardedfor() {
+        let request = Request::builder()
+            .uri("/test")
+            .header("x-forwarded-for", "172.16.0.1")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        assert_eq!(
+            extract_ip_from_request(&request),
+            Some("172.16.0.1".to_string())
+        );
+    }
+
+    #[test]
     fn test_extract_ip_xrealip() {
         let request = Request::builder()
             .uri("/test")
@@ -219,6 +232,107 @@ mod tests {
         assert_eq!(
             extract_ip_from_request(&request),
             Some("1.2.3.4".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_ip_empty_forwarded() {
+        let request = Request::builder()
+            .uri("/test")
+            .header("x-forwarded-for", "")
+            .header("x-real-ip", "10.0.0.5")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        // Empty x-forwarded-for header returns empty string, not fallback
+        assert_eq!(extract_ip_from_request(&request), Some("".to_string()));
+    }
+
+    #[test]
+    fn test_extract_ip_whitespace_handling() {
+        let request = Request::builder()
+            .uri("/test")
+            .header("x-forwarded-for", "  192.0.2.1  ,  10.0.0.2  ")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        assert_eq!(
+            extract_ip_from_request(&request),
+            Some("192.0.2.1".to_string())
+        );
+    }
+
+    #[test]
+    fn test_create_api_key_error_response() {
+        let response = create_api_key_error_response("Invalid API key");
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[test]
+    fn test_create_api_key_error_response_various_messages() {
+        let messages = vec![
+            "Invalid API key",
+            "API key expired",
+            "API key not found",
+            "Missing X-API-Key header",
+            "Internal error",
+            "Insufficient permissions",
+        ];
+
+        for msg in messages {
+            let response = create_api_key_error_response(msg);
+            assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        }
+    }
+
+    #[test]
+    fn test_extract_ip_ipv4_addresses() {
+        let test_cases = vec![
+            ("127.0.0.1", "127.0.0.1"),
+            ("192.168.1.1", "192.168.1.1"),
+            ("10.0.0.0", "10.0.0.0"),
+            ("255.255.255.255", "255.255.255.255"),
+            ("0.0.0.0", "0.0.0.0"),
+        ];
+
+        for (ip, expected) in test_cases {
+            let request = Request::builder()
+                .uri("/test")
+                .header("x-forwarded-for", ip)
+                .body(axum::body::Body::empty())
+                .unwrap();
+
+            assert_eq!(
+                extract_ip_from_request(&request),
+                Some(expected.to_string()),
+                "Failed for IP: {}",
+                ip
+            );
+        }
+    }
+
+    #[test]
+    fn test_extract_ip_multiple_addresses_first_preferred() {
+        let request = Request::builder()
+            .uri("/test")
+            .header("x-forwarded-for", "10.1.2.3, 10.4.5.6, 10.7.8.9")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        assert_eq!(
+            extract_ip_from_request(&request),
+            Some("10.1.2.3".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_ip_fallback_chain() {
+        // Test that x-real-ip is used when x-forwarded-for is empty
+        let request = Request::builder()
+            .uri("/test")
+            .header("x-real-ip", "203.0.113.1")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        assert_eq!(
+            extract_ip_from_request(&request),
+            Some("203.0.113.1".to_string())
         );
     }
 }

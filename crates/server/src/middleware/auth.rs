@@ -134,14 +134,12 @@ fn create_auth_error_response(message: &str) -> Response {
 
 #[cfg(test)]
 mod tests {
-    use axum::http::Request;
-    use tower::ServiceExt;
     use auth::jwt::extract_bearer_token;
 
     use super::*;
 
-    #[tokio::test]
-    async fn test_extract_bearer_token() {
+    #[test]
+    fn test_extract_bearer_token() {
         assert_eq!(
             extract_bearer_token("Bearer abc123"),
             Some("abc123".to_string())
@@ -155,12 +153,178 @@ mod tests {
         assert!(extract_bearer_token("").is_none());
     }
 
-    #[tokio::test]
-    async fn test_extract_bearer_token_edge_cases() {
-        // Verify extract_bearer_token works correctly
+    #[test]
+    fn test_extract_bearer_token_edge_cases() {
         assert!(extract_bearer_token("Bearer test").is_some());
         assert!(extract_bearer_token("Bearer").is_none());
         assert!(extract_bearer_token("").is_none());
         assert!(extract_bearer_token("Basic abc123").is_none());
+    }
+
+    #[test]
+    fn test_extract_bearer_token_with_spaces() {
+        assert_eq!(
+            extract_bearer_token("Bearer token123"),
+            Some("token123".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_bearer_token_case_sensitive() {
+        // Bearer prefix should be case-sensitive
+        assert!(extract_bearer_token("bearer token").is_none());
+        assert!(extract_bearer_token("BEARER token").is_none());
+    }
+
+    #[test]
+    fn test_authenticated_user_structure() {
+        let user = AuthenticatedUser {
+            id:    "user-123".to_string(),
+            email: "user@example.com".to_string(),
+            roles: vec!["admin".to_string(), "viewer".to_string()],
+        };
+
+        assert_eq!(user.id, "user-123");
+        assert_eq!(user.email, "user@example.com");
+        assert_eq!(user.roles.len(), 2);
+        assert!(user.roles.contains(&"admin".to_string()));
+    }
+
+    #[test]
+    fn test_authenticated_user_clone() {
+        let user1 = AuthenticatedUser {
+            id:    "user-456".to_string(),
+            email: "test@example.com".to_string(),
+            roles: vec!["user".to_string()],
+        };
+
+        let user2 = user1.clone();
+        assert_eq!(user1.id, user2.id);
+        assert_eq!(user1.email, user2.email);
+        assert_eq!(user1.roles, user2.roles);
+    }
+
+    #[test]
+    fn test_authenticated_user_empty_roles() {
+        let user = AuthenticatedUser {
+            id:    "user-789".to_string(),
+            email: "noprole@example.com".to_string(),
+            roles: vec![],
+        };
+
+        assert!(user.roles.is_empty());
+    }
+
+    #[test]
+    fn test_create_auth_error_response_formats() {
+        // Test that error responses are created correctly
+        let response = create_auth_error_response("Test error");
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[test]
+    fn test_create_auth_error_messages() {
+        let messages = vec![
+            "Missing authorization header",
+            "Invalid authorization header format",
+            "Token has expired",
+            "Invalid token signature",
+            "Invalid token",
+            "Authentication failed",
+            "Token has been revoked",
+            "Authentication service temporarily unavailable",
+        ];
+
+        for msg in messages {
+            let response = create_auth_error_response(msg);
+            assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        }
+    }
+
+    #[test]
+    fn test_bearer_token_extraction_variations() {
+        // Test various Bearer token formats
+        let test_cases = vec![
+            (
+                "Bearer valid_token_123",
+                Some("valid_token_123".to_string()),
+            ),
+            (
+                "Bearer token.with.dots",
+                Some("token.with.dots".to_string()),
+            ),
+            (
+                "Bearer token-with-dashes",
+                Some("token-with-dashes".to_string()),
+            ),
+            (
+                "Bearer token_with_underscores",
+                Some("token_with_underscores".to_string()),
+            ),
+            ("Bearer", None),
+            ("Bearer ", None),
+            ("bearer lowercase", None),
+        ];
+
+        for (input, expected) in test_cases {
+            assert_eq!(
+                extract_bearer_token(input),
+                expected,
+                "Failed for input: {}",
+                input
+            );
+        }
+    }
+
+    #[test]
+    fn test_authenticated_user_debug_format() {
+        let user = AuthenticatedUser {
+            id:    "user-debug".to_string(),
+            email: "debug@example.com".to_string(),
+            roles: vec!["admin".to_string()],
+        };
+
+        let debug_str = format!("{:?}", user);
+        assert!(debug_str.contains("user-debug"));
+        assert!(debug_str.contains("debug@example.com"));
+    }
+
+    #[test]
+    fn test_authenticated_user_multiple_roles() {
+        let roles = vec![
+            "admin".to_string(),
+            "editor".to_string(),
+            "viewer".to_string(),
+            "user".to_string(),
+        ];
+
+        let user = AuthenticatedUser {
+            id:    "multi-role-user".to_string(),
+            email: "roles@example.com".to_string(),
+            roles: roles.clone(),
+        };
+
+        assert_eq!(user.roles.len(), 4);
+        for (i, role) in roles.iter().enumerate() {
+            assert_eq!(&user.roles[i], role);
+        }
+    }
+
+    #[test]
+    fn test_authenticated_user_equality() {
+        let user1 = AuthenticatedUser {
+            id:    "same-user".to_string(),
+            email: "same@example.com".to_string(),
+            roles: vec!["admin".to_string()],
+        };
+
+        let user2 = AuthenticatedUser {
+            id:    "same-user".to_string(),
+            email: "same@example.com".to_string(),
+            roles: vec!["admin".to_string()],
+        };
+
+        assert_eq!(user1.id, user2.id);
+        assert_eq!(user1.email, user2.email);
     }
 }

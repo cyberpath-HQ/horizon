@@ -2,6 +2,8 @@
 //!
 //! Manages Redis-based token blacklisting for immediate token invalidation.
 
+use std::collections::HashSet;
+
 use chrono::{DateTime, Utc};
 use redis::{AsyncCommands, RedisResult};
 use tracing::debug;
@@ -220,53 +222,285 @@ pub fn hash_token_for_blacklist(token: &str) -> String { blake3::hash(token.as_b
 
 #[cfg(test)]
 mod tests {
-    use redis::Client;
-
     use super::*;
 
-    async fn setup_test_redis() -> Client {
-        // For tests, we'll use a mock or skip if Redis not available
-        // In real tests, you'd set up a test Redis instance
-        Client::open("redis://127.0.0.1:6379").expect("Failed to create Redis client")
-    }
+    // ==================== token hash tests ====================
 
-    #[tokio::test]
-    async fn test_token_hashing() {
-        let token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.test.signature";
+    #[test]
+    fn test_hash_token_deterministic() {
+        let token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.test";
         let hash1 = hash_token_for_blacklist(token);
         let hash2 = hash_token_for_blacklist(token);
 
-        // Same input should produce same hash
+        // Same input should always produce same hash
         assert_eq!(hash1, hash2);
-
-        // Hash should be 64 characters (32 bytes hex encoded)
-        assert_eq!(hash1.len(), 64);
     }
 
-    // Note: Redis integration tests would require a running Redis instance
-    // These are commented out to avoid test failures in CI
-    // #[tokio::test]
-    // async fn test_blacklist_operations() {
-    // let client = setup_test_redis().await;
-    // let blacklist = TokenBlacklist::new(client);
-    //
-    // let token = "test.jwt.token";
-    // let token_hash = hash_token_for_blacklist(token);
-    // let expires_at = Utc::now() + chrono::Duration::hours(1);
-    //
-    // Initially not blacklisted
-    // assert!(!blacklist.is_blacklisted(&token_hash).await.unwrap());
-    //
-    // Blacklist the token
-    // blacklist.blacklist_token(&token_hash, expires_at).await.unwrap();
-    //
-    // Now it should be blacklisted
-    // assert!(blacklist.is_blacklisted(&token_hash).await.unwrap());
-    //
-    // Remove from blacklist
-    // blacklist.remove_from_blacklist(&token_hash).await.unwrap();
-    //
-    // Should no longer be blacklisted
-    // assert!(!blacklist.is_blacklisted(&token_hash).await.unwrap());
-    // }
+    #[test]
+    fn test_hash_token_format() {
+        let token = "test.jwt.token";
+        let hash = hash_token_for_blacklist(token);
+
+        // Hash should be 64 characters (32 bytes hex encoded with BLAKE3)
+        assert_eq!(hash.len(), 64);
+
+        // Hash should only contain hex characters (0-9, a-f)
+        assert!(hash.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn test_hash_token_empty_string() {
+        let token = "";
+        let hash = hash_token_for_blacklist(token);
+
+        // Empty string should still produce valid hash
+        assert_eq!(hash.len(), 64);
+        assert!(hash.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn test_hash_token_sensitive_to_changes() {
+        let token1 = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.test.signature";
+        let token2 = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.test.signaturE"; // Changed last char
+
+        let hash1 = hash_token_for_blacklist(token1);
+        let hash2 = hash_token_for_blacklist(token2);
+
+        // Different tokens should produce different hashes
+        assert_ne!(hash1, hash2);
+    }
+
+    #[test]
+    fn test_hash_token_long_string() {
+        let token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyLCJleHAiOjIwMDAwMDAwMDAsImlzcyI6ImF1dGgiLCJhdWQiOiJhcGkifQ.verylongsignaturewithalotofcharacterstomakethetokenevenlargerandtestthatfunctioncanhandlelonginputs";
+        let hash = hash_token_for_blacklist(token);
+
+        assert_eq!(hash.len(), 64);
+        assert!(hash.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn test_hash_token_with_special_chars() {
+        let token = "!@#$%^&*()_+-=[]{}|;:',.<>?/\\`~";
+        let hash = hash_token_for_blacklist(token);
+
+        assert_eq!(hash.len(), 64);
+        assert!(hash.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn test_hash_token_with_unicode() {
+        let token = "token_with_unicode_🎉_emoji_and_中文";
+        let hash = hash_token_for_blacklist(token);
+
+        assert_eq!(hash.len(), 64);
+        assert!(hash.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn test_hash_token_whitespace() {
+        let token = "token   with   spaces\tand\ttabs\nand\nnewlines";
+        let hash = hash_token_for_blacklist(token);
+
+        assert_eq!(hash.len(), 64);
+        assert!(hash.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn test_hash_token_case_sensitivity() {
+        let token_lower = "eyj0exaiojsijEyfHb21j0eXaiojsjnv4.test.signature";
+        let token_upper = "EYJ0EXAIOJSIJEYB0EXB1OJSJNV4.TEST.SIGNATURE";
+
+        let hash_lower = hash_token_for_blacklist(token_lower);
+        let hash_upper = hash_token_for_blacklist(token_upper);
+
+        // Different case = different tokens = different hashes
+        assert_ne!(hash_lower, hash_upper);
+    }
+
+    #[test]
+    fn test_hash_token_multiple_calls_unique() {
+        // Different tokens should all produce different hashes
+        let tokens = vec![
+            "token1.signature.here",
+            "token2.signature.here",
+            "token3.signature.here",
+            "token4.signature.here",
+            "token5.signature.here",
+        ];
+
+        let hashes: Vec<_> = tokens.iter().map(|t| hash_token_for_blacklist(t)).collect();
+
+        // All hashes should be unique
+        let mut deduped = hashes.clone();
+        deduped.sort();
+        deduped.dedup();
+        assert_eq!(hashes.len(), deduped.len());
+    }
+
+    // ==================== blacklist stats tests ====================
+
+    #[test]
+    fn test_blacklist_stats_structure() {
+        let stats = BlacklistStats { total_tokens: 42 };
+
+        assert_eq!(stats.total_tokens, 42);
+    }
+
+    #[test]
+    fn test_blacklist_stats_zero() {
+        let stats = BlacklistStats { total_tokens: 0 };
+
+        assert_eq!(stats.total_tokens, 0);
+    }
+
+    #[test]
+    fn test_blacklist_stats_large_number() {
+        let stats = BlacklistStats { total_tokens: 1_000_000_000 };
+
+        assert_eq!(stats.total_tokens, 1_000_000_000);
+    }
+
+    #[test]
+    fn test_blacklist_stats_clone() {
+        let stats1 = BlacklistStats { total_tokens: 100 };
+        let stats2 = stats1.clone();
+
+        // Cloned stats should have same value
+        assert_eq!(stats1.total_tokens, stats2.total_tokens);
+        assert_eq!(stats1, stats2);
+    }
+
+    #[test]
+    fn test_blacklist_stats_equality() {
+        let stats1 = BlacklistStats { total_tokens: 50 };
+        let stats2 = BlacklistStats { total_tokens: 50 };
+        let stats3 = BlacklistStats { total_tokens: 51 };
+
+        assert_eq!(stats1, stats2);
+        assert_ne!(stats1, stats3);
+    }
+
+    #[test]
+    fn test_blacklist_stats_debug_format() {
+        let stats = BlacklistStats { total_tokens: 25 };
+        let debug_str = format!("{:?}", stats);
+
+        assert!(debug_str.contains("BlacklistStats"));
+        assert!(debug_str.contains("25"));
+    }
+
+    // ==================== token blacklist structure tests ====================
+
+    #[test]
+    fn test_token_blacklist_new() {
+        // Create a client that would connect to Redis (note: actual Redis might not be available)
+        // But we can test that the constructor works with a valid client
+        let client = redis::Client::open("redis://127.0.0.1:6379").unwrap();
+        let blacklist = TokenBlacklist::new(client);
+
+        // TokenBlacklist should be cloneable and debuggable
+        let _cloned = blacklist.clone();
+    }
+
+    #[test]
+    fn test_token_blacklist_clone() {
+        let client = redis::Client::open("redis://127.0.0.1:6379").unwrap();
+        let blacklist1 = TokenBlacklist::new(client.clone());
+        let blacklist2 = blacklist1.clone();
+
+        // Both instances should be valid TokenBlacklist instances
+        // They should be separate clones but represent the same service
+        let _debug1 = format!("{:?}", blacklist1);
+        let _debug2 = format!("{:?}", blacklist2);
+    }
+
+    #[test]
+    fn test_token_blacklist_debug_format() {
+        let client = redis::Client::open("redis://127.0.0.1:6379").unwrap();
+        let blacklist = TokenBlacklist::new(client);
+        let debug_str = format!("{:?}", blacklist);
+
+        // Debug format should contain TokenBlacklist
+        assert!(debug_str.contains("TokenBlacklist"));
+    }
+
+    // ==================== integration-style tests (unit level) ====================
+
+    #[test]
+    fn test_hash_token_consistency_across_multiple_calls() {
+        let token = "test.example.token";
+        let mut hashes = Vec::new();
+
+        // Call hash function many times
+        for _ in 0..100 {
+            hashes.push(hash_token_for_blacklist(token));
+        }
+
+        // All hashes should be identical for same input
+        assert!(hashes.iter().all(|h| h == &hashes[0]));
+    }
+
+    #[test]
+    fn test_hash_token_collision_resistance() {
+        // Test that slightly different tokens produce completely different hashes
+        let base = "base.token.string";
+        let mut variations = vec![];
+
+        for i in 0..10 {
+            let variant = format!("{}.{}", base, i);
+            variations.push(hash_token_for_blacklist(&variant));
+        }
+
+        // Check that all hashes are unique
+        for i in 0..variations.len() {
+            for j in (i + 1)..variations.len() {
+                assert_ne!(
+                    variations[i], variations[j],
+                    "Hashes for variant {} and {} should be different",
+                    i, j
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_hash_token_entropy() {
+        // Generate hashes from many different tokens
+        let mut hashes = HashSet::new();
+
+        for i in 0..50 {
+            let token = format!("token_{}_unique_input", i);
+            let hash = hash_token_for_blacklist(&token);
+            hashes.insert(hash);
+        }
+
+        // All 50 hashes should be unique
+        assert_eq!(hashes.len(), 50, "Expected 50 unique hashes, got {}", hashes.len());
+    }
+
+    #[test]
+    fn test_blacklist_stats_field_independence() {
+        let stats1 = BlacklistStats { total_tokens: 10 };
+        let stats2 = BlacklistStats { total_tokens: 20 };
+
+        // Modifying one shouldn't affect the other
+        assert_ne!(stats1.total_tokens, stats2.total_tokens);
+        assert_ne!(stats1, stats2);
+    }
+
+    #[test]
+    fn test_hash_token_key_format_compatibility() {
+        let token = "test.jwt.token";
+        let hash = hash_token_for_blacklist(token);
+
+        // Hash should be suitable for use in Redis keys
+        // Redis keys can contain any binary data, but hex strings are safe
+        let redis_key = format!("blacklist:token:{}", hash);
+
+        // Key should be valid length and format
+        assert!(redis_key.len() > 0);
+        assert!(redis_key.contains("blacklist:token:"));
+        assert_eq!(redis_key.len(), "blacklist:token:".len() + 64);
+    }
 }

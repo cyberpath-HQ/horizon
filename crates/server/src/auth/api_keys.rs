@@ -661,7 +661,11 @@ mod tests {
     fn test_generate_api_key_randomness() {
         let keys: Vec<String> = (0 .. 100).map(|_| generate_api_key()).collect();
         let unique_keys: std::collections::HashSet<_> = keys.iter().collect();
-        assert_eq!(unique_keys.len(), 100, "All generated keys should be unique");
+        assert_eq!(
+            unique_keys.len(),
+            100,
+            "All generated keys should be unique"
+        );
     }
 
     #[test]
@@ -735,7 +739,11 @@ mod tests {
         let perms = serde_json::json!({"endpoints": ["/api/v1/health"]});
         assert!(check_api_key_permissions(&perms, "/api/v1/health", "GET"));
         assert!(!check_api_key_permissions(&perms, "/api/v1/health/", "GET"));
-        assert!(!check_api_key_permissions(&perms, "/api/v1/health/detail", "GET"));
+        assert!(!check_api_key_permissions(
+            &perms,
+            "/api/v1/health/detail",
+            "GET"
+        ));
     }
 
     #[test]
@@ -752,7 +760,11 @@ mod tests {
             "GET"
         ));
         assert!(!check_api_key_permissions(&perms, "/api/v1/other", "GET"));
-        assert!(!check_api_key_permissions(&perms, "/api/v2/assets/123", "GET"));
+        assert!(!check_api_key_permissions(
+            &perms,
+            "/api/v2/assets/123",
+            "GET"
+        ));
     }
 
     #[test]
@@ -772,7 +784,11 @@ mod tests {
         let perms = serde_json::json!({"methods": ["GET"]});
         assert!(check_api_key_permissions(&perms, "/api/v1/health", "GET"));
         assert!(!check_api_key_permissions(&perms, "/api/v1/health", "POST"));
-        assert!(!check_api_key_permissions(&perms, "/api/v1/health", "DELETE"));
+        assert!(!check_api_key_permissions(
+            &perms,
+            "/api/v1/health",
+            "DELETE"
+        ));
     }
 
     #[test]
@@ -781,7 +797,11 @@ mod tests {
         assert!(check_api_key_permissions(&perms, "/api/v1/health", "GET"));
         assert!(check_api_key_permissions(&perms, "/api/v1/health", "POST"));
         assert!(!check_api_key_permissions(&perms, "/api/v1/health", "PUT"));
-        assert!(!check_api_key_permissions(&perms, "/api/v1/health", "DELETE"));
+        assert!(!check_api_key_permissions(
+            &perms,
+            "/api/v1/health",
+            "DELETE"
+        ));
     }
 
     #[test]
@@ -891,7 +911,11 @@ mod tests {
         let perms = serde_json::json!({"endpoints": ["/api/v1/*"], "scopes": ["admin"]});
         assert!(check_api_key_permissions(&perms, "/api/v1/assets", "GET"));
         assert!(check_api_key_permissions(&perms, "/api/v1/assets/1", "GET"));
-        assert!(check_api_key_permissions(&perms, "/api/v1/teams/1/members", "GET"));
+        assert!(check_api_key_permissions(
+            &perms,
+            "/api/v1/teams/1/members",
+            "GET"
+        ));
         assert!(!check_api_key_permissions(&perms, "/api/v2/assets", "GET"));
         assert!(!check_api_key_permissions(&perms, "/health", "GET"));
     }
@@ -1085,13 +1109,17 @@ mod tests {
             "endpoints": ["/api/v1/health", "/api/v1/assets/*"],
             "scopes": ["admin"]
         });
-        
+
         // Exact match works for non-protected endpoint
         assert!(check_api_key_permissions(&perms, "/api/v1/health", "GET"));
-        
+
         // Glob match works for non-protected endpoint
-        assert!(check_api_key_permissions(&perms, "/api/v1/assets/123", "GET"));
-        
+        assert!(check_api_key_permissions(
+            &perms,
+            "/api/v1/assets/123",
+            "GET"
+        ));
+
         // Unauthorized endpoint (not in permissions)
         assert!(!check_api_key_permissions(&perms, "/api/v1/teams", "GET"));
     }
@@ -1101,12 +1129,12 @@ mod tests {
         let key1 = generate_api_key();
         let key2 = generate_api_key();
         let key3 = generate_api_key();
-        
+
         // Keys should be different (extremely unlikely to collide randomly)
         assert_ne!(key1, key2);
         assert_ne!(key2, key3);
         assert_ne!(key1, key3);
-        
+
         // Should maintain 32 bytes of entropy
         let hex_part1 = &key1[API_KEY_PREFIX.len() ..];
         assert_eq!(hex_part1.len(), 64); // 32 bytes = 64 hex chars
@@ -1117,17 +1145,20 @@ mod tests {
         let key = generate_api_key();
         let hash1 = hash_api_key(&key);
         let hash2 = hash_api_key(&key);
-        
+
         // Deterministic
         assert_eq!(hash1, hash2);
-        
+
         // Not reversible (cryptographic property)
         assert_ne!(hash1, key);
-        
+
         // Good distribution (even minor changes produce completely different hash)
-        let modified_key = format!("{}a", &key[.. key.len() - 1]);
+        let modified_key = format!("{}X", key);
         let hash3 = hash_api_key(&modified_key);
-        assert_ne!(hash1, hash3);
+        assert_ne!(
+            hash1, hash3,
+            "Different keys should produce different hashes"
+        );
     }
 
     #[test]
@@ -1135,6 +1166,10 @@ mod tests {
         // Endpoint paths are case-sensitive
         let perms = serde_json::json!({"endpoints": ["/api/v1/Assets/*"]});
         assert!(check_api_key_permissions(&perms, "/api/v1/Assets/1", "GET"));
-        assert!(!check_api_key_permissions(&perms, "/api/v1/assets/1", "GET")); // Different case
+        assert!(!check_api_key_permissions(
+            &perms,
+            "/api/v1/assets/1",
+            "GET"
+        )); // Different case
     }
 }

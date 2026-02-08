@@ -348,6 +348,67 @@ fn create_rate_limit_response(max_requests: u64, retry_after: u64) -> Response {
 mod tests {
     use super::*;
 
+    // ==================== rate limit config tests ====================
+
+    #[test]
+    fn test_rate_limit_config_new() {
+        let config = RateLimitConfig::new(50, 30);
+        assert_eq!(config.max_requests, 50);
+        assert_eq!(config.window_seconds, 30);
+    }
+
+    #[test]
+    fn test_rate_limit_config_zero_requests() {
+        let config = RateLimitConfig::new(0, 60);
+        assert_eq!(config.max_requests, 0);
+        assert_eq!(config.window_seconds, 60);
+    }
+
+    #[test]
+    fn test_rate_limit_config_large_values() {
+        let config = RateLimitConfig::new(1_000_000, 3600);
+        assert_eq!(config.max_requests, 1_000_000);
+        assert_eq!(config.window_seconds, 3600);
+    }
+
+    #[test]
+    fn test_rate_limit_config_clone() {
+        let config1 = RateLimitConfig::new(100, 60);
+        let config2 = config1.clone();
+
+        assert_eq!(config1.max_requests, config2.max_requests);
+        assert_eq!(config1.window_seconds, config2.window_seconds);
+    }
+
+    #[test]
+    fn test_rate_limit_config_debug_format() {
+        let config = RateLimitConfig::new(100, 60);
+        let debug_str = format!("{:?}", config);
+
+        assert!(debug_str.contains("RateLimitConfig"));
+        assert!(debug_str.contains("100"));
+        assert!(debug_str.contains("60"));
+    }
+
+    #[test]
+    fn test_rate_limit_constants() {
+        // Verify all rate limit constants are properly configured
+        assert_eq!(RATE_LIMIT_DEFAULT.max_requests, 100);
+        assert_eq!(RATE_LIMIT_AUTH.max_requests, 10);
+        assert_eq!(RATE_LIMIT_LOGIN.max_requests, 5);
+        assert_eq!(RATE_LIMIT_MFA.max_requests, 10);
+        assert_eq!(RATE_LIMIT_API_KEYS.max_requests, 30);
+
+        // All should have 60-second windows
+        assert_eq!(RATE_LIMIT_DEFAULT.window_seconds, 60);
+        assert_eq!(RATE_LIMIT_AUTH.window_seconds, 60);
+        assert_eq!(RATE_LIMIT_LOGIN.window_seconds, 60);
+        assert_eq!(RATE_LIMIT_MFA.window_seconds, 60);
+        assert_eq!(RATE_LIMIT_API_KEYS.window_seconds, 60);
+    }
+
+    // ==================== rate_limit_for_path tests ====================
+
     #[test]
     fn test_rate_limit_for_path_login() {
         let config = rate_limit_for_path("/api/v1/auth/login");
@@ -386,22 +447,100 @@ mod tests {
     }
 
     #[test]
-    fn test_categorize_path() {
+    fn test_rate_limit_for_path_empty() {
+        let config = rate_limit_for_path("");
+        assert_eq!(config.max_requests, RATE_LIMIT_DEFAULT.max_requests);
+    }
+
+    #[test]
+    fn test_rate_limit_for_path_case_sensitive() {
+        // Paths are case-sensitive, so different case should hit default
+        let config = rate_limit_for_path("/api/v1/AUTH/LOGIN");
+        assert_eq!(config.max_requests, RATE_LIMIT_DEFAULT.max_requests);
+    }
+
+    #[test]
+    fn test_rate_limit_for_path_login_variations() {
+        // Test that substring matching works for various login path variations
+        assert_eq!(rate_limit_for_path("/auth/login").max_requests, RATE_LIMIT_LOGIN.max_requests);
+        assert_eq!(rate_limit_for_path("/v1/auth/login").max_requests, RATE_LIMIT_LOGIN.max_requests);
+        assert_eq!(rate_limit_for_path("/api/auth/login").max_requests, RATE_LIMIT_LOGIN.max_requests);
+    }
+
+    #[test]
+    fn test_rate_limit_for_path_mfa_variations() {
+        assert_eq!(rate_limit_for_path("/auth/mfa/verify").max_requests, RATE_LIMIT_MFA.max_requests);
+        assert_eq!(rate_limit_for_path("/auth/mfa/setup").max_requests, RATE_LIMIT_MFA.max_requests);
+        assert_eq!(rate_limit_for_path("/auth/mfa/disable").max_requests, RATE_LIMIT_MFA.max_requests);
+    }
+
+    // ==================== categorize_path tests ====================
+
+    #[test]
+    fn test_categorize_path_login() {
         assert_eq!(categorize_path("/api/v1/auth/login"), "auth_login");
+    }
+
+    #[test]
+    fn test_categorize_path_mfa() {
         assert_eq!(categorize_path("/api/v1/auth/mfa/verify"), "auth_mfa");
+    }
+
+    #[test]
+    fn test_categorize_path_setup() {
         assert_eq!(categorize_path("/api/v1/auth/setup"), "auth_setup");
+    }
+
+    #[test]
+    fn test_categorize_path_refresh() {
         assert_eq!(categorize_path("/api/v1/auth/refresh"), "auth_refresh");
+    }
+
+    #[test]
+    fn test_categorize_path_api_keys() {
         assert_eq!(categorize_path("/api/v1/auth/api-keys"), "api_keys");
+    }
+
+    #[test]
+    fn test_categorize_path_other_auth() {
         assert_eq!(categorize_path("/api/v1/auth/logout"), "auth_other");
+    }
+
+    #[test]
+    fn test_categorize_path_default() {
         assert_eq!(categorize_path("/api/v1/health"), "default");
     }
 
     #[test]
-    fn test_rate_limit_config_new() {
-        let config = RateLimitConfig::new(50, 30);
-        assert_eq!(config.max_requests, 50);
-        assert_eq!(config.window_seconds, 30);
+    fn test_categorize_path_empty() {
+        assert_eq!(categorize_path(""), "default");
     }
+
+    #[test]
+    fn test_categorize_path_priority_order() {
+        // /auth/login should match login before auth_other
+        assert_eq!(categorize_path("/auth/login"), "auth_login");
+        // /auth/mfa should match mfa before auth_other
+        assert_eq!(categorize_path("/auth/mfa"), "auth_mfa");
+    }
+
+    #[test]
+    fn test_categorize_path_case_sensitivity() {
+        // Paths are case-sensitive
+        assert_eq!(categorize_path("/API/V1/AUTH/LOGIN"), "default");
+        assert_eq!(categorize_path("/api/v1/Auth/login"), "default");
+    }
+
+    #[test]
+    fn test_categorize_path_variations() {
+        // Test multiple forms of each endpoint
+        assert_eq!(categorize_path("/v1/auth/login"), "auth_login");
+        assert_eq!(categorize_path("/auth/login/extra"), "auth_login");
+        assert_eq!(categorize_path("/api/auth/mfa/verify"), "auth_mfa");
+        assert_eq!(categorize_path("/auth/setup/init"), "auth_setup");
+    }
+
+    // ==================== extract_client_ip tests ====================
 
     #[test]
     fn test_extract_client_ip_xforwardedfor() {
@@ -445,5 +584,187 @@ mod tests {
             .unwrap();
         let peer_addr = "127.0.0.1:8080".parse().unwrap();
         assert_eq!(extract_client_ip(&request, &peer_addr), "1.2.3.4");
+    }
+
+    #[test]
+    fn test_extract_client_ip_xforwardedfor_single() {
+        let request = Request::builder()
+            .uri("/test")
+            .header("x-forwarded-for", "10.20.30.40")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        let peer_addr = "127.0.0.1:8080".parse().unwrap();
+        assert_eq!(extract_client_ip(&request, &peer_addr), "10.20.30.40");
+    }
+
+    #[test]
+    fn test_extract_client_ip_xforwardedfor_whitespace() {
+        let request = Request::builder()
+            .uri("/test")
+            .header("x-forwarded-for", "  192.168.1.100  ,  10.0.0.1")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        let peer_addr = "127.0.0.1:8080".parse().unwrap();
+        // Should trim whitespace from first IP
+        assert_eq!(extract_client_ip(&request, &peer_addr), "192.168.1.100");
+    }
+
+    #[test]
+    fn test_extract_client_ip_xforwardedfor_multiple() {
+        let request = Request::builder()
+            .uri("/test")
+            .header("x-forwarded-for", "1.1.1.1, 2.2.2.2, 3.3.3.3, 4.4.4.4")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        let peer_addr = "127.0.0.1:8080".parse().unwrap();
+        // Should take first IP
+        assert_eq!(extract_client_ip(&request, &peer_addr), "1.1.1.1");
+    }
+
+    #[test]
+    fn test_extract_client_ip_ipv6() {
+        let request = Request::builder()
+            .uri("/test")
+            .header("x-forwarded-for", "[2001:db8::1]")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        let peer_addr = "127.0.0.1:8080".parse().unwrap();
+        assert_eq!(extract_client_ip(&request, &peer_addr), "[2001:db8::1]");
+    }
+
+    #[test]
+    fn test_extract_client_ip_xrealip_ipv6() {
+        let request = Request::builder()
+            .uri("/test")
+            .header("x-real-ip", "2001:db8::1")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        let peer_addr = "127.0.0.1:8080".parse().unwrap();
+        assert_eq!(extract_client_ip(&request, &peer_addr), "2001:db8::1");
+    }
+
+    #[test]
+    fn test_extract_client_ip_localhost() {
+        let request = Request::builder()
+            .uri("/test")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        let peer_addr = "[::1]:8080".parse().unwrap();
+        // Should extract the peer address when no headers
+        let ip = extract_client_ip(&request, &peer_addr);
+        assert!(!ip.is_empty());
+    }
+
+    #[test]
+    fn test_extract_client_ip_case_insensitive_headers() {
+        // HTTP headers are case-insensitive, but lowercase is standard
+        let request = Request::builder()
+            .uri("/test")
+            .header("X-Forwarded-For", "203.0.113.1")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        let peer_addr = "127.0.0.1:8080".parse().unwrap();
+        // Header names are standardized to lowercase internally
+        let ip = extract_client_ip(&request, &peer_addr);
+        // If lowercase header is not found, should fall to peer addr
+        assert!(!ip.is_empty());
+    }
+
+    // ==================== create_rate_limit_response tests ====================
+
+    #[test]
+    fn test_create_rate_limit_response_status() {
+        let response = create_rate_limit_response(100, 30);
+        assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+    }
+
+    #[test]
+    fn test_create_rate_limit_response_headers() {
+        let response = create_rate_limit_response(100, 30);
+        let headers = response.headers();
+
+        // Should have Retry-After header
+        assert!(headers.contains_key("retry-after"));
+        let retry_after = headers.get("retry-after").unwrap().to_str().unwrap();
+        assert_eq!(retry_after, "30");
+
+        // Should have rate limit headers
+        assert!(headers.contains_key("x-ratelimit-limit"));
+        assert!(headers.contains_key("x-ratelimit-remaining"));
+        assert_eq!(
+            headers.get("x-ratelimit-remaining").unwrap().to_str().unwrap(),
+            "0"
+        );
+    }
+
+    #[test]
+    fn test_create_rate_limit_response_retry_after_values() {
+        let response1 = create_rate_limit_response(100, 1);
+        let response2 = create_rate_limit_response(100, 60);
+        let response3 = create_rate_limit_response(100, 3600);
+
+        assert_eq!(
+            response1.headers().get("retry-after").unwrap().to_str().unwrap(),
+            "1"
+        );
+        assert_eq!(
+            response2.headers().get("retry-after").unwrap().to_str().unwrap(),
+            "60"
+        );
+        assert_eq!(
+            response3.headers().get("retry-after").unwrap().to_str().unwrap(),
+            "3600"
+        );
+    }
+
+    #[test]
+    fn test_create_rate_limit_response_zero_retry() {
+        let response = create_rate_limit_response(100, 0);
+        // Even with 0, should set some header
+        assert!(response.headers().contains_key("retry-after"));
+    }
+
+    #[test]
+    fn test_create_rate_limit_response_large_limits() {
+        let response = create_rate_limit_response(10_000, 3600);
+        assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert!(response.headers().contains_key("x-ratelimit-limit"));
+    }
+
+    // ==================== edge cases and integration tests ====================
+
+    #[test]
+    fn test_path_routing_accuracy() {
+        // Ensure path routing doesn't have false matches
+        assert_eq!(categorize_path("/auth/not-login"), "auth_other");
+        assert_eq!(categorize_path("/authlogin"), "default"); // No slash
+
+        // Ensure substring matching doesn't create false positives
+        // "/create-auth-api-keys" doesn't contain "/auth/" so should be default
+        assert_eq!(categorize_path("/create-auth-api-keys"), "default");
+    }
+
+    #[test]
+    fn test_rate_limit_for_nested_paths() {
+        // Verify deeply nested paths work correctly
+        assert_eq!(
+            rate_limit_for_path("/api/v1/auth/mfa/verify/backup-codes").max_requests,
+            RATE_LIMIT_MFA.max_requests
+        );
+    }
+
+    #[test]
+    fn test_extract_client_ip_with_empty_xforwardedfor() {
+        let request = Request::builder()
+            .uri("/test")
+            .header("x-forwarded-for", "")
+            .header("x-real-ip", "10.0.0.1")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        let peer_addr = "127.0.0.1:8080".parse().unwrap();
+        // When x-forwarded-for header exists but is empty, it returns empty string
+        // (the map() finds Some("") and doesn't trigger or_else)
+        let ip = extract_client_ip(&request, &peer_addr);
+        assert_eq!(ip, "");
     }
 }

@@ -955,4 +955,238 @@ mod tests {
         let _service: PermissionService;
         assert!(true); // Service type exists
     }
+
+    // ==================== Additional Comprehensive Tests ====================
+
+    #[test]
+    fn test_multiple_actions_for_each_resource() {
+        // Test all combinations of resources and actions
+        let resources = vec![
+            ("users", vec!["create", "read", "update", "delete"]),
+            (
+                "teams",
+                vec![
+                    "create",
+                    "read",
+                    "update",
+                    "delete",
+                    "members_read",
+                    "members_add",
+                    "members_update",
+                    "members_remove",
+                ],
+            ),
+            (
+                "api_keys",
+                vec!["create", "read", "update", "delete", "rotate", "usage_read"],
+            ),
+        ];
+
+        for (resource, actions) in resources {
+            for action in actions {
+                let perm_str = format!("{}:{}", resource, action);
+                let parsed = Permission::from_string(&perm_str);
+                assert!(parsed.is_some(), "Failed to parse: {}", perm_str);
+                let parsed_perm = parsed.unwrap();
+                let back_to_str = parsed_perm.to_string();
+                assert_eq!(back_to_str, perm_str, "Round-trip failed for {}", perm_str);
+            }
+        }
+    }
+
+    #[test]
+    fn test_permission_ordering_consistency() {
+        // Ensure permission comparison is consistent
+        let user_create = Permission::Users(UserAction::Create);
+        let user_read = Permission::Users(UserAction::Read);
+
+        assert_eq!(user_create, user_create);
+        assert_ne!(user_create, user_read);
+        assert_ne!(user_read, user_create);
+    }
+
+    #[test]
+    fn test_invalid_resource_names() {
+        let invalid = vec![
+            "admins:create",
+            "roles:read",
+            "permissions:write",
+            "systems:delete",
+            "data:read",
+            ":create:",
+            ":::",
+        ];
+
+        for s in invalid {
+            assert!(
+                Permission::from_string(&s).is_none(),
+                "Should not parse invalid: {}",
+                s
+            );
+        }
+    }
+
+    #[test]
+    fn test_permission_query_all_scope_combinations() {
+        let test_cases = vec![
+            (None, None, false),
+            (Some("team".to_string()), None, false),
+            (Some("asset".to_string()), Some("a123".to_string()), false),
+            (None, None, true),
+            (Some("team".to_string()), Some("t456".to_string()), true),
+        ];
+
+        for (scope_type, scope_id, check_all) in test_cases {
+            let query = PermissionQuery {
+                permission:       Permission::Users(UserAction::Read),
+                scope_type:       scope_type.clone(),
+                scope_id:         scope_id.clone(),
+                check_all_scopes: check_all,
+            };
+            assert_eq!(query.scope_type, scope_type);
+            assert_eq!(query.scope_id, scope_id);
+            assert_eq!(query.check_all_scopes, check_all);
+        }
+    }
+
+    #[test]
+    fn test_permission_result_pattern_matching() {
+        let allowed = PermissionCheckResult::Allowed;
+        let denied = PermissionCheckResult::Denied;
+        let requires_context = PermissionCheckResult::RequiresContext {
+            scope_type: "team".to_string(),
+            scope_id:   None,
+        };
+        let unauth = PermissionCheckResult::Unauthenticated;
+
+        // Test pattern matching
+        assert!(matches!(allowed, PermissionCheckResult::Allowed));
+        assert!(matches!(denied, PermissionCheckResult::Denied));
+        assert!(matches!(
+            requires_context,
+            PermissionCheckResult::RequiresContext { .. }
+        ));
+        assert!(matches!(unauth, PermissionCheckResult::Unauthenticated));
+
+        // Negative tests
+        assert!(!matches!(allowed, PermissionCheckResult::Denied));
+        assert!(!matches!(denied, PermissionCheckResult::Allowed));
+    }
+
+    #[test]
+    fn test_permission_query_with_all_fields_populated() {
+        let query = PermissionQuery {
+            permission:       Permission::Teams(TeamAction::MembersAdd),
+            scope_type:       Some("team".to_string()),
+            scope_id:         Some("team-abc123".to_string()),
+            check_all_scopes: true,
+        };
+
+        assert!(query.scope_type.is_some());
+        assert!(query.scope_id.is_some());
+        assert_eq!(query.check_all_scopes, true);
+    }
+
+    #[test]
+    fn test_api_key_action_all_variants() {
+        let actions = vec![
+            ApiKeyAction::Create,
+            ApiKeyAction::Read,
+            ApiKeyAction::Update,
+            ApiKeyAction::Delete,
+            ApiKeyAction::Rotate,
+            ApiKeyAction::UsageRead,
+        ];
+
+        for action in &actions {
+            let display = format!("{}", action);
+            let parsed = ApiKeyAction::from_string(&display);
+            assert_eq!(Some(action.clone()), parsed);
+        }
+    }
+
+    #[test]
+    fn test_team_action_all_member_operations() {
+        let member_actions = vec![
+            TeamAction::MembersRead,
+            TeamAction::MembersAdd,
+            TeamAction::MembersUpdate,
+            TeamAction::MembersRemove,
+        ];
+
+        for action in member_actions {
+            let perm = Permission::Teams(action);
+            let str_perm = perm.to_string();
+            assert!(str_perm.contains("members"));
+            let parsed = Permission::from_string(&str_perm);
+            assert_eq!(Some(perm), parsed);
+        }
+    }
+
+    #[test]
+    fn test_permission_hashable_in_collections() {
+        use std::collections::HashMap;
+
+        let mut perm_map: HashMap<Permission, i32> = HashMap::new();
+
+        perm_map.insert(Permission::Users(UserAction::Create), 1);
+        perm_map.insert(Permission::Users(UserAction::Read), 2);
+        perm_map.insert(Permission::Teams(TeamAction::Create), 3);
+
+        assert_eq!(perm_map.len(), 3);
+        assert_eq!(
+            perm_map.get(&Permission::Users(UserAction::Create)),
+            Some(&1)
+        );
+        assert_eq!(
+            perm_map.get(&Permission::Teams(TeamAction::Create)),
+            Some(&3)
+        );
+    }
+
+    #[test]
+    fn test_permission_string_lengths() {
+        let short = Permission::Users(UserAction::Read);
+        let long = Permission::Teams(TeamAction::MembersRemove);
+
+        let short_str = short.to_string();
+        let long_str = long.to_string();
+
+        assert!(short_str.len() < long_str.len());
+        assert!(short_str.contains(":"));
+        assert!(long_str.contains(":"));
+    }
+
+    #[test]
+    fn test_permission_from_string_boundary_cases() {
+        // Single character parts
+        assert_eq!(Permission::from_string("a:b"), None);
+
+        // Maximum reasonable length
+        let long_perm = format!("{}:create", "x".repeat(100));
+        assert_eq!(Permission::from_string(&long_perm), None);
+
+        // Unicode characters
+        assert_eq!(Permission::from_string("userš:create"), None);
+        assert_eq!(Permission::from_string("users:créate"), None);
+    }
+
+    #[test]
+    fn test_all_user_actions_unique() {
+        let user_actions = vec![
+            UserAction::Create,
+            UserAction::Read,
+            UserAction::Update,
+            UserAction::Delete,
+        ];
+
+        // Ensure all have unique string representations
+        let strings: Vec<String> = user_actions.iter().map(|a| format!("{}", a)).collect();
+
+        for i in 0 .. strings.len() {
+            for j in (i + 1) .. strings.len() {
+                assert_ne!(strings[i], strings[j]);
+            }
+        }
+    }
 }

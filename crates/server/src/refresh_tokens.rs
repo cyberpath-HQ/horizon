@@ -241,6 +241,42 @@ mod tests {
         assert_eq!(token1.len(), 43);
     }
 
+    #[test]
+    fn test_generate_refresh_token_multiple_calls() {
+        let tokens: Vec<String> = (0..10).map(|_| generate_refresh_token()).collect();
+        
+        // All tokens should be unique
+        for (i, token1) in tokens.iter().enumerate() {
+            for (j, token2) in tokens.iter().enumerate() {
+                if i != j {
+                    assert_ne!(token1, token2, "Tokens at index {} and {} should be different", i, j);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_generate_refresh_token_format() {
+        let token = generate_refresh_token();
+        
+        // Should only contain URL-safe base64 characters
+        assert!(token.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_'));
+        
+        // Should not contain padding or other base64 chars
+        assert!(!token.contains('='));
+        assert!(!token.contains('+'));
+        assert!(!token.contains('/'));
+    }
+
+    #[test]
+    fn test_generate_refresh_token_length() {
+        for _ in 0..100 {
+            let token = generate_refresh_token();
+            // 32 bytes -> 43 chars in URL-safe base64 without padding
+            assert_eq!(token.len(), 43, "Token length should always be 43");
+        }
+    }
+
     #[tokio::test]
     async fn test_refresh_token_hashing() {
         let token_value = "test-token-value";
@@ -252,5 +288,152 @@ mod tests {
 
         // Hash should be 64 characters (32 bytes hex encoded)
         assert_eq!(hash1.len(), 64);
+    }
+
+    #[test]
+    fn test_refresh_token_hash_deterministic() {
+        let token = "consistent-token-value";
+        let hashes: Vec<String> = (0..5)
+            .map(|_| blake3::hash(token.as_bytes()).to_hex().to_string())
+            .collect();
+
+        // All hashes should be identical
+        for hash in hashes.iter().skip(1) {
+            assert_eq!(&hashes[0], hash);
+        }
+    }
+
+    #[test]
+    fn test_refresh_token_hash_different_inputs() {
+        let token1 = "token-1";
+        let token2 = "token-2";
+
+        let hash1 = blake3::hash(token1.as_bytes()).to_hex().to_string();
+        let hash2 = blake3::hash(token2.as_bytes()).to_hex().to_string();
+
+        // Different inputs should produce different hashes
+        assert_ne!(hash1, hash2);
+    }
+
+    #[test]
+    fn test_refresh_token_hash_length() {
+        let tokens = vec![
+            "short",
+            "a-much-longer-token-value-for-testing",
+            "token-with-special-chars-!@#$%",
+            "",
+        ];
+
+        for token in tokens {
+            let hash = blake3::hash(token.as_bytes()).to_hex().to_string();
+            // BLAKE3 always produces 64-char hex strings (32 bytes)
+            assert_eq!(hash.len(), 64, "Hash of '{}' should be 64 chars", token);
+        }
+    }
+
+    #[test]
+    fn test_refresh_token_model_structure() {
+        let token = RefreshToken {
+            id: "token-id-123".to_string(),
+            user_id: "user-456".to_string(),
+            token_hash: "abc123def456".to_string(),
+            expires_at: Utc::now(),
+            revoked_at: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        assert_eq!(token.id, "token-id-123");
+        assert_eq!(token.user_id, "user-456");
+        assert_eq!(token.token_hash, "abc123def456");
+        assert!(token.revoked_at.is_none());
+    }
+
+    #[test]
+    fn test_refresh_token_model_revoked() {
+        let revoked_time = Utc::now();
+        let token = RefreshToken {
+            id: "revoked-token".to_string(),
+            user_id: "user-789".to_string(),
+            token_hash: "hash789".to_string(),
+            expires_at: Utc::now(),
+            revoked_at: Some(revoked_time),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        assert!(token.revoked_at.is_some());
+        assert_eq!(token.revoked_at.unwrap(), revoked_time);
+    }
+
+    #[test]
+    fn test_refresh_token_model_clone() {
+        let original = RefreshToken {
+            id: "token-clone-test".to_string(),
+            user_id: "user-clone".to_string(),
+            token_hash: "hash-clone".to_string(),
+            expires_at: Utc::now(),
+            revoked_at: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let cloned = original.clone();
+        assert_eq!(original.id, cloned.id);
+        assert_eq!(original.user_id, cloned.user_id);
+        assert_eq!(original.token_hash, cloned.token_hash);
+    }
+
+    #[test]
+    fn test_refresh_token_model_debug() {
+        let token = RefreshToken {
+            id: "debug-token".to_string(),
+            user_id: "debug-user".to_string(),
+            token_hash: "debug-hash".to_string(),
+            expires_at: Utc::now(),
+            revoked_at: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let debug_str = format!("{:?}", token);
+        assert!(debug_str.contains("debug-token"));
+        assert!(debug_str.contains("debug-user"));
+    }
+
+    #[test]
+    fn test_base64_encoding_url_safe() {
+        let test_bytes = [
+            0xFF, 0xFE, 0xFD, 0xFC, 0xFB, 0xFA, 0xF9, 0xF8,
+            0xF7, 0xF6, 0xF5, 0xF4, 0xF3, 0xF2, 0xF1, 0xF0,
+            0xEF, 0xEE, 0xED, 0xEC, 0xEB, 0xEA, 0xE9, 0xE8,
+            0xE7, 0xE6, 0xE5, 0xE4, 0xE3, 0xE2, 0xE1, 0xE0,
+        ];
+
+        let encoded = general_purpose::URL_SAFE_NO_PAD.encode(&test_bytes);
+        
+        // Should use URL-safe alphabet (no + or /)
+        assert!(!encoded.contains('+'));
+        assert!(!encoded.contains('/'));
+        assert!(!encoded.contains('='));
+
+        // Should be decodable
+        let decoded = general_purpose::URL_SAFE_NO_PAD.decode(&encoded);
+        assert!(decoded.is_ok());
+    }
+
+    #[test]
+    fn test_refresh_token_entropy() {
+        let tokens: Vec<String> = (0..50).map(|_| generate_refresh_token()).collect();
+        
+        // All tokens should be unique (no duplicates)
+        let mut seen = std::collections::HashSet::new();
+        for token in &tokens {
+            assert!(
+                seen.insert(token.clone()),
+                "Duplicate token found: {}",
+                token
+            );
+        }
     }
 }
