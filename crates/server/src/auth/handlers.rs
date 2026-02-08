@@ -16,8 +16,8 @@ use tracing::info;
 use axum::{extract::Request, Json};
 use error::{AppError, Result};
 
+use auth::{jwt::create_access_token, roles::get_user_roles};
 use crate::{
-    auth::{jwt::create_access_token, roles::get_user_roles},
     dto::auth::{
         AuthSuccessResponse,
         AuthTokens,

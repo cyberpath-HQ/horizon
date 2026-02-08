@@ -4,6 +4,7 @@
 
 use auth::{
     mfa::{
+        check_backup_code_valid,
         deserialize_backup_codes,
         generate_backup_codes,
         generate_mfa_setup,
@@ -21,8 +22,8 @@ use error::{AppError, Result};
 use sea_orm::{ActiveModelTrait, EntityTrait, Set};
 use tracing::info;
 
+use auth::jwt::create_access_token;
 use crate::{
-    auth::jwt::create_access_token,
     dto::{
         auth::{AuthTokens, AuthenticatedUser, SuccessResponse},
         mfa::{
@@ -188,7 +189,7 @@ pub async fn mfa_verify_login_handler(
     req: MfaVerifyRequest,
 ) -> Result<Json<MfaVerifyResponse>> {
     // Validate the MFA token (it's a short-lived JWT with special claims)
-    let claims = crate::auth::jwt::validate_token(&state.jwt_config, mfa_token)?;
+    let claims = auth::jwt::validate_token(&state.jwt_config, mfa_token)?;
 
     // Ensure this is an MFA token (check for mfa_pending role)
     if !claims.roles.contains(&"mfa_pending".to_string()) {
@@ -216,7 +217,7 @@ pub async fn mfa_verify_login_handler(
     }
 
     // Load actual user roles
-    let user_roles = crate::auth::roles::get_user_roles(&state.db, &db_user.id).await?;
+    let user_roles = auth::roles::get_user_roles(&state.db, &db_user.id).await?;
 
     // Generate full authentication tokens
     let refresh_token_str = generate_refresh_token();
@@ -274,7 +275,7 @@ pub async fn mfa_verify_backup_code_handler(
     req: MfaBackupCodeRequest,
 ) -> Result<Json<MfaVerifyResponse>> {
     // Validate the MFA token
-    let claims = crate::auth::jwt::validate_token(&state.jwt_config, mfa_token)?;
+    let claims = auth::jwt::validate_token(&state.jwt_config, mfa_token)?;
 
     if !claims.roles.contains(&"mfa_pending".to_string()) {
         return Err(AppError::unauthorized("Invalid MFA token"));
@@ -296,7 +297,7 @@ pub async fn mfa_verify_backup_code_handler(
     let hashed_codes = deserialize_backup_codes(&codes_json)
         .map_err(|e| AppError::internal(format!("Failed to parse backup codes: {}", e)))?;
 
-    let remaining_codes = verify_and_consume_backup_code(&req.backup_code, &hashed_codes)
+    let remaining_codes = verify_and_consume_backup_code(&req.backup_code, hashed_codes)
         .map_err(|_| AppError::unauthorized("Invalid backup code"))?;
 
     // Update the backup codes in database
@@ -312,7 +313,7 @@ pub async fn mfa_verify_backup_code_handler(
         .map_err(|e| AppError::database(format!("Failed to update backup codes: {}", e)))?;
 
     // Load user roles and generate tokens
-    let user_roles = crate::auth::roles::get_user_roles(&state.db, &db_user.id).await?;
+    let user_roles = auth::roles::get_user_roles(&state.db, &db_user.id).await?;
 
     let refresh_token_str = generate_refresh_token();
     crate::refresh_tokens::create_refresh_token(
@@ -345,7 +346,7 @@ pub async fn mfa_verify_backup_code_handler(
 
     info!(
         user_id = %db_user.id,
-        remaining_codes = remaining_codes.codes.len(),
+        remaining_codes = remaining_codes.len(),
         "MFA backup code used successfully"
     );
 
@@ -406,7 +407,7 @@ pub async fn mfa_disable_handler(
 
         let backup_valid = if let Some(json) = codes_json {
             if let Ok(hashed_codes) = deserialize_backup_codes(&json) {
-                verify_and_consume_backup_code(&req.code, &hashed_codes).is_ok()
+                auth::mfa::check_backup_code_valid(&req.code, &hashed_codes)
             }
             else {
                 false
@@ -526,7 +527,7 @@ pub async fn mfa_status_handler(state: &AppState, user: MiddlewareUser) -> Resul
     let backup_codes_remaining = if let Some(codes_value) = &db_user.backup_codes {
         if let Some(json) = codes_value.as_str() {
             deserialize_backup_codes(json)
-                .map(|c| c.codes.len())
+                .map(|c| c.len())
                 .unwrap_or(0)
         }
         else {

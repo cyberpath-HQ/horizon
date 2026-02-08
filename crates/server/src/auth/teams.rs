@@ -52,19 +52,13 @@ pub async fn create_team_handler(
     req: CreateTeamRequest,
 ) -> Result<Json<TeamResponse>> {
     // Check permission
-    let permission_service = crate::auth::permissions::PermissionService::new(state.db.clone());
-    let result = permission_service
-        .check_permission(&user.id, crate::auth::permissions::Permission::new("teams", "create"))
+    let permission_service = auth::permissions::PermissionService::new(state.db.clone());
+    permission_service
+        .require_permission(
+            &user.id,
+            auth::permissions::Permission::Teams(auth::permissions::TeamAction::Create),
+        )
         .await?;
-
-    match result {
-        crate::auth::permissions::PermissionCheckResult::Allowed => {
-            // Permission granted, continue
-        },
-        _ => {
-            return Err(AppError::forbidden("You do not have permission to create teams"));
-        }
-    }
     // Generate slug from name
     let slug = slugify(&req.name);
 
@@ -136,19 +130,13 @@ pub async fn create_team_handler(
 /// The team response
 pub async fn get_team_handler(state: &AppState, user: AuthenticatedUser, team_id: &str) -> Result<Json<TeamResponse>> {
     // Check permission
-    let permission_service = crate::auth::permissions::PermissionService::new(state.db.clone());
-    let result = permission_service
-        .check_permission(&user.id, crate::auth::permissions::Permission::new("teams", "read"))
+    let permission_service = auth::permissions::PermissionService::new(state.db.clone());
+    permission_service
+        .require_permission(
+            &user.id,
+            auth::permissions::Permission::Teams(auth::permissions::TeamAction::Read),
+        )
         .await?;
-
-    match result {
-        crate::auth::permissions::PermissionCheckResult::Allowed => {
-            // Permission granted, continue
-        },
-        _ => {
-            return Err(AppError::forbidden("You do not have permission to view teams"));
-        }
-    }
     let team = TeamsEntity::find_by_id(team_id)
         .one(&state.db)
         .await?
@@ -184,19 +172,13 @@ pub async fn list_teams_handler(
     query: TeamListQuery,
 ) -> Result<Json<TeamListResponse>> {
     // Check permission
-    let permission_service = crate::auth::permissions::PermissionService::new(state.db.clone());
-    let result = permission_service
-        .check_permission(&user.id, crate::auth::permissions::Permission::new("teams", "read"))
+    let permission_service = auth::permissions::PermissionService::new(state.db.clone());
+    permission_service
+        .require_permission(
+            &user.id,
+            auth::permissions::Permission::Teams(auth::permissions::TeamAction::Read),
+        )
         .await?;
-
-    match result {
-        crate::auth::permissions::PermissionCheckResult::Allowed => {
-            // Permission granted, continue
-        },
-        _ => {
-            return Err(AppError::forbidden("You do not have permission to list teams"));
-        }
-    }
     let page = query.page();
     let per_page = query.per_page();
 
@@ -269,18 +251,23 @@ pub async fn update_team_handler(
     req: UpdateTeamRequest,
 ) -> Result<Json<TeamResponse>> {
     // Check permission
-    let permission_service = crate::auth::permissions::PermissionService::new(state.db.clone());
+    let permission_service = auth::permissions::PermissionService::new(state.db.clone());
     let result = permission_service
-        .check_permission(&user.id, crate::auth::permissions::Permission::new("teams", "update"))
+        .check_permission(
+            &user.id,
+            auth::permissions::Permission::Teams(auth::permissions::TeamAction::Update),
+        )
         .await?;
 
     match result {
-        crate::auth::permissions::PermissionCheckResult::Allowed => {
+        auth::permissions::PermissionCheckResult::Allowed => {
             // Permission granted, continue
         },
         _ => {
-            return Err(AppError::forbidden("You do not have permission to update teams"));
-        }
+            return Err(AppError::forbidden(
+                "You do not have permission to update teams",
+            ));
+        },
     }
     let team = TeamsEntity::find_by_id(team_id)
         .one(&state.db)
@@ -354,18 +341,23 @@ pub async fn delete_team_handler(
     team_id: &str,
 ) -> Result<Json<crate::dto::auth::SuccessResponse>> {
     // Check permission
-    let permission_service = crate::auth::permissions::PermissionService::new(state.db.clone());
+    let permission_service = auth::permissions::PermissionService::new(state.db.clone());
     let result = permission_service
-        .check_permission(&user.id, crate::auth::permissions::Permission::new("teams", "delete"))
+        .check_permission(
+            &user.id,
+            auth::permissions::Permission::Teams(auth::permissions::TeamAction::Delete),
+        )
         .await?;
 
     match result {
-        crate::auth::permissions::PermissionCheckResult::Allowed => {
+        auth::permissions::PermissionCheckResult::Allowed => {
             // Permission granted, continue
         },
         _ => {
-            return Err(AppError::forbidden("You do not have permission to delete teams"));
-        }
+            return Err(AppError::forbidden(
+                "You do not have permission to delete teams",
+            ));
+        },
     }
     let team = TeamsEntity::find_by_id(team_id)
         .one(&state.db)
@@ -417,18 +409,23 @@ pub async fn add_team_member_handler(
     req: AddTeamMemberRequest,
 ) -> Result<Json<TeamMemberResponse>> {
     // Check permission
-    let permission_service = crate::auth::permissions::PermissionService::new(state.db.clone());
+    let permission_service = auth::permissions::PermissionService::new(state.db.clone());
     let result = permission_service
-        .check_permission(&user.id, crate::auth::permissions::Permission::new("teams", "members:create"))
+        .check_permission(
+            &user.id,
+            auth::permissions::Permission::Teams(auth::permissions::TeamAction::MembersAdd),
+        )
         .await?;
 
     match result {
-        crate::auth::permissions::PermissionCheckResult::Allowed => {
+        auth::permissions::PermissionCheckResult::Allowed => {
             // Permission granted, continue
         },
         _ => {
-            return Err(AppError::forbidden("You do not have permission to add team members"));
-        }
+            return Err(AppError::forbidden(
+                "You do not have permission to add team members",
+            ));
+        },
     }
     let team = TeamsEntity::find_by_id(team_id)
         .one(&state.db)
@@ -522,18 +519,23 @@ pub async fn update_team_member_handler(
     req: UpdateTeamMemberRequest,
 ) -> Result<Json<TeamMemberResponse>> {
     // Check permission
-    let permission_service = crate::auth::permissions::PermissionService::new(state.db.clone());
+    let permission_service = auth::permissions::PermissionService::new(state.db.clone());
     let result = permission_service
-        .check_permission(&user.id, crate::auth::permissions::Permission::new("teams", "members:update"))
+        .check_permission(
+            &user.id,
+            auth::permissions::Permission::Teams(auth::permissions::TeamAction::MembersUpdate),
+        )
         .await?;
 
     match result {
-        crate::auth::permissions::PermissionCheckResult::Allowed => {
+        auth::permissions::PermissionCheckResult::Allowed => {
             // Permission granted, continue
         },
         _ => {
-            return Err(AppError::forbidden("You do not have permission to update team members"));
-        }
+            return Err(AppError::forbidden(
+                "You do not have permission to update team members",
+            ));
+        },
     }
     let team = TeamsEntity::find_by_id(team_id)
         .one(&state.db)
@@ -621,18 +623,23 @@ pub async fn remove_team_member_handler(
     member_id: &str,
 ) -> Result<Json<crate::dto::auth::SuccessResponse>> {
     // Check permission
-    let permission_service = crate::auth::permissions::PermissionService::new(state.db.clone());
+    let permission_service = auth::permissions::PermissionService::new(state.db.clone());
     let result = permission_service
-        .check_permission(&user.id, crate::auth::permissions::Permission::new("teams", "members:delete"))
+        .check_permission(
+            &user.id,
+            auth::permissions::Permission::Teams(auth::permissions::TeamAction::MembersRemove),
+        )
         .await?;
 
     match result {
-        crate::auth::permissions::PermissionCheckResult::Allowed => {
+        auth::permissions::PermissionCheckResult::Allowed => {
             // Permission granted, continue
         },
         _ => {
-            return Err(AppError::forbidden("You do not have permission to remove team members"));
-        }
+            return Err(AppError::forbidden(
+                "You do not have permission to remove team members",
+            ));
+        },
     }
     let team = TeamsEntity::find_by_id(team_id)
         .one(&state.db)
@@ -703,18 +710,23 @@ pub async fn list_team_members_handler(
     team_id: &str,
 ) -> Result<Json<TeamMembersResponse>> {
     // Check permission
-    let permission_service = crate::auth::permissions::PermissionService::new(state.db.clone());
+    let permission_service = auth::permissions::PermissionService::new(state.db.clone());
     let result = permission_service
-        .check_permission(&user.id, crate::auth::permissions::Permission::new("teams", "members:read"))
+        .check_permission(
+            &user.id,
+            auth::permissions::Permission::Teams(auth::permissions::TeamAction::MembersRead),
+        )
         .await?;
 
     match result {
-        crate::auth::permissions::PermissionCheckResult::Allowed => {
+        auth::permissions::PermissionCheckResult::Allowed => {
             // Permission granted, continue
         },
         _ => {
-            return Err(AppError::forbidden("You do not have permission to view team members"));
-        }
+            return Err(AppError::forbidden(
+                "You do not have permission to view team members",
+            ));
+        },
     }
     // Verify team exists
     let team = TeamsEntity::find_by_id(team_id)

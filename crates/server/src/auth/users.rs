@@ -11,9 +11,9 @@ use entity::{
 use error::{AppError, Result};
 use sea_orm::{ActiveModelTrait, ColumnTrait, Condition, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set};
 use tracing::info;
+use auth::roles::get_user_roles;
 
 use crate::{
-    auth::roles::get_user_roles,
     dto::users::{PaginationInfo, UpdateUserProfileRequest, UserListQuery, UserListResponse, UserProfileResponse},
     middleware::auth::AuthenticatedUser,
     AppState,
@@ -105,16 +105,16 @@ pub async fn list_users_handler(
     query: UserListQuery,
 ) -> Result<Json<UserListResponse>> {
     // Check permission using the permission service
-    let permission_service = crate::auth::permissions::PermissionService::new(state.db.clone());
+    let permission_service = auth::permissions::PermissionService::new(state.db.clone());
     let result = permission_service
         .check_permission(
             &user.id,
-            crate::auth::permissions::Permission::new("users", "read"),
+            auth::permissions::Permission::Users(auth::permissions::UserAction::Read),
         )
         .await?;
 
     match result {
-        crate::auth::permissions::PermissionCheckResult::Allowed => {
+        auth::permissions::PermissionCheckResult::Allowed => {
             // Permission granted, continue with handler logic
         },
         _ => {
