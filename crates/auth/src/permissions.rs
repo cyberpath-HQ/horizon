@@ -79,16 +79,6 @@ pub enum ApiKeyAction {
 }
 
 impl Permission {
-    /// Create a permission string (e.g., "users:create")
-    #[must_use]
-    pub fn as_string(&self) -> String {
-        match self {
-            Permission::Users(action) => format!("users:{}", action.as_string()),
-            Permission::Teams(action) => format!("teams:{}", action.as_string()),
-            Permission::ApiKeys(action) => format!("api_keys:{}", action.as_string()),
-        }
-    }
-
     /// Parse a permission string into a Permission enum
     #[must_use]
     pub fn from_string(s: &str) -> Option<Self> {
@@ -108,20 +98,27 @@ impl Permission {
 }
 
 impl std::fmt::Display for Permission {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "{}", self.as_string()) }
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Permission::Users(action) => write!(f, "users:{}", action),
+            Permission::Teams(action) => write!(f, "teams:{}", action),
+            Permission::ApiKeys(action) => write!(f, "api_keys:{}", action),
+        }
+    }
+}
+
+impl std::fmt::Display for UserAction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            UserAction::Create => write!(f, "create"),
+            UserAction::Read => write!(f, "read"),
+            UserAction::Update => write!(f, "update"),
+            UserAction::Delete => write!(f, "delete"),
+        }
+    }
 }
 
 impl UserAction {
-    #[must_use]
-    pub fn as_string(&self) -> String {
-        match self {
-            UserAction::Create => "create".to_string(),
-            UserAction::Read => "read".to_string(),
-            UserAction::Update => "update".to_string(),
-            UserAction::Delete => "delete".to_string(),
-        }
-    }
-
     #[must_use]
     pub fn from_string(s: &str) -> Option<Self> {
         match s {
@@ -134,21 +131,22 @@ impl UserAction {
     }
 }
 
-impl TeamAction {
-    #[must_use]
-    pub fn as_string(&self) -> String {
+impl std::fmt::Display for TeamAction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TeamAction::Create => "create".to_string(),
-            TeamAction::Read => "read".to_string(),
-            TeamAction::Update => "update".to_string(),
-            TeamAction::Delete => "delete".to_string(),
-            TeamAction::MembersRead => "members_read".to_string(),
-            TeamAction::MembersAdd => "members_add".to_string(),
-            TeamAction::MembersUpdate => "members_update".to_string(),
-            TeamAction::MembersRemove => "members_remove".to_string(),
+            TeamAction::Create => write!(f, "create"),
+            TeamAction::Read => write!(f, "read"),
+            TeamAction::Update => write!(f, "update"),
+            TeamAction::Delete => write!(f, "delete"),
+            TeamAction::MembersRead => write!(f, "members_read"),
+            TeamAction::MembersAdd => write!(f, "members_add"),
+            TeamAction::MembersUpdate => write!(f, "members_update"),
+            TeamAction::MembersRemove => write!(f, "members_remove"),
         }
     }
+}
 
+impl TeamAction {
     #[must_use]
     pub fn from_string(s: &str) -> Option<Self> {
         match s {
@@ -165,19 +163,20 @@ impl TeamAction {
     }
 }
 
-impl ApiKeyAction {
-    #[must_use]
-    pub fn as_string(&self) -> String {
+impl std::fmt::Display for ApiKeyAction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ApiKeyAction::Create => "create".to_string(),
-            ApiKeyAction::Read => "read".to_string(),
-            ApiKeyAction::Update => "update".to_string(),
-            ApiKeyAction::Delete => "delete".to_string(),
-            ApiKeyAction::Rotate => "rotate".to_string(),
-            ApiKeyAction::UsageRead => "usage_read".to_string(),
+            ApiKeyAction::Create => write!(f, "create"),
+            ApiKeyAction::Read => write!(f, "read"),
+            ApiKeyAction::Update => write!(f, "update"),
+            ApiKeyAction::Delete => write!(f, "delete"),
+            ApiKeyAction::Rotate => write!(f, "rotate"),
+            ApiKeyAction::UsageRead => write!(f, "usage_read"),
         }
     }
+}
 
+impl ApiKeyAction {
     #[must_use]
     pub fn from_string(s: &str) -> Option<Self> {
         match s {
@@ -307,14 +306,14 @@ impl PermissionService {
         let role_permissions: Vec<String> = serde_json::from_value(role.permissions.clone()).unwrap_or_default();
 
         // Check if the permission is directly granted by this role
-        if role_permissions.contains(&permission.as_string()) {
+        if role_permissions.contains(&permission.to_string()) {
             return Ok(PermissionCheckResult::Allowed);
         }
 
         // Check if this role inherits from other roles
         let inherited_permissions: HashSet<String> = self.get_role_inheritance(&self.db, &role.id).await?;
 
-        if inherited_permissions.contains(&permission.as_string()) {
+        if inherited_permissions.contains(&permission.to_string()) {
             return Ok(PermissionCheckResult::Allowed);
         }
 
@@ -551,7 +550,7 @@ mod tests {
     #[tokio::test]
     async fn test_permission_new() {
         let perm = Permission::Users(UserAction::Create);
-        assert_eq!(perm.as_string(), "users:create");
+        assert_eq!(perm.to_string(), "users:create");
     }
 
     #[tokio::test]
@@ -563,7 +562,7 @@ mod tests {
     #[tokio::test]
     async fn test_permission_as_string() {
         let perm = Permission::Teams(TeamAction::Update);
-        assert_eq!(perm.as_string(), "teams:update");
+        assert_eq!(perm.to_string(), "teams:update");
     }
 
     #[tokio::test]
