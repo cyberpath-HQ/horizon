@@ -49,3 +49,29 @@ impl std::fmt::Display for RoleScopeType {
     }
 }
 // ===== END CUSTOM EDIT: display_for_role_scope_type =====
+
+// ===== START CUSTOM EDIT: display_for_team_member_role =====
+impl std::fmt::Display for TeamMemberRole {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TeamMemberRole::Owner => write!(f, "owner"),
+            TeamMemberRole::Admin => write!(f, "admin"),
+            TeamMemberRole::Member => write!(f, "member"),
+            TeamMemberRole::Viewer => write!(f, "viewer"),
+        }
+    }
+}
+// ===== END CUSTOM EDIT: display_for_team_member_role =====
+
+// ===== START CUSTOM EDIT: display_for_user_status =====
+impl std::fmt::Display for UserStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            UserStatus::Active => write!(f, "active"),
+            UserStatus::Inactive => write!(f, "inactive"),
+            UserStatus::Suspended => write!(f, "suspended"),
+            UserStatus::PendingVerification => write!(f, "pending_verification"),
+        }
+    }
+}
+// ===== END CUSTOM EDIT: display_for_user_status =====

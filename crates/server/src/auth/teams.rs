@@ -36,16 +36,6 @@ use crate::{
     AppState,
 };
 
-/// Convert TeamMemberRole to string
-fn role_to_string(role: &entity::sea_orm_active_enums::TeamMemberRole) -> String {
-    match role {
-        entity::sea_orm_active_enums::TeamMemberRole::Owner => "owner".to_string(),
-        entity::sea_orm_active_enums::TeamMemberRole::Admin => "admin".to_string(),
-        entity::sea_orm_active_enums::TeamMemberRole::Member => "member".to_string(),
-        entity::sea_orm_active_enums::TeamMemberRole::Viewer => "viewer".to_string(),
-    }
-}
-
 /// Create a new team
 ///
 /// The authenticated user becomes the team manager and is added as `owner` member.
@@ -466,7 +456,7 @@ pub async fn update_team_member_handler(
         user_id: updated.user_id,
         email: member_user.email,
         display_name,
-        role: role_to_string(&role),
+        role: role.to_string(),
         joined_at: updated.joined_at.to_string(),
     }))
 }
@@ -584,7 +574,7 @@ pub async fn list_team_members_handler(
                 user_id: m.user_id,
                 email,
                 display_name,
-                role: format!("{:?}", m.role).to_lowercase(),
+                role: m.role.to_string(),
                 joined_at: m.joined_at.to_string(),
             }
         })
