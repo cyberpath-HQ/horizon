@@ -43,3 +43,18 @@ impl MigratorTrait for Migrator {
 pub async fn connect_to_database(database_url: &str) -> Result<sea_orm::DatabaseConnection, sea_orm::DbErr> {
     sea_orm::Database::connect(database_url).await
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_migrations_list() {
+        let migrations = Migrator::migrations();
+        assert_eq!(migrations.len(), 14);
+        // Check that the migrations are in the correct order
+        assert!(migrations[0].name().contains("create_cuid_function"));
+        assert!(migrations[1].name().contains("create_users_table"));
+        // Add more checks if needed
+    }
+}

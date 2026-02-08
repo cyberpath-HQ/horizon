@@ -27,12 +27,22 @@ pub struct JwtConfig {
 
 impl Default for JwtConfig {
     fn default() -> Self {
+        let secret = std::env::var("HORIZON_JWT_SECRET").unwrap_or_else(|_| {
+            #[cfg(test)]
+            {
+                "dGVzdC1zZWNyZXQta2V5LXRoYXQtaXMtYXQtbGVhc3QtMzItYnl0ZXMtbG9uZw==".to_string()
+            }
+            #[cfg(not(test))]
+            {
+                panic!("HORIZON_JWT_SECRET environment variable must be set")
+            }
+        });
+
         Self {
-            secret:             std::env::var("HORIZON_JWT_SECRET")
-                .expect("HORIZON_JWT_SECRET environment variable must be set"),
+            secret,
             expiration_seconds: 3600, // 1 hour
-            issuer:             "horizon".to_string(),
-            audience:           "horizon-api".to_string(),
+            issuer: "horizon".to_string(),
+            audience: "horizon-api".to_string(),
         }
     }
 }
@@ -168,6 +178,7 @@ pub fn extract_bearer_token(auth_header: &str) -> Option<String> {
 }
 
 #[cfg(test)]
+#[cfg(test)]
 mod tests {
     use base64::Engine;
 
@@ -218,5 +229,61 @@ mod tests {
         assert!(extract_bearer_token("Basic abc123").is_none());
         assert!(extract_bearer_token("Bearer").is_none());
         assert!(extract_bearer_token("").is_none());
+    }
+
+    #[test]
+    fn test_jwt_config_default() {
+        unsafe {
+            std::env::set_var(
+                "HORIZON_JWT_SECRET",
+                "dGVzdC1zZWNyZXQta2V5LXRoYXQtaXMtYXQtbGVhc3QtMzItYnl0ZXMtbG9uZw==",
+            );
+        }
+
+        let config = JwtConfig::default();
+
+        assert_eq!(
+            config.secret,
+            "dGVzdC1zZWNyZXQta2V5LXRoYXQtaXMtYXQtbGVhc3QtMzItYnl0ZXMtbG9uZw=="
+        );
+        assert_eq!(config.expiration_seconds, 3600);
+        assert_eq!(config.issuer, "horizon");
+        assert_eq!(config.audience, "horizon-api");
+    }
+
+    #[test]
+    fn test_validate_token_invalid_signature() {
+        let secret = "test-secret-key-that-is-at-least-32-bytes-long";
+        let config = JwtConfig {
+            secret:             base64::engine::general_purpose::STANDARD.encode(secret),
+            expiration_seconds: 3600,
+            issuer:             "test-issuer".to_string(),
+            audience:           "test-audience".to_string(),
+        };
+
+        // Create token with different secret
+        let wrong_secret = "wrong-secret-key-that-is-at-least-32-bytes";
+        let wrong_config = JwtConfig {
+            secret:             base64::engine::general_purpose::STANDARD.encode(wrong_secret),
+            expiration_seconds: 3600,
+            issuer:             "test-issuer".to_string(),
+            audience:           "test-audience".to_string(),
+        };
+
+        let token = create_access_token(
+            &wrong_config,
+            "user-123",
+            "test@example.com",
+            &["admin".to_string()],
+        )
+        .expect("Failed to create token");
+
+        // Validate with correct config
+        let result = validate_token(&config, &token);
+
+        assert!(result.is_err());
+        if let Err(e) = result {
+            assert!(matches!(e, error::AppError::JwtInvalidSignature));
+        }
     }
 }

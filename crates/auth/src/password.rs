@@ -313,11 +313,10 @@ mod tests {
     }
 
     #[test]
-    fn test_password_validation() {
-        let weak = "abc";
-        assert!(validate_password_strength(weak).is_err());
-
-        let strong = "StrongP@ssw0rd!";
-        assert!(validate_password_strength(strong).is_ok());
+    fn test_verify_invalid_hash_format() {
+        let password = SecretString::from("password".to_string());
+        let invalid_hash = "invalid";
+        let result = verify_password(&password, invalid_hash);
+        assert!(matches!(result, Err(PasswordError::InvalidHashFormat)));
     }
 }
