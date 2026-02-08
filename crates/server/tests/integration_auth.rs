@@ -12,7 +12,10 @@ use auth::{
     JwtConfig,
 };
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
-use common::{init_test_env, TestRedis};
+use common::{init_test_env, TestDb, TestRedis, UserFixture};
+use entity::{refresh_tokens, user_sessions, users};
+use sea_orm::{ActiveModelTrait, Set};
+use server::{middleware::auth::AuthenticatedUser, AppState};
 
 /// Test the JWT token creation and validation flow
 #[tokio::test]
@@ -321,4 +324,472 @@ async fn test_token_creation_empty_roles() {
     assert_eq!(claims.roles.len(), 0, "Roles should be empty");
     assert_eq!(claims.sub, "user-id");
     assert_eq!(claims.email, "user@example.com");
+}
+
+/// Test session management handlers
+#[tokio::test]
+async fn test_session_management() {
+    init_test_env();
+
+    let db = match TestDb::new().await {
+        Ok(db) => db,
+        Err(e) => {
+            eprintln!("Warning: Database connection failed: {}", e);
+            eprintln!("This test requires PostgreSQL to be running with DATABASE_URL set");
+            return;
+        },
+    };
+
+    let redis = match TestRedis::new() {
+        Ok(redis) => redis,
+        Err(e) => {
+            eprintln!("Warning: Redis connection failed: {}", e);
+            eprintln!("This test requires Redis to be running with REDIS_URL set");
+            return;
+        },
+    };
+
+    let redis = redis;
+    // Try to flush Redis, but skip if it fails
+    if let Err(e) = redis.flush_all().await {
+        eprintln!("Warning: Failed to flush Redis: {}", e);
+        eprintln!("Skipping test due to Redis unavailability");
+        return;
+    }
+
+    let state = AppState {
+        db:         db.conn.clone(),
+        redis:      redis.client.clone(),
+        jwt_config: JwtConfig {
+            secret:             BASE64.encode("test-secret-key-that-is-at-least-32-bytes-long".as_bytes()),
+            expiration_seconds: 3600,
+            issuer:             "test-issuer".to_string(),
+            audience:           "test-audience".to_string(),
+        },
+        start_time: std::time::Instant::now(),
+    };
+
+    // Create test user
+    let user_fixture = UserFixture::new();
+    let hashed_password = hash_password(
+        &auth::secrecy::SecretString::from(user_fixture.password.clone()),
+        None,
+    )
+    .expect("Failed to hash password");
+
+    let test_user = entity::users::ActiveModel {
+        email: sea_orm::Set(user_fixture.email.clone()),
+        username: sea_orm::Set(user_fixture.username.clone()),
+        password_hash: sea_orm::Set(hashed_password.expose_secret().to_string()),
+        status: sea_orm::Set(entity::sea_orm_active_enums::UserStatus::Active),
+        created_at: sea_orm::Set(chrono::Utc::now().naive_utc()),
+        updated_at: sea_orm::Set(chrono::Utc::now().naive_utc()),
+        ..Default::default()
+    };
+
+    let created_user = test_user
+        .insert(&db.conn)
+        .await
+        .expect("Failed to create test user");
+
+    // Create refresh token for the user
+    let refresh_token_hash = format!("test-refresh-token-hash-{}", created_user.id);
+    let refresh_token_model = entity::refresh_tokens::ActiveModel {
+        user_id: sea_orm::Set(created_user.id.clone()),
+        token_hash: sea_orm::Set(refresh_token_hash),
+        expires_at: sea_orm::Set(
+            (chrono::Utc::now() + chrono::Duration::days(30)).with_timezone(&chrono::FixedOffset::east_opt(0).unwrap()),
+        ),
+        revoked_at: sea_orm::Set(None),
+        created_at: sea_orm::Set(chrono::Utc::now().with_timezone(&chrono::FixedOffset::east_opt(0).unwrap())),
+        updated_at: sea_orm::Set(chrono::Utc::now().with_timezone(&chrono::FixedOffset::east_opt(0).unwrap())),
+        ..Default::default()
+    };
+
+    let refresh_token = refresh_token_model
+        .insert(&db.conn)
+        .await
+        .expect("Failed to create refresh token");
+
+    // Create multiple sessions for the user
+    let now = chrono::Utc::now();
+    let session1 = entity::user_sessions::ActiveModel {
+        user_id: sea_orm::Set(created_user.id.clone()),
+        refresh_token_id: sea_orm::Set(refresh_token.id.clone()),
+        user_agent: sea_orm::Set(Some("Mozilla/5.0 (Test Browser)".to_string())),
+        ip_address: sea_orm::Set(Some("127.0.0.1".to_string())),
+        created_at: sea_orm::Set(now.with_timezone(&chrono::FixedOffset::east_opt(0).unwrap())),
+        last_used_at: sea_orm::Set(now.with_timezone(&chrono::FixedOffset::east_opt(0).unwrap())),
+        revoked_at: sea_orm::Set(None),
+        ..Default::default()
+    };
+
+    let session2 = entity::user_sessions::ActiveModel {
+        user_id: sea_orm::Set(created_user.id.clone()),
+        refresh_token_id: sea_orm::Set(refresh_token.id.clone()),
+        user_agent: sea_orm::Set(Some("Mozilla/5.0 (Mobile)".to_string())),
+        ip_address: sea_orm::Set(Some("192.168.1.1".to_string())),
+        created_at: sea_orm::Set(
+            (now + chrono::Duration::minutes(5)).with_timezone(&chrono::FixedOffset::east_opt(0).unwrap()),
+        ),
+        last_used_at: sea_orm::Set(
+            (now + chrono::Duration::minutes(5)).with_timezone(&chrono::FixedOffset::east_opt(0).unwrap()),
+        ),
+        revoked_at: sea_orm::Set(None),
+        ..Default::default()
+    };
+
+    let created_session1 = session1
+        .insert(&db.conn)
+        .await
+        .expect("Failed to create session 1");
+    let created_session2 = session2
+        .insert(&db.conn)
+        .await
+        .expect("Failed to create session 2");
+
+    let authenticated_user = AuthenticatedUser {
+        id:    created_user.id.clone(),
+        email: user_fixture.email.clone(),
+        roles: vec!["user".to_string()],
+    };
+
+    // Test get_sessions_handler
+    let sessions_response = server::auth::sessions::get_sessions_handler(&state, authenticated_user.clone())
+        .await
+        .expect("Failed to get sessions");
+
+    assert!(
+        sessions_response.success,
+        "Sessions response should be successful"
+    );
+    assert_eq!(
+        sessions_response.sessions.len(),
+        2,
+        "Should have 2 sessions"
+    );
+
+    // Check session details
+    let session_info1 = sessions_response
+        .sessions
+        .iter()
+        .find(|s| s.id == created_session1.id)
+        .expect("Session 1 not found");
+    assert_eq!(
+        session_info1.user_agent,
+        Some("Mozilla/5.0 (Test Browser)".to_string())
+    );
+    assert_eq!(session_info1.ip_address, Some("127.0.0.1".to_string()));
+
+    let session_info2 = sessions_response
+        .sessions
+        .iter()
+        .find(|s| s.id == created_session2.id)
+        .expect("Session 2 not found");
+    assert_eq!(
+        session_info2.user_agent,
+        Some("Mozilla/5.0 (Mobile)".to_string())
+    );
+    assert_eq!(session_info2.ip_address, Some("192.168.1.1".to_string()));
+
+    // Test delete_session_handler for session 1
+    let delete_response = server::auth::sessions::delete_session_handler(
+        &state,
+        authenticated_user.clone(),
+        axum::extract::Path(created_session1.id.clone()),
+    )
+    .await
+    .expect("Failed to delete session");
+
+    assert!(
+        delete_response.success,
+        "Delete response should be successful"
+    );
+    assert!(
+        delete_response.message.contains("deleted successfully"),
+        "Delete message should indicate success"
+    );
+
+    // Verify session 1 is deleted
+    let remaining_sessions = server::auth::sessions::get_sessions_handler(&state, authenticated_user.clone())
+        .await
+        .expect("Failed to get remaining sessions");
+
+    assert_eq!(
+        remaining_sessions.sessions.len(),
+        1,
+        "Should have 1 session remaining"
+    );
+    assert!(
+        remaining_sessions
+            .sessions
+            .iter()
+            .all(|s| s.id != created_session1.id),
+        "Session 1 should be deleted"
+    );
+
+    // Test delete_all_sessions_handler
+    let delete_all_response = server::auth::sessions::delete_all_sessions_handler(&state, authenticated_user.clone())
+        .await
+        .expect("Failed to delete all sessions");
+
+    assert!(
+        delete_all_response.success,
+        "Delete all response should be successful"
+    );
+    assert!(
+        delete_all_response.message.contains("deleted successfully"),
+        "Delete all message should indicate success"
+    );
+
+    // Verify all sessions are deleted
+    let final_sessions = server::auth::sessions::get_sessions_handler(&state, authenticated_user)
+        .await
+        .expect("Failed to get final sessions");
+
+    assert_eq!(
+        final_sessions.sessions.len(),
+        0,
+        "Should have no sessions remaining"
+    );
+}
+
+/// Test deleting a session that doesn't belong to the user
+#[tokio::test]
+async fn test_delete_session_forbidden() {
+    init_test_env();
+
+    let db = match TestDb::new().await {
+        Ok(db) => db,
+        Err(e) => {
+            eprintln!("Warning: Database connection failed: {}", e);
+            eprintln!("This test requires PostgreSQL to be running with DATABASE_URL set");
+            return;
+        },
+    };
+
+    let redis = match TestRedis::new() {
+        Ok(redis) => redis,
+        Err(e) => {
+            eprintln!("Warning: Redis connection failed: {}", e);
+            eprintln!("This test requires Redis to be running with REDIS_URL set");
+            return;
+        },
+    };
+
+    let redis = redis;
+    // Try to flush Redis, but skip if it fails
+    if let Err(e) = redis.flush_all().await {
+        eprintln!("Warning: Failed to flush Redis: {}", e);
+        eprintln!("Skipping test due to Redis unavailability");
+        return;
+    }
+
+    let state = AppState {
+        db:         db.conn.clone(),
+        redis:      redis.client.clone(),
+        jwt_config: JwtConfig {
+            secret:             BASE64.encode("test-secret-key-that-is-at-least-32-bytes-long".as_bytes()),
+            expiration_seconds: 3600,
+            issuer:             "test-issuer".to_string(),
+            audience:           "test-audience".to_string(),
+        },
+        start_time: std::time::Instant::now(),
+    };
+
+    // Create two test users
+    let user1_fixture = UserFixture::new().with_id("user1");
+    let user2_fixture = UserFixture::new().with_id("user2");
+    let hashed_password1 = hash_password(
+        &auth::secrecy::SecretString::from(user1_fixture.password.clone()),
+        None,
+    )
+    .expect("Failed to hash password");
+    let hashed_password2 = hash_password(
+        &auth::secrecy::SecretString::from(user2_fixture.password.clone()),
+        None,
+    )
+    .expect("Failed to hash password");
+
+    let test_user1 = entity::users::ActiveModel {
+        email: sea_orm::Set(user1_fixture.email.clone()),
+        username: sea_orm::Set(user1_fixture.username.clone()),
+        password_hash: sea_orm::Set(hashed_password1.expose_secret().to_string()),
+        status: sea_orm::Set(entity::sea_orm_active_enums::UserStatus::Active),
+        created_at: sea_orm::Set(chrono::Utc::now().naive_utc()),
+        updated_at: sea_orm::Set(chrono::Utc::now().naive_utc()),
+        ..Default::default()
+    };
+
+    let test_user2 = entity::users::ActiveModel {
+        email: sea_orm::Set(user2_fixture.email.clone()),
+        username: sea_orm::Set(user2_fixture.username.clone()),
+        password_hash: sea_orm::Set(hashed_password2.expose_secret().to_string()),
+        status: sea_orm::Set(entity::sea_orm_active_enums::UserStatus::Active),
+        created_at: sea_orm::Set(chrono::Utc::now().naive_utc()),
+        updated_at: sea_orm::Set(chrono::Utc::now().naive_utc()),
+        ..Default::default()
+    };
+
+    let created_user1 = test_user1
+        .insert(&db.conn)
+        .await
+        .expect("Failed to create test user 1");
+    let created_user2 = test_user2
+        .insert(&db.conn)
+        .await
+        .expect("Failed to create test user 2");
+
+    // Create session for user 2
+    let refresh_token_hash = format!("test-refresh-token-hash-{}", created_user2.id);
+    let refresh_token_model = entity::refresh_tokens::ActiveModel {
+        user_id: sea_orm::Set(created_user2.id.clone()),
+        token_hash: sea_orm::Set(refresh_token_hash),
+        expires_at: sea_orm::Set(
+            (chrono::Utc::now() + chrono::Duration::days(30)).with_timezone(&chrono::FixedOffset::east_opt(0).unwrap()),
+        ),
+        revoked_at: sea_orm::Set(None),
+        created_at: sea_orm::Set(chrono::Utc::now().with_timezone(&chrono::FixedOffset::east_opt(0).unwrap())),
+        ..Default::default()
+    };
+
+    let refresh_token = refresh_token_model
+        .insert(&db.conn)
+        .await
+        .expect("Failed to create refresh token");
+
+    let session = entity::user_sessions::ActiveModel {
+        user_id: sea_orm::Set(created_user2.id.clone()),
+        refresh_token_id: sea_orm::Set(refresh_token.id.clone()),
+        user_agent: sea_orm::Set(Some("Mozilla/5.0".to_string())),
+        ip_address: sea_orm::Set(Some("127.0.0.1".to_string())),
+        created_at: sea_orm::Set(chrono::Utc::now().with_timezone(&chrono::FixedOffset::east_opt(0).unwrap())),
+        last_used_at: sea_orm::Set(chrono::Utc::now().with_timezone(&chrono::FixedOffset::east_opt(0).unwrap())),
+        revoked_at: sea_orm::Set(None),
+        ..Default::default()
+    };
+
+    let created_session = session
+        .insert(&db.conn)
+        .await
+        .expect("Failed to create session");
+
+    let authenticated_user1 = AuthenticatedUser {
+        id:    created_user1.id.clone(),
+        email: user1_fixture.email.clone(),
+        roles: vec!["user".to_string()],
+    };
+
+    // Try to delete user2's session as user1 - should fail
+    let result = server::auth::sessions::delete_session_handler(
+        &state,
+        authenticated_user1,
+        axum::extract::Path(created_session.id.clone()),
+    )
+    .await;
+
+    assert!(
+        result.is_err(),
+        "Should fail to delete session that doesn't belong to user"
+    );
+    let error = result.unwrap_err();
+    match error {
+        error::AppError::Forbidden {
+            ..
+        } => {}, // Expected
+        _ => panic!("Expected Forbidden error, got {:?}", error),
+    }
+}
+
+/// Test deleting a non-existent session
+#[tokio::test]
+async fn test_delete_nonexistent_session() {
+    init_test_env();
+
+    let db = match TestDb::new().await {
+        Ok(db) => db,
+        Err(e) => {
+            eprintln!("Warning: Database connection failed: {}", e);
+            eprintln!("This test requires PostgreSQL to be running with DATABASE_URL set");
+            return;
+        },
+    };
+
+    let redis = match TestRedis::new() {
+        Ok(redis) => redis,
+        Err(e) => {
+            eprintln!("Warning: Redis connection failed: {}", e);
+            eprintln!("This test requires Redis to be running with REDIS_URL set");
+            return;
+        },
+    };
+
+    let redis = redis;
+    // Try to flush Redis, but skip if it fails
+    if let Err(e) = redis.flush_all().await {
+        eprintln!("Warning: Failed to flush Redis: {}", e);
+        eprintln!("Skipping test due to Redis unavailability");
+        return;
+    }
+
+    let state = AppState {
+        db:         db.conn.clone(),
+        redis:      redis.client.clone(),
+        jwt_config: JwtConfig {
+            secret:             BASE64.encode("test-secret-key-that-is-at-least-32-bytes-long".as_bytes()),
+            expiration_seconds: 3600,
+            issuer:             "test-issuer".to_string(),
+            audience:           "test-audience".to_string(),
+        },
+        start_time: std::time::Instant::now(),
+    };
+
+    // Create test user
+    let user_fixture = UserFixture::new();
+    let hashed_password = hash_password(
+        &auth::secrecy::SecretString::from(user_fixture.password.clone()),
+        None,
+    )
+    .expect("Failed to hash password");
+
+    let test_user = entity::users::ActiveModel {
+        email: sea_orm::Set(user_fixture.email.clone()),
+        username: sea_orm::Set(user_fixture.username.clone()),
+        password_hash: sea_orm::Set(hashed_password.expose_secret().to_string()),
+        status: sea_orm::Set(entity::sea_orm_active_enums::UserStatus::Active),
+        created_at: sea_orm::Set(chrono::Utc::now().naive_utc()),
+        updated_at: sea_orm::Set(chrono::Utc::now().naive_utc()),
+        ..Default::default()
+    };
+
+    let created_user = test_user
+        .insert(&db.conn)
+        .await
+        .expect("Failed to create test user");
+
+    let authenticated_user = AuthenticatedUser {
+        id:    created_user.id.clone(),
+        email: user_fixture.email.clone(),
+        roles: vec!["user".to_string()],
+    };
+
+    // Try to delete non-existent session
+    let result = server::auth::sessions::delete_session_handler(
+        &state,
+        authenticated_user,
+        axum::extract::Path("nonexistent-session-id".to_string()),
+    )
+    .await;
+
+    assert!(
+        result.is_err(),
+        "Should fail to delete non-existent session"
+    );
+    let error = result.unwrap_err();
+    match error {
+        error::AppError::NotFound {
+            ..
+        } => {}, // Expected
+        _ => panic!("Expected NotFound error, got {:?}", error),
+    }
 }

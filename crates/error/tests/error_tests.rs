@@ -163,3 +163,168 @@ mod result_type_tests {
         assert_eq!(chained.unwrap(), 8);
     }
 }
+
+#[cfg(test)]
+mod into_response_tests {
+    use error::AppError;
+
+    #[test]
+    fn test_app_error_variants() {
+        // Test that all error variants can be created
+        let _not_found = AppError::NotFound {
+            message: "Not found".to_string(),
+        };
+        let _bad_request = AppError::BadRequest {
+            message: "Bad request".to_string(),
+        };
+        let _unauthorized = AppError::Unauthorized {
+            message: "Unauthorized".to_string(),
+        };
+        let _forbidden = AppError::Forbidden {
+            message: "Forbidden".to_string(),
+        };
+        let _conflict = AppError::Conflict {
+            message: "Conflict".to_string(),
+        };
+        let _validation = AppError::Validation {
+            message: "Validation error".to_string(),
+        };
+        let _internal = AppError::Internal {
+            message: "Internal error".to_string(),
+        };
+        let _database = AppError::Database {
+            message: "Database error".to_string(),
+        };
+        let _io = AppError::Io {
+            message: "IO error".to_string(),
+        };
+        let _jwt_expired = AppError::JwtExpired;
+        let _jwt_invalid_signature = AppError::JwtInvalidSignature;
+        let _jwt_invalid_token = AppError::JwtInvalidToken;
+    }
+
+    #[test]
+    fn test_app_error_into_response() {
+        use axum::response::IntoResponse;
+
+        let error = AppError::NotFound {
+            message: "Test not found".to_string(),
+        };
+        let response = error.into_response();
+        assert_eq!(response.status(), axum::http::StatusCode::NOT_FOUND);
+
+        let error = AppError::BadRequest {
+            message: "Test bad request".to_string(),
+        };
+        let response = error.into_response();
+        assert_eq!(response.status(), axum::http::StatusCode::BAD_REQUEST);
+
+        let error = AppError::Unauthorized {
+            message: "Test unauthorized".to_string(),
+        };
+        let response = error.into_response();
+        assert_eq!(response.status(), axum::http::StatusCode::UNAUTHORIZED);
+
+        let error = AppError::Forbidden {
+            message: "Test forbidden".to_string(),
+        };
+        let response = error.into_response();
+        assert_eq!(response.status(), axum::http::StatusCode::FORBIDDEN);
+
+        let error = AppError::Conflict {
+            message: "Test conflict".to_string(),
+        };
+        let response = error.into_response();
+        assert_eq!(response.status(), axum::http::StatusCode::CONFLICT);
+
+        let error = AppError::Validation {
+            message: "Test validation".to_string(),
+        };
+        let response = error.into_response();
+        assert_eq!(
+            response.status(),
+            axum::http::StatusCode::UNPROCESSABLE_ENTITY
+        );
+
+        let error = AppError::Internal {
+            message: "Test internal".to_string(),
+        };
+        let response = error.into_response();
+        assert_eq!(
+            response.status(),
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR
+        );
+
+        let error = AppError::Database {
+            message: "Test database".to_string(),
+        };
+        let response = error.into_response();
+        assert_eq!(
+            response.status(),
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR
+        );
+
+        let error = AppError::Io {
+            message: "Test io".to_string(),
+        };
+        let response = error.into_response();
+        assert_eq!(
+            response.status(),
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR
+        );
+
+        let error = AppError::JwtExpired;
+        let response = error.into_response();
+        assert_eq!(response.status(), axum::http::StatusCode::UNAUTHORIZED);
+
+        let error = AppError::JwtInvalidSignature;
+        let response = error.into_response();
+        assert_eq!(response.status(), axum::http::StatusCode::UNAUTHORIZED);
+
+        let error = AppError::JwtInvalidToken;
+        let response = error.into_response();
+        assert_eq!(response.status(), axum::http::StatusCode::UNAUTHORIZED);
+    }
+
+    #[test]
+    fn test_api_response_success() {
+        use error::ApiResponse;
+
+        let response: ApiResponse<String> = ApiResponse::ok("test data".to_string());
+        assert!(response.is_success());
+        assert_eq!(response.data(), Some(&"test data".to_string()));
+    }
+
+    #[test]
+    fn test_api_response_error() {
+        use error::ApiResponse;
+
+        let response: ApiResponse<()> = ApiResponse::error("TEST_ERROR", "Test error message");
+        assert!(!response.is_success());
+        assert_eq!(response.data(), None);
+    }
+
+    #[test]
+    fn test_api_response_builder() {
+        use error::ApiResponse;
+
+        let response: ApiResponse<String> = ApiResponse::builder()
+            .with_data("test data".to_string())
+            .with_request_id("req-123")
+            .build();
+        assert!(response.is_success());
+        assert_eq!(response.data(), Some(&"test data".to_string()));
+    }
+
+    #[test]
+    fn test_api_response_builder_error() {
+        use error::ApiResponse;
+
+        let response: ApiResponse<()> = ApiResponse::builder()
+            .with_error("TEST_ERROR", "Test error message")
+            .with_request_id("req-123")
+            .build();
+        assert!(!response.is_success());
+        assert_eq!(response.data(), None);
+    }
+}

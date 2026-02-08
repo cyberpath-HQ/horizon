@@ -138,3 +138,33 @@ pub async fn delete_all_sessions_handler(
         ),
     }))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_session_response_structure() {
+        let response = SessionsResponse {
+            success:  true,
+            sessions: vec![],
+        };
+        assert!(response.success);
+        assert!(response.sessions.is_empty());
+    }
+
+    #[test]
+    fn test_session_info_structure() {
+        let now = chrono::Utc::now();
+        let session = SessionInfo {
+            id:           "session-123".to_string(),
+            user_agent:   Some("Mozilla/5.0".to_string()),
+            ip_address:   Some("127.0.0.1".to_string()),
+            created_at:   now,
+            last_used_at: now,
+        };
+        assert_eq!(session.id, "session-123");
+        assert_eq!(session.user_agent, Some("Mozilla/5.0".to_string()));
+        assert_eq!(session.ip_address, Some("127.0.0.1".to_string()));
+    }
+}

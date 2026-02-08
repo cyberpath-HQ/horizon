@@ -184,12 +184,7 @@ mod api_key_usage_log_tests {
 
     #[test]
     fn test_usage_log_endpoint() {
-        let endpoints = vec![
-            "/api/users",
-            "/api/teams",
-            "/api/assets",
-            "/api/health",
-        ];
+        let endpoints = vec!["/api/users", "/api/teams", "/api/assets", "/api/health"];
         for endpoint in endpoints {
             assert!(endpoint.starts_with("/"));
         }
@@ -223,7 +218,7 @@ mod api_key_usage_log_tests {
         let log_created = Utc::now() - chrono::Duration::days(89);
         let retention_days = 90;
         let now = Utc::now();
-        
+
         let age_days = (now - log_created).num_days();
         assert!(age_days < retention_days as i64);
     }

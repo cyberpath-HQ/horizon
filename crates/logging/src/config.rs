@@ -129,10 +129,23 @@ mod tests {
 
     #[test]
     fn test_config_default() {
+        // Ensure HORIZON_ENV is not set for this test
+        let orig = std::env::var("HORIZON_ENV").ok();
+        unsafe {
+            std::env::remove_var("HORIZON_ENV");
+        }
+
         let config = LoggingConfig::from_env("info", "json", None);
         assert_eq!(config.level, "info");
         assert_eq!(config.format, "json");
         assert_eq!(config.environment, "development");
+
+        // Restore
+        unsafe {
+            if let Some(v) = orig {
+                std::env::set_var("HORIZON_ENV", v);
+            }
+        }
     }
 
     #[test]

@@ -55,3 +55,16 @@ impl ServerResult {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_server_result_new() {
+        let address = "127.0.0.1:8080";
+        let result = ServerResult::new(address);
+        assert_eq!(result.address, address);
+        assert!(result.started_at.timestamp() > 0); // Should have a valid timestamp
+    }
+}

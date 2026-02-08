@@ -143,3 +143,48 @@ impl AuthErrorResponse {
     /// Validation error
     pub fn validation(message: &str) -> Self { Self::new("VALIDATION_ERROR", message) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_auth_error_response_new() {
+        let response = AuthErrorResponse::new("TEST_CODE", "Test message");
+        assert!(!response.success);
+        assert_eq!(response.code, "TEST_CODE");
+        assert_eq!(response.message, "Test message");
+    }
+
+    #[test]
+    fn test_auth_error_response_unauthorized() {
+        let response = AuthErrorResponse::unauthorized("Access denied");
+        assert!(!response.success);
+        assert_eq!(response.code, "UNAUTHORIZED");
+        assert_eq!(response.message, "Access denied");
+    }
+
+    #[test]
+    fn test_auth_error_response_bad_request() {
+        let response = AuthErrorResponse::bad_request("Invalid input");
+        assert!(!response.success);
+        assert_eq!(response.code, "BAD_REQUEST");
+        assert_eq!(response.message, "Invalid input");
+    }
+
+    #[test]
+    fn test_auth_error_response_conflict() {
+        let response = AuthErrorResponse::conflict("Already exists");
+        assert!(!response.success);
+        assert_eq!(response.code, "CONFLICT");
+        assert_eq!(response.message, "Already exists");
+    }
+
+    #[test]
+    fn test_auth_error_response_validation() {
+        let response = AuthErrorResponse::validation("Field is required");
+        assert!(!response.success);
+        assert_eq!(response.code, "VALIDATION_ERROR");
+        assert_eq!(response.message, "Field is required");
+    }
+}

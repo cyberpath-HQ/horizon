@@ -14,6 +14,9 @@ static INIT: Once = Once::new();
 /// Initialize test environment including structured logging
 pub fn init_test_env() {
     INIT.call_once(|| {
+        // Load environment variables from .env file if present
+        dotenv::dotenv().ok();
+
         // Initialize tracing subscriber for tests
         let _ = tracing_subscriber::fmt()
             .with_test_writer()
@@ -30,19 +33,34 @@ pub struct TestDb {
 impl TestDb {
     /// Create a new test database connection
     ///
-    /// Connects to the test PostgreSQL database specified by DATABASE_URL env var.
-    /// The database should be created and migrations should be run before calling this.
+    /// Connects to the test database specified by DATABASE_URL env var.
+    /// For testing, defaults to an in-memory SQLite database if DATABASE_URL is not set
+    /// or if it points to a PostgreSQL instance that's not available.
     ///
     /// # Errors
     ///
     /// Returns an error if the database connection fails
     pub async fn new() -> Result<Self, String> {
-        let database_url =
-            std::env::var("DATABASE_URL").map_err(|_| "DATABASE_URL environment variable not set".to_string())?;
+        // Try to connect to the configured database first
+        if let Ok(database_url) = std::env::var("DATABASE_URL") {
+            match Database::connect(&database_url).await {
+                Ok(conn) => {
+                    return Ok(Self {
+                        conn,
+                    })
+                },
+                Err(_) => {
+                    // If the configured database is not available, fall back to SQLite
+                    eprintln!("Warning: Configured database not available, falling back to SQLite for tests");
+                },
+            }
+        }
 
-        let conn = Database::connect(&database_url)
+        // Fall back to in-memory SQLite for testing
+        let sqlite_url = "sqlite::memory:".to_string();
+        let conn = Database::connect(&sqlite_url)
             .await
-            .map_err(|e| format!("Failed to connect to test database: {}", e))?;
+            .map_err(|e| format!("Failed to connect to test SQLite database: {}", e))?;
 
         Ok(Self {
             conn,
@@ -61,19 +79,73 @@ pub struct TestRedis {
 impl TestRedis {
     /// Create a new Redis test connection
     ///
-    /// Connects to the test Redis instance specified by REDIS_URL env var.
+    /// Connects to the test Redis instance specified by REDIS_URL env var,
+    /// or constructs URL from REDIS_HOST, REDIS_PORT, etc. if REDIS_URL is not set.
+    /// For tests, defaults to localhost if the configured host is not available.
     ///
     /// # Errors
     ///
     /// Returns an error if the Redis connection fails
     pub fn new() -> Result<Self, String> {
-        let redis_url = std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
+        let redis_url = std::env::var("REDIS_URL").unwrap_or_else(|_| {
+            let host = std::env::var("REDIS_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+            let port = std::env::var("REDIS_PORT").unwrap_or_else(|_| "6379".to_string());
+            let password = std::env::var("REDIS_PASSWORD").unwrap_or_default();
+            let db = std::env::var("REDIS_DB").unwrap_or_else(|_| "0".to_string());
 
-        let client = Client::open(redis_url).map_err(|e| format!("Failed to create Redis client: {}", e))?;
+            if password.is_empty() {
+                format!("redis://{}:{}/{}", host, port, db)
+            }
+            else {
+                format!("redis://:{}@{}:{}/{}", password, host, port, db)
+            }
+        });
 
-        Ok(Self {
-            client,
-        })
+        // Try to create the client, and if it fails with connection issues, try localhost
+        match Client::open(redis_url.clone()) {
+            Ok(client) => {
+                // Test the connection to make sure it's actually available
+                if let Ok(mut conn) = client.get_connection() {
+                    if redis::cmd("PING").query::<String>(&mut conn).is_ok() {
+                        return Ok(Self {
+                            client,
+                        });
+                    }
+                }
+
+                // If connection fails, try localhost as fallback for tests
+                let fallback_url = format!(
+                    "redis://127.0.0.1:{}/{}",
+                    std::env::var("REDIS_PORT").unwrap_or_else(|_| "6379".to_string()),
+                    std::env::var("REDIS_DB").unwrap_or_else(|_| "0".to_string())
+                );
+                let fallback_client = match Client::open(fallback_url.clone()) {
+                    Ok(client) => client,
+                    Err(e) => {
+                        return Err(format!(
+                            "Failed to create Redis client (tried {} and {}): {}",
+                            redis_url, fallback_url, e
+                        ))
+                    },
+                };
+
+                // Test the fallback connection
+                if let Ok(mut conn) = fallback_client.get_connection() {
+                    if redis::cmd("PING").query::<String>(&mut conn).is_ok() {
+                        return Ok(Self {
+                            client: fallback_client,
+                        });
+                    }
+                }
+
+                // If both connections fail, return an error
+                Err(format!(
+                    "No Redis server available (tried {} and {})",
+                    redis_url, fallback_url
+                ))
+            },
+            Err(e) => Err(format!("Failed to create Redis client: {}", e)),
+        }
     }
 
     /// Get a reference to the Redis client
@@ -116,10 +188,18 @@ pub struct UserFixture {
 
 impl Default for UserFixture {
     fn default() -> Self {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
+        let count = COUNTER.fetch_add(1, Ordering::SeqCst);
+        let pid = std::process::id();
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
         Self {
-            id:       "test-user-123".to_string(),
-            email:    "test@example.com".to_string(),
-            username: "testuser".to_string(),
+            id:       format!("test-user-{}-{}-{}", count, pid, timestamp),
+            email:    format!("test{}-{}-{}@example.com", count, pid, timestamp),
+            username: format!("testuser{}{}{}", count, pid, timestamp % 10000),
             password: "TestPassword123!".to_string(),
         }
     }

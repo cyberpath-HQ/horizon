@@ -3,7 +3,9 @@
 //! HTTP request handlers for authentication endpoints.
 
 use auth::{
+    jwt::create_access_token,
     password::{hash_password, validate_password_strength, verify_password},
+    roles::get_user_roles,
     secrecy::ExposeSecret,
 };
 use entity::{
@@ -16,7 +18,6 @@ use tracing::{info, warn};
 use axum::{extract::Request, Json};
 use error::{AppError, Result};
 
-use auth::{jwt::create_access_token, roles::get_user_roles};
 use crate::{
     dto::auth::{
         AuthSuccessResponse,
