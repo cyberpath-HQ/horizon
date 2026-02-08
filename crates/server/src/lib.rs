@@ -17,6 +17,7 @@ pub mod middleware;
 pub mod refresh_tokens;
 pub mod router;
 pub mod token_blacklist;
+pub mod utils;
 
 pub use router::create_app_router;
 
