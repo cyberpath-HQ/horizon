@@ -1,5 +1,8 @@
 #![recursion_limit = "1024"]
-#![allow(clippy::all)]
+#![allow(
+    clippy::all,
+    reason = "Sea-ORM generated code with complex relationships requires this"
+)]
 
 //! Entity definitions for Horizon CMDB
 //!
