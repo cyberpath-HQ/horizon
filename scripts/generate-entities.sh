@@ -230,7 +230,10 @@ update_lib_rs() {
 
     # Generate new lib.rs with correct format
     local lib_content="#![recursion_limit = \"1024\"]
-#![allow(clippy::all)]
+#![allow(
+    clippy::all,
+    reason = \"Sea-ORM generated code with complex relationships requires this\"
+)]
 
 //! Entity definitions for Horizon CMDB
 //!
@@ -527,7 +530,7 @@ inject_security_attributes() {
     log_step "Injecting security attributes for sensitive fields..."
 
     # Define sensitive field patterns (field name only, pattern is built below)
-    local sensitive_fields=("password_hash" "totp_secret" "key_hash")
+    local sensitive_fields=("password_hash" "totp_secret" "key_hash" "backup_codes")
 
     local modified_count=0
 

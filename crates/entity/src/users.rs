@@ -29,6 +29,7 @@ pub struct Model {
     pub updated_at:            DateTime,
     pub deleted_at:            Option<DateTime>,
     #[sea_orm(column_type = "JsonBinary", nullable)]
+    #[serde(skip_serializing)]
     pub backup_codes:          Option<Json>,
     pub failed_login_attempts: i32,
     pub locked_until:          Option<DateTimeWithTimeZone>,
