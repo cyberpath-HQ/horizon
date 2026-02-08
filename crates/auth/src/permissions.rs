@@ -603,4 +603,167 @@ mod tests {
         );
         assert_eq!(ApiKeyAction::from_string("invalid"), None);
     }
+
+    #[test]
+    fn test_permission_from_string_invalid() {
+        assert_eq!(Permission::from_string("invalid:create"), None);
+        assert_eq!(Permission::from_string("users:invalid"), None);
+        assert_eq!(Permission::from_string("users"), None);
+        assert_eq!(Permission::from_string(""), None);
+        assert_eq!(Permission::from_string("users:create:extra"), None);
+        assert_eq!(Permission::from_string("teams:"), None);
+        assert_eq!(Permission::from_string(":create"), None);
+    }
+
+    #[test]
+    fn test_permission_from_string_valid_all() {
+        assert_eq!(
+            Permission::from_string("users:create"),
+            Some(Permission::Users(UserAction::Create))
+        );
+        assert_eq!(
+            Permission::from_string("users:read"),
+            Some(Permission::Users(UserAction::Read))
+        );
+        assert_eq!(
+            Permission::from_string("users:update"),
+            Some(Permission::Users(UserAction::Update))
+        );
+        assert_eq!(
+            Permission::from_string("users:delete"),
+            Some(Permission::Users(UserAction::Delete))
+        );
+        assert_eq!(
+            Permission::from_string("teams:create"),
+            Some(Permission::Teams(TeamAction::Create))
+        );
+        assert_eq!(
+            Permission::from_string("teams:read"),
+            Some(Permission::Teams(TeamAction::Read))
+        );
+        assert_eq!(
+            Permission::from_string("teams:update"),
+            Some(Permission::Teams(TeamAction::Update))
+        );
+        assert_eq!(
+            Permission::from_string("teams:delete"),
+            Some(Permission::Teams(TeamAction::Delete))
+        );
+        assert_eq!(
+            Permission::from_string("teams:members_read"),
+            Some(Permission::Teams(TeamAction::MembersRead))
+        );
+        assert_eq!(
+            Permission::from_string("teams:members_add"),
+            Some(Permission::Teams(TeamAction::MembersAdd))
+        );
+        assert_eq!(
+            Permission::from_string("teams:members_update"),
+            Some(Permission::Teams(TeamAction::MembersUpdate))
+        );
+        assert_eq!(
+            Permission::from_string("teams:members_remove"),
+            Some(Permission::Teams(TeamAction::MembersRemove))
+        );
+        assert_eq!(
+            Permission::from_string("api_keys:create"),
+            Some(Permission::ApiKeys(ApiKeyAction::Create))
+        );
+        assert_eq!(
+            Permission::from_string("api_keys:read"),
+            Some(Permission::ApiKeys(ApiKeyAction::Read))
+        );
+        assert_eq!(
+            Permission::from_string("api_keys:update"),
+            Some(Permission::ApiKeys(ApiKeyAction::Update))
+        );
+        assert_eq!(
+            Permission::from_string("api_keys:delete"),
+            Some(Permission::ApiKeys(ApiKeyAction::Delete))
+        );
+        assert_eq!(
+            Permission::from_string("api_keys:rotate"),
+            Some(Permission::ApiKeys(ApiKeyAction::Rotate))
+        );
+        assert_eq!(
+            Permission::from_string("api_keys:usage_read"),
+            Some(Permission::ApiKeys(ApiKeyAction::UsageRead))
+        );
+    }
+
+    #[test]
+    fn test_permission_display_all() {
+        assert_eq!(
+            format!("{}", Permission::Users(UserAction::Create)),
+            "users:create"
+        );
+        assert_eq!(
+            format!("{}", Permission::Users(UserAction::Read)),
+            "users:read"
+        );
+        assert_eq!(
+            format!("{}", Permission::Users(UserAction::Update)),
+            "users:update"
+        );
+        assert_eq!(
+            format!("{}", Permission::Users(UserAction::Delete)),
+            "users:delete"
+        );
+        assert_eq!(
+            format!("{}", Permission::Teams(TeamAction::Create)),
+            "teams:create"
+        );
+        assert_eq!(
+            format!("{}", Permission::Teams(TeamAction::Read)),
+            "teams:read"
+        );
+        assert_eq!(
+            format!("{}", Permission::Teams(TeamAction::Update)),
+            "teams:update"
+        );
+        assert_eq!(
+            format!("{}", Permission::Teams(TeamAction::Delete)),
+            "teams:delete"
+        );
+        assert_eq!(
+            format!("{}", Permission::Teams(TeamAction::MembersRead)),
+            "teams:members_read"
+        );
+        assert_eq!(
+            format!("{}", Permission::Teams(TeamAction::MembersAdd)),
+            "teams:members_add"
+        );
+        assert_eq!(
+            format!("{}", Permission::Teams(TeamAction::MembersUpdate)),
+            "teams:members_update"
+        );
+        assert_eq!(
+            format!("{}", Permission::Teams(TeamAction::MembersRemove)),
+            "teams:members_remove"
+        );
+        assert_eq!(
+            format!("{}", Permission::ApiKeys(ApiKeyAction::Create)),
+            "api_keys:create"
+        );
+        assert_eq!(
+            format!("{}", Permission::ApiKeys(ApiKeyAction::Read)),
+            "api_keys:read"
+        );
+        assert_eq!(
+            format!("{}", Permission::ApiKeys(ApiKeyAction::Update)),
+            "api_keys:update"
+        );
+        assert_eq!(
+            format!("{}", Permission::ApiKeys(ApiKeyAction::Delete)),
+            "api_keys:delete"
+        );
+        assert_eq!(
+            format!("{}", Permission::ApiKeys(ApiKeyAction::Rotate)),
+            "api_keys:rotate"
+        );
+        assert_eq!(
+            format!("{}", Permission::ApiKeys(ApiKeyAction::UsageRead)),
+            "api_keys:usage_read"
+        );
+    }
 }

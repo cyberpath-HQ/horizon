@@ -250,4 +250,23 @@ mod tests {
         let result = verify_and_consume_backup_code("a1b2-c3d4", hashed, salt);
         assert!(result.is_ok());
     }
+
+    #[test]
+    fn test_verify_totp_code_invalid_secret() {
+        let result = verify_totp_code("invalid_secret", "123456", "TestApp", "user@example.com");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_deserialize_backup_codes_invalid_json() {
+        let result = deserialize_backup_codes("invalid json");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_verify_and_consume_backup_code_invalid() {
+        let codes = vec!["hashed".to_string()];
+        let result = verify_and_consume_backup_code("wrong", codes, "salt");
+        assert!(result.is_err());
+    }
 }
