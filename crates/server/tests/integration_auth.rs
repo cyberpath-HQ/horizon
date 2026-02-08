@@ -133,7 +133,7 @@ async fn test_app_state_initialization() {
     let redis_client = Client::open(redis_url).expect("Failed to connect to Redis");
 
     let jwt_config = JwtConfig {
-        secret:             "test-jwt-secret-key-that-is-at-least-32-bytes-long-for-testing-purposes".to_string(),
+        secret:             BASE64.encode(b"test-jwt-secret-key-that-is-at-least-32-bytes-long-for-testing-purposes"),
         expiration_seconds: 3600,
         issuer:             "horizon".to_string(),
         audience:           "horizon-api".to_string(),
