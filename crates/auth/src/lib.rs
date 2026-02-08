@@ -1,9 +1,33 @@
-// Auth service implementation
-// Provides password hashing and MFA functionality
+//! # Authentication Service
+//!
+//! Comprehensive authentication and authorization system including:
+//! - JWT token management
+//! - Password hashing and validation
+//! - Role-based permissions
+//! - API key management
+//! - User and team management
 
+pub mod jwt;
 pub mod mfa;
 pub mod password;
+pub mod permissions;
+pub mod roles;
 
+// Re-export commonly used types
+pub use permissions::{ApiKeyAction, Permission, PermissionService, TeamAction, UserAction};
+pub use jwt::{create_access_token, extract_bearer_token, validate_token, Claims, JwtConfig};
+pub use password::{hash_password, validate_password_strength, verify_password};
+pub use roles::{assign_role_to_user, get_user_roles};
+pub use mfa::{
+    check_backup_code_valid,
+    deserialize_backup_codes,
+    generate_backup_codes,
+    generate_mfa_setup,
+    hash_backup_codes,
+    serialize_backup_codes,
+    verify_and_consume_backup_code,
+    verify_totp_code,
+};
 pub use secrecy;
 pub use subtle;
 

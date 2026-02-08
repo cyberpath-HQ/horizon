@@ -12,6 +12,7 @@ path = "src/lib.rs"
 [dependencies]
 # Error handling
 thiserror = { workspace = true }
+anyhow = { workspace = true }
 
 # Password hashing
 argon2 = { workspace = true }
@@ -37,6 +38,32 @@ blake3 = { workspace = true }
 # Serialization
 serde = { workspace = true }
 serde_json = { workspace = true }
+
+# JWT
+jsonwebtoken = { workspace = true }
+
+# Database
+sea-orm = { workspace = true, features = [
+    "runtime-tokio-rustls",
+    "sqlx-postgres",
+] }
+
+# Logging
+tracing = { workspace = true }
+
+# Validation
+validator = { workspace = true, features = ["derive"] }
+
+# Internal dependencies
+error = { path = "../error" }
+entity = { path = "../entity" }
+migration = { path = "../migration" }
+
+# CUID generation
+cuid2 = { workspace = true }
+
+# Time handling
+chrono = { workspace = true, features = ["serde"] }
 
 [dev-dependencies]
 # Test utilities
