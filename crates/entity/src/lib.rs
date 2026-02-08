@@ -1,4 +1,5 @@
-#![recursion_limit = "1024"]
+#![recursion_limit = "8192"]
+#![type_length_limit = "4194304"]
 #![allow(
     clippy::all,
     reason = "Sea-ORM generated code with complex relationships requires this"

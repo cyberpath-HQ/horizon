@@ -20,3 +20,9 @@ cuid2 = { workspace = true }
 
 [lints]
 workspace = true
+
+[profile.dev]
+recursion-limit = 1024
+
+[profile.release]
+recursion-limit = 1024
