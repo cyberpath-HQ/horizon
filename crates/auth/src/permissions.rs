@@ -486,6 +486,7 @@ impl PermissionService {
     pub async fn require_permission(&self, user_id: &str, permission: Permission) -> Result<()> {
         match self.check_permission(user_id, permission).await? {
             PermissionCheckResult::Allowed => Ok(()),
+            PermissionCheckResult::Unauthenticated => Err(error::AppError::unauthorized("Authentication required")),
             _ => Err(error::AppError::forbidden("Insufficient permissions")),
         }
     }
