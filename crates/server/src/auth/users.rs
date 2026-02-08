@@ -11,7 +11,11 @@ use entity::{
 use error::{AppError, Result};
 use sea_orm::{ActiveModelTrait, ColumnTrait, Condition, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set};
 use tracing::info;
-use auth::roles::get_user_roles;
+use auth::{
+    permissions::{Permission, UserAction},
+    roles::get_user_roles,
+};
+use permissions_macro::with_permission;
 
 use crate::{
     dto::users::{PaginationInfo, UpdateUserProfileRequest, UserListQuery, UserListResponse, UserProfileResponse},
@@ -92,38 +96,13 @@ pub async fn update_my_profile_handler(
 ///
 /// # Arguments
 ///
-/// * `state` - Application state
-/// * `user` - Authenticated user from middleware (must have admin or super_admin role)
-/// * `query` - Query parameters for filtering and pagination
-///
-/// # Returns
-///
 /// Paginated user list response
+#[with_permission(Permission::Users(UserAction::Read))]
 pub async fn list_users_handler(
     state: &AppState,
     user: AuthenticatedUser,
     query: UserListQuery,
 ) -> Result<Json<UserListResponse>> {
-    // Check permission using the permission service
-    let permission_service = auth::permissions::PermissionService::new(state.db.clone());
-    let result = permission_service
-        .check_permission(
-            &user.id,
-            auth::permissions::Permission::Users(auth::permissions::UserAction::Read),
-        )
-        .await?;
-
-    match result {
-        auth::permissions::PermissionCheckResult::Allowed => {
-            // Permission granted, continue with handler logic
-        },
-        _ => {
-            return Err(AppError::forbidden(
-                "You do not have permission to list users",
-            ));
-        },
-    }
-
     let page = query.page();
     let per_page = query.per_page();
 
