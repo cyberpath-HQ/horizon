@@ -14,6 +14,11 @@ use error::{AppError, Result};
 use sea_orm::{ActiveModelTrait, ColumnTrait, Condition, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set};
 use tracing::info;
 
+/// Escape LIKE wildcards (% and _) in a search string
+fn escape_like_wildcards(s: &str) -> String {
+    s.replace('%', "\\%").replace('_', "\\_")
+}
+
 use crate::{
     dto::{
         api_keys::{
@@ -125,7 +130,8 @@ pub async fn list_api_keys_handler(
     let mut base_query = ApiKeysEntity::find().filter(KeyColumn::UserId.eq(&user.id));
 
     if let Some(ref search) = query.search {
-        let pattern = format!("%{}%", search);
+        let escaped_search = escape_like_wildcards(search);
+        let pattern = format!("%{}%", escaped_search);
         base_query = base_query.filter(
             Condition::any()
                 .add(KeyColumn::Name.like(&pattern))
@@ -412,9 +418,7 @@ pub async fn log_api_key_usage(
         .map_err(|e| AppError::database(format!("Failed to log API key usage: {}", e)))?;
 
     // Also update last_used_at on the API key itself
-    let api_key = ApiKeysEntity::find_by_id(api_key_id).one(&state.db).await?;
-
-    if let Some(key) = api_key {
+    if let Ok(Some(key)) = ApiKeysEntity::find_by_id(api_key_id).one(&state.db).await {
         let mut active_model: entity::api_keys::ActiveModel = key.into();
         active_model.last_used_at = Set(Some(Utc::now().naive_utc()));
         active_model.last_used_ip = Set(ip_address.map(|s| s.to_string()));
