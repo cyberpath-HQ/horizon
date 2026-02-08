@@ -3,26 +3,23 @@
 //! Tests the complete authentication flow including login, token refresh,
 //! logout, and token validation.
 
-use std::time::Duration;
-
 use auth::{
+    jwt::{create_access_token, extract_bearer_token, validate_token},
     password::{hash_password, verify_password},
     secrecy::ExposeSecret,
-};
-use redis::{Client, ConnectionLike};
-use sea_orm::{ConnectionTrait, Database};
-use server::{
-    auth::jwt::{create_access_token, extract_bearer_token, validate_token},
-    AppState,
     JwtConfig,
 };
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
+use redis::{Client, ConnectionLike};
+use sea_orm::Database;
+use server::AppState;
 
 /// Test the JWT token creation and validation flow
 #[tokio::test]
 async fn test_jwt_token_flow() {
     let secret = "test-secret-key-that-is-at-least-32-bytes-long";
     let config = JwtConfig {
-        secret:             base64::encode(secret),
+        secret:             BASE64.encode(secret.as_bytes()),
         expiration_seconds: 3600,
         issuer:             "test-issuer".to_string(),
         audience:           "test-audience".to_string(),
@@ -105,7 +102,7 @@ async fn test_bearer_token_extraction() {
 #[tokio::test]
 async fn test_password_hashing() {
     let password = "StrongP@ssw0rd!123";
-    let password_secret = auth::secrecy::SecretString::from(password.clone());
+    let password_secret = auth::secrecy::SecretString::from(password);
 
     // Hash the password
     let hash = hash_password(&password_secret, None).expect("Failed to hash password");
@@ -156,7 +153,7 @@ async fn test_app_state_initialization() {
         },
     };
 
-    let state = AppState {
+    let _state = AppState {
         db,
         jwt_config,
         redis: redis_client.clone(),
@@ -174,7 +171,7 @@ async fn test_app_state_initialization() {
 async fn test_jwt_expiration() {
     let secret = "test-secret-key-that-is-at-least-32-bytes-long";
     let config = JwtConfig {
-        secret:             base64::encode(secret),
+        secret:             BASE64.encode(secret.as_bytes()),
         expiration_seconds: 3600, // 1 hour
         issuer:             "test-issuer".to_string(),
         audience:           "test-audience".to_string(),
@@ -224,7 +221,7 @@ async fn test_jwt_expiration() {
 async fn test_token_claims_structure() {
     let secret = "test-secret-key-that-is-at-least-32-bytes-long";
     let config = JwtConfig {
-        secret:             base64::encode(secret),
+        secret:             BASE64.encode(secret.as_bytes()),
         expiration_seconds: 3600,
         issuer:             "horizon-cmdb".to_string(),
         audience:           "horizon-api".to_string(),
@@ -263,7 +260,7 @@ async fn test_token_claims_structure() {
 async fn test_token_validation_edge_cases() {
     let secret = "test-secret-key-that-is-at-least-32-bytes-long";
     let config = JwtConfig {
-        secret:             base64::encode(secret),
+        secret:             BASE64.encode(secret.as_bytes()),
         expiration_seconds: 3600,
         issuer:             "test-issuer".to_string(),
         audience:           "test-audience".to_string(),
