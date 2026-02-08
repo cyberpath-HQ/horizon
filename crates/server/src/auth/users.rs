@@ -104,14 +104,24 @@ pub async fn list_users_handler(
     user: AuthenticatedUser,
     query: UserListQuery,
 ) -> Result<Json<UserListResponse>> {
-    if !user
-        .roles
-        .iter()
-        .any(|r| r == "super_admin" || r == "admin")
-    {
-        return Err(AppError::forbidden(
-            "You do not have permission to list users",
-        ));
+    // Check permission using the permission service
+    let permission_service = crate::auth::permissions::PermissionService::new(state.db.clone());
+    let result = permission_service
+        .check_permission(
+            &user.id,
+            crate::auth::permissions::Permission::new("users", "read"),
+        )
+        .await?;
+
+    match result {
+        crate::auth::permissions::PermissionCheckResult::Allowed => {
+            // Permission granted, continue with handler logic
+        },
+        _ => {
+            return Err(AppError::forbidden(
+                "You do not have permission to list users",
+            ));
+        },
     }
 
     let page = query.page();
