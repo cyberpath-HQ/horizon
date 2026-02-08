@@ -57,7 +57,7 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/v1/auth/api-keys/{id}/rotate", post(rotate_api_key_handler))
         .route("/api/v1/auth/api-keys/{id}/permissions", put(update_api_key_permissions_handler))
         .route("/api/v1/auth/api-keys/{id}/usage", get(get_api_key_usage_handler))
-        // Apply API key auth before JWT auth for dual authentication
+        // Layers execute bottom-up: auth (JWT) runs first, then api_key_auth
         .layer(middleware::from_fn(crate::middleware::api_key_auth::api_key_auth_middleware))
         .layer(middleware::from_fn(crate::middleware::auth::auth_middleware));
 
