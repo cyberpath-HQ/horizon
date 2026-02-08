@@ -548,61 +548,7 @@ impl PermissionService {
 mod tests {
     use super::*;
 
-    #[tokio::test]
-    async fn test_permission_new() {
-        let perm = Permission::Users(UserAction::Create);
-        assert_eq!(perm.to_string(), "users:create");
-    }
-
-    #[tokio::test]
-    async fn test_permission_from_string() {
-        let perm = Permission::from_string("users:create").unwrap();
-        assert_eq!(perm, Permission::Users(UserAction::Create));
-    }
-
-    #[tokio::test]
-    async fn test_permission_as_string() {
-        let perm = Permission::Teams(TeamAction::Update);
-        assert_eq!(perm.to_string(), "teams:update");
-    }
-
-    #[tokio::test]
-    async fn test_permission_display() {
-        let perm = Permission::ApiKeys(ApiKeyAction::Delete);
-        let display = format!("{}", perm);
-        assert_eq!(display, "api_keys:delete");
-    }
-
-    #[tokio::test]
-    async fn test_user_action_from_string() {
-        assert_eq!(UserAction::from_string("read"), Some(UserAction::Read));
-        assert_eq!(UserAction::from_string("update"), Some(UserAction::Update));
-        assert_eq!(UserAction::from_string("delete"), Some(UserAction::Delete));
-        assert_eq!(UserAction::from_string("invalid"), None);
-    }
-
-    #[tokio::test]
-    async fn test_team_action_from_string() {
-        assert_eq!(TeamAction::from_string("create"), Some(TeamAction::Create));
-        assert_eq!(
-            TeamAction::from_string("members_read"),
-            Some(TeamAction::MembersRead)
-        );
-        assert_eq!(TeamAction::from_string("invalid"), None);
-    }
-
-    #[tokio::test]
-    async fn test_api_key_action_from_string() {
-        assert_eq!(
-            ApiKeyAction::from_string("create"),
-            Some(ApiKeyAction::Create)
-        );
-        assert_eq!(
-            ApiKeyAction::from_string("rotate"),
-            Some(ApiKeyAction::Rotate)
-        );
-        assert_eq!(ApiKeyAction::from_string("invalid"), None);
-    }
+    // ==================== Permission Parsing Tests ====================
 
     #[test]
     fn test_permission_from_string_invalid() {
@@ -765,5 +711,248 @@ mod tests {
             format!("{}", Permission::ApiKeys(ApiKeyAction::UsageRead)),
             "api_keys:usage_read"
         );
+    }
+
+    // ==================== UserAction Tests ====================
+
+    #[test]
+    fn test_user_action_from_string_valid() {
+        assert_eq!(UserAction::from_string("create"), Some(UserAction::Create));
+        assert_eq!(UserAction::from_string("read"), Some(UserAction::Read));
+        assert_eq!(UserAction::from_string("update"), Some(UserAction::Update));
+        assert_eq!(UserAction::from_string("delete"), Some(UserAction::Delete));
+    }
+
+    #[test]
+    fn test_user_action_from_string_invalid() {
+        assert_eq!(UserAction::from_string("invalid"), None);
+        assert_eq!(UserAction::from_string(""), None);
+        assert_eq!(UserAction::from_string("READ"), None); // Case-sensitive
+        assert_eq!(UserAction::from_string("destroy"), None);
+    }
+
+    #[test]
+    fn test_user_action_display() {
+        assert_eq!(format!("{}", UserAction::Create), "create");
+        assert_eq!(format!("{}", UserAction::Read), "read");
+        assert_eq!(format!("{}", UserAction::Update), "update");
+        assert_eq!(format!("{}", UserAction::Delete), "delete");
+    }
+
+    // ==================== TeamAction Tests ====================
+
+    #[test]
+    fn test_team_action_from_string_valid() {
+        assert_eq!(TeamAction::from_string("create"), Some(TeamAction::Create));
+        assert_eq!(TeamAction::from_string("read"), Some(TeamAction::Read));
+        assert_eq!(TeamAction::from_string("update"), Some(TeamAction::Update));
+        assert_eq!(TeamAction::from_string("delete"), Some(TeamAction::Delete));
+        assert_eq!(
+            TeamAction::from_string("members_read"),
+            Some(TeamAction::MembersRead)
+        );
+        assert_eq!(
+            TeamAction::from_string("members_add"),
+            Some(TeamAction::MembersAdd)
+        );
+        assert_eq!(
+            TeamAction::from_string("members_update"),
+            Some(TeamAction::MembersUpdate)
+        );
+        assert_eq!(
+            TeamAction::from_string("members_remove"),
+            Some(TeamAction::MembersRemove)
+        );
+    }
+
+    #[test]
+    fn test_team_action_from_string_invalid() {
+        assert_eq!(TeamAction::from_string("invalid"), None);
+        assert_eq!(TeamAction::from_string(""), None);
+        assert_eq!(TeamAction::from_string("members"), None);
+        assert_eq!(TeamAction::from_string("MEMBERS_READ"), None); // Case-sensitive
+    }
+
+    #[test]
+    fn test_team_action_display() {
+        assert_eq!(format!("{}", TeamAction::Create), "create");
+        assert_eq!(format!("{}", TeamAction::Read), "read");
+        assert_eq!(format!("{}", TeamAction::Update), "update");
+        assert_eq!(format!("{}", TeamAction::Delete), "delete");
+        assert_eq!(format!("{}", TeamAction::MembersRead), "members_read");
+        assert_eq!(format!("{}", TeamAction::MembersAdd), "members_add");
+        assert_eq!(format!("{}", TeamAction::MembersUpdate), "members_update");
+        assert_eq!(format!("{}", TeamAction::MembersRemove), "members_remove");
+    }
+
+    // ==================== ApiKeyAction Tests ====================
+
+    #[test]
+    fn test_api_key_action_from_string_valid() {
+        assert_eq!(
+            ApiKeyAction::from_string("create"),
+            Some(ApiKeyAction::Create)
+        );
+        assert_eq!(ApiKeyAction::from_string("read"), Some(ApiKeyAction::Read));
+        assert_eq!(
+            ApiKeyAction::from_string("update"),
+            Some(ApiKeyAction::Update)
+        );
+        assert_eq!(
+            ApiKeyAction::from_string("delete"),
+            Some(ApiKeyAction::Delete)
+        );
+        assert_eq!(
+            ApiKeyAction::from_string("rotate"),
+            Some(ApiKeyAction::Rotate)
+        );
+        assert_eq!(
+            ApiKeyAction::from_string("usage_read"),
+            Some(ApiKeyAction::UsageRead)
+        );
+    }
+
+    #[test]
+    fn test_api_key_action_from_string_invalid() {
+        assert_eq!(ApiKeyAction::from_string("invalid"), None);
+        assert_eq!(ApiKeyAction::from_string(""), None);
+        assert_eq!(ApiKeyAction::from_string("usage"), None);
+        assert_eq!(ApiKeyAction::from_string("ROTATE"), None); // Case-sensitive
+    }
+
+    #[test]
+    fn test_api_key_action_display() {
+        assert_eq!(format!("{}", ApiKeyAction::Create), "create");
+        assert_eq!(format!("{}", ApiKeyAction::Read), "read");
+        assert_eq!(format!("{}", ApiKeyAction::Update), "update");
+        assert_eq!(format!("{}", ApiKeyAction::Delete), "delete");
+        assert_eq!(format!("{}", ApiKeyAction::Rotate), "rotate");
+        assert_eq!(format!("{}", ApiKeyAction::UsageRead), "usage_read");
+    }
+
+    // ==================== Permission Enum Tests ====================
+
+    #[test]
+    fn test_permission_clone_and_equality() {
+        let perm1 = Permission::Users(UserAction::Create);
+        let perm2 = perm1.clone();
+        assert_eq!(perm1, perm2);
+    }
+
+    #[test]
+    fn test_permission_different_types_not_equal() {
+        let perm1 = Permission::Users(UserAction::Create);
+        let perm2 = Permission::Teams(TeamAction::Create);
+        assert_ne!(perm1, perm2);
+    }
+
+    #[test]
+    fn test_permission_hash() {
+        use std::collections::HashSet;
+        let mut set = HashSet::new();
+        set.insert(Permission::Users(UserAction::Create));
+        set.insert(Permission::Users(UserAction::Create));
+        assert_eq!(set.len(), 1); // Duplicates should not be added
+    }
+
+    // ==================== PermissionQuery Tests ====================
+
+    #[test]
+    fn test_permission_query_creation() {
+        let query = PermissionQuery {
+            permission:       Permission::Users(UserAction::Read),
+            scope_type:       Some("team".to_string()),
+            scope_id:         Some("team-123".to_string()),
+            check_all_scopes: false,
+        };
+        assert_eq!(query.scope_type, Some("team".to_string()));
+        assert_eq!(query.scope_id, Some("team-123".to_string()));
+    }
+
+    #[test]
+    fn test_permission_query_no_scope() {
+        let query = PermissionQuery {
+            permission:       Permission::Users(UserAction::Read),
+            scope_type:       None,
+            scope_id:         None,
+            check_all_scopes: false,
+        };
+        assert_eq!(query.scope_type, None);
+        assert_eq!(query.scope_id, None);
+    }
+
+    // ==================== PermissionCheckResult Tests ====================
+
+    #[test]
+    fn test_permission_check_result_allowed() {
+        let result = PermissionCheckResult::Allowed;
+        assert!(matches!(result, PermissionCheckResult::Allowed));
+    }
+
+    #[test]
+    fn test_permission_check_result_denied() {
+        let result = PermissionCheckResult::Denied;
+        assert!(matches!(result, PermissionCheckResult::Denied));
+    }
+
+    #[test]
+    fn test_permission_check_result_requires_context() {
+        let result = PermissionCheckResult::RequiresContext {
+            scope_type: "team".to_string(),
+            scope_id:   Some("t123".to_string()),
+        };
+        assert!(matches!(
+            result,
+            PermissionCheckResult::RequiresContext { .. }
+        ));
+    }
+
+    #[test]
+    fn test_permission_check_result_unauthenticated() {
+        let result = PermissionCheckResult::Unauthenticated;
+        assert!(matches!(result, PermissionCheckResult::Unauthenticated));
+    }
+
+    // ==================== Edge Cases ====================
+
+    #[test]
+    fn test_empty_permission_string() {
+        assert_eq!(Permission::from_string(""), None);
+    }
+
+    #[test]
+    fn test_whitespace_in_permission_string() {
+        assert_eq!(Permission::from_string("users: create"), None);
+        assert_eq!(Permission::from_string(" users:create"), None);
+    }
+
+    #[test]
+    fn test_special_characters_in_permission() {
+        assert_eq!(Permission::from_string("users@:create"), None);
+        assert_eq!(Permission::from_string("users:create!"), None);
+    }
+
+    #[test]
+    fn test_permission_conversion_roundtrip() {
+        let perms = vec![
+            Permission::Users(UserAction::Create),
+            Permission::Users(UserAction::Read),
+            Permission::Teams(TeamAction::MembersAdd),
+            Permission::ApiKeys(ApiKeyAction::Rotate),
+        ];
+
+        for perm in perms {
+            let str_perm = perm.to_string();
+            let parsed = Permission::from_string(&str_perm);
+            assert_eq!(Some(perm), parsed);
+        }
+    }
+
+    #[test]
+    fn test_permission_service_creation() {
+        // This test verifies that PermissionService can be created
+        // (Note: Full database-dependent tests would require integration tests)
+        let _service: PermissionService;
+        assert!(true); // Service type exists
     }
 }

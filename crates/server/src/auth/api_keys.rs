@@ -640,6 +640,8 @@ fn api_key_model_to_detail(key: &entity::api_keys::Model) -> ApiKeyDetail {
 mod tests {
     use super::*;
 
+    // ==================== API Key Generation Tests ====================
+
     #[test]
     fn test_generate_api_key_format() {
         let key = generate_api_key();
@@ -654,6 +656,27 @@ mod tests {
         let key2 = generate_api_key();
         assert_ne!(key1, key2);
     }
+
+    #[test]
+    fn test_generate_api_key_randomness() {
+        let keys: Vec<String> = (0 .. 100).map(|_| generate_api_key()).collect();
+        let unique_keys: std::collections::HashSet<_> = keys.iter().collect();
+        assert_eq!(unique_keys.len(), 100, "All generated keys should be unique");
+    }
+
+    #[test]
+    fn test_generate_api_key_hex_encoding() {
+        let key = generate_api_key();
+        let hex_part = &key[API_KEY_PREFIX.len() ..];
+        for ch in hex_part.chars() {
+            assert!(
+                ch.is_ascii_hexdigit(),
+                "Key should only contain hex digits after prefix"
+            );
+        }
+    }
+
+    // ==================== API Key Hashing Tests ====================
 
     #[test]
     fn test_hash_api_key_deterministic() {
@@ -671,6 +694,24 @@ mod tests {
     }
 
     #[test]
+    fn test_hash_api_key_not_reversible() {
+        let key = "hzn_secret_key_123";
+        let hash = hash_api_key(key);
+        assert_ne!(hash, key);
+        assert!(!key.contains(&hash)); // Original key should not be in hash
+    }
+
+    #[test]
+    fn test_hash_api_key_length() {
+        let key = generate_api_key();
+        let hash = hash_api_key(&key);
+        // BLAKE3 produces 256-bit hash, hex-encoded = 64 chars
+        assert_eq!(hash.len(), 64);
+    }
+
+    // ==================== Permission Checking Tests ====================
+
+    #[test]
     fn test_check_permissions_all_allowed() {
         let perms = serde_json::json!({});
         assert!(check_api_key_permissions(&perms, "/api/v1/anything", "GET"));
@@ -685,13 +726,16 @@ mod tests {
     fn test_check_permissions_wildcard_endpoints() {
         let perms = serde_json::json!({"endpoints": ["*"]});
         assert!(check_api_key_permissions(&perms, "/api/v1/anything", "GET"));
+        assert!(check_api_key_permissions(&perms, "/health", "GET"));
+        assert!(check_api_key_permissions(&perms, "/", "DELETE"));
     }
 
     #[test]
-    fn test_check_permissions_specific_endpoint() {
+    fn test_check_permissions_specific_endpoint_exact_match() {
         let perms = serde_json::json!({"endpoints": ["/api/v1/health"]});
         assert!(check_api_key_permissions(&perms, "/api/v1/health", "GET"));
-        // Note: user management endpoints (like /api/v1/users) require admin scope
+        assert!(!check_api_key_permissions(&perms, "/api/v1/health/", "GET"));
+        assert!(!check_api_key_permissions(&perms, "/api/v1/health/detail", "GET"));
     }
 
     #[test]
@@ -708,6 +752,19 @@ mod tests {
             "GET"
         ));
         assert!(!check_api_key_permissions(&perms, "/api/v1/other", "GET"));
+        assert!(!check_api_key_permissions(&perms, "/api/v2/assets/123", "GET"));
+    }
+
+    #[test]
+    fn test_check_permissions_multiple_endpoint_patterns() {
+        // Note: endpoints under /api/v1/users, /api/v1/teams, /api/v1/auth/api-keys require admin scope
+        let perms = serde_json::json!({
+            "endpoints": ["/api/v1/health", "/api/v1/assets/*"],
+            "scopes": ["admin"]
+        });
+        assert!(check_api_key_permissions(&perms, "/api/v1/health", "GET"));
+        assert!(check_api_key_permissions(&perms, "/api/v1/assets/1", "GET"));
+        assert!(!check_api_key_permissions(&perms, "/api/v1/other", "GET"));
     }
 
     #[test]
@@ -715,6 +772,16 @@ mod tests {
         let perms = serde_json::json!({"methods": ["GET"]});
         assert!(check_api_key_permissions(&perms, "/api/v1/health", "GET"));
         assert!(!check_api_key_permissions(&perms, "/api/v1/health", "POST"));
+        assert!(!check_api_key_permissions(&perms, "/api/v1/health", "DELETE"));
+    }
+
+    #[test]
+    fn test_check_permissions_multiple_methods() {
+        let perms = serde_json::json!({"methods": ["GET", "POST"]});
+        assert!(check_api_key_permissions(&perms, "/api/v1/health", "GET"));
+        assert!(check_api_key_permissions(&perms, "/api/v1/health", "POST"));
+        assert!(!check_api_key_permissions(&perms, "/api/v1/health", "PUT"));
+        assert!(!check_api_key_permissions(&perms, "/api/v1/health", "DELETE"));
     }
 
     #[test]
@@ -725,10 +792,21 @@ mod tests {
             "/api/v1/health",
             "DELETE"
         ));
+        assert!(check_api_key_permissions(&perms, "/api/v1/health", "PUT"));
+        assert!(check_api_key_permissions(&perms, "/api/v1/health", "PATCH"));
     }
 
     #[test]
-    fn test_check_permissions_user_management_blocked() {
+    fn test_check_permissions_case_insensitive_method() {
+        let perms = serde_json::json!({"methods": ["GET", "POST"]});
+        assert!(check_api_key_permissions(&perms, "/api/v1/health", "get"));
+        assert!(check_api_key_permissions(&perms, "/api/v1/health", "Get"));
+        assert!(check_api_key_permissions(&perms, "/api/v1/health", "POST"));
+        assert!(check_api_key_permissions(&perms, "/api/v1/health", "post"));
+    }
+
+    #[test]
+    fn test_check_permissions_user_management_blocked_no_scope() {
         // User management endpoints require admin/user_management scope
         let perms = serde_json::json!({});
         assert!(!check_api_key_permissions(&perms, "/api/v1/users", "GET"));
@@ -738,19 +816,53 @@ mod tests {
             "GET"
         ));
         assert!(!check_api_key_permissions(&perms, "/api/v1/teams", "GET"));
+        assert!(!check_api_key_permissions(
+            &perms,
+            "/api/v1/teams/123/members",
+            "POST"
+        ));
+        assert!(!check_api_key_permissions(
+            &perms,
+            "/api/v1/auth/api-keys",
+            "POST"
+        ));
+    }
+
+    #[test]
+    fn test_check_permissions_user_management_blocked_with_other_scope() {
+        let perms = serde_json::json!({"scopes": ["read", "write"]});
+        assert!(!check_api_key_permissions(&perms, "/api/v1/users", "GET"));
+        assert!(!check_api_key_permissions(&perms, "/api/v1/teams", "POST"));
     }
 
     #[test]
     fn test_check_permissions_user_management_with_admin_scope() {
         let perms = serde_json::json!({"scopes": ["admin"]});
         assert!(check_api_key_permissions(&perms, "/api/v1/users", "GET"));
+        assert!(check_api_key_permissions(&perms, "/api/v1/users/me", "GET"));
         assert!(check_api_key_permissions(&perms, "/api/v1/teams", "POST"));
+        assert!(check_api_key_permissions(
+            &perms,
+            "/api/v1/teams/123/members",
+            "DELETE"
+        ));
+        assert!(check_api_key_permissions(
+            &perms,
+            "/api/v1/auth/api-keys",
+            "CREATE"
+        ));
     }
 
     #[test]
     fn test_check_permissions_user_management_with_specific_scope() {
         let perms = serde_json::json!({"scopes": ["user_management"]});
         assert!(check_api_key_permissions(&perms, "/api/v1/users", "GET"));
+        assert!(check_api_key_permissions(&perms, "/api/v1/teams", "POST"));
+        assert!(check_api_key_permissions(
+            &perms,
+            "/api/v1/auth/api-keys",
+            "DELETE"
+        ));
     }
 
     #[test]
@@ -774,18 +886,82 @@ mod tests {
     }
 
     #[test]
-    fn test_is_user_management_endpoint() {
-        assert!(is_user_management_endpoint("/api/v1/users"));
-        assert!(is_user_management_endpoint("/api/v1/users/me"));
-        assert!(is_user_management_endpoint("/api/v1/teams"));
-        assert!(is_user_management_endpoint("/api/v1/teams/123/members"));
-        assert!(is_user_management_endpoint("/api/v1/auth/api-keys"));
-        assert!(!is_user_management_endpoint("/api/v1/health"));
-        assert!(!is_user_management_endpoint("/api/v1/assets"));
+    fn test_check_permissions_endpoint_with_trailing_wildcard_variations() {
+        // Note: /api/v1/teams and /api/v1/users are protected endpoints
+        let perms = serde_json::json!({"endpoints": ["/api/v1/*"], "scopes": ["admin"]});
+        assert!(check_api_key_permissions(&perms, "/api/v1/assets", "GET"));
+        assert!(check_api_key_permissions(&perms, "/api/v1/assets/1", "GET"));
+        assert!(check_api_key_permissions(&perms, "/api/v1/teams/1/members", "GET"));
+        assert!(!check_api_key_permissions(&perms, "/api/v2/assets", "GET"));
+        assert!(!check_api_key_permissions(&perms, "/health", "GET"));
     }
 
     #[test]
-    fn test_api_key_model_to_detail() {
+    fn test_check_permissions_empty_arrays() {
+        let perms = serde_json::json!({"endpoints": [], "methods": []});
+        // Empty arrays should not match anything
+        assert!(!check_api_key_permissions(&perms, "/api/v1/health", "GET"));
+    }
+
+    #[test]
+    fn test_check_permissions_invalid_json_structure() {
+        // Non-array values should be ignored
+        let perms = serde_json::json!({
+            "endpoints": "not_an_array",
+            "methods": 123
+        });
+        // Should default to allowing everything
+        assert!(check_api_key_permissions(&perms, "/api/v1/health", "GET"));
+    }
+
+    // ==================== User Management Endpoint Detection Tests ====================
+
+    #[test]
+    fn test_is_user_management_endpoint_users() {
+        assert!(is_user_management_endpoint("/api/v1/users"));
+        assert!(is_user_management_endpoint("/api/v1/users/"));
+        assert!(is_user_management_endpoint("/api/v1/users/me"));
+        assert!(is_user_management_endpoint("/api/v1/users/123"));
+        assert!(is_user_management_endpoint("/api/v1/users/123/profile"));
+    }
+
+    #[test]
+    fn test_is_user_management_endpoint_teams() {
+        assert!(is_user_management_endpoint("/api/v1/teams"));
+        assert!(is_user_management_endpoint("/api/v1/teams/"));
+        assert!(is_user_management_endpoint("/api/v1/teams/123"));
+        assert!(is_user_management_endpoint("/api/v1/teams/123/members"));
+    }
+
+    #[test]
+    fn test_is_user_management_endpoint_api_keys() {
+        assert!(is_user_management_endpoint("/api/v1/auth/api-keys"));
+        assert!(is_user_management_endpoint("/api/v1/auth/api-keys/"));
+        assert!(is_user_management_endpoint("/api/v1/auth/api-keys/rotate"));
+    }
+
+    #[test]
+    fn test_is_user_management_endpoint_false() {
+        assert!(!is_user_management_endpoint("/api/v1/health"));
+        assert!(!is_user_management_endpoint("/api/v1/assets"));
+        assert!(!is_user_management_endpoint("/api/v1/assets/123"));
+        assert!(!is_user_management_endpoint("/api/v1/incidents"));
+        assert!(!is_user_management_endpoint("/health"));
+        assert!(!is_user_management_endpoint("/"));
+    }
+
+    #[test]
+    fn test_is_user_management_endpoint_similar_names() {
+        // These should match because they start with the protected patterns
+        assert!(is_user_management_endpoint("/api/v1/users_content"));
+        assert!(is_user_management_endpoint("/api/v1/teams_admin"));
+    }
+
+    // ==================== API Key Model to Detail Conversion Tests ====================
+
+    #[test]
+    fn test_api_key_model_to_detail_full() {
+        let now = chrono::NaiveDateTime::default();
         let model = entity::api_keys::Model {
             id:           "ak_test".to_string(),
             user_id:      "usr_test".to_string(),
@@ -793,11 +969,11 @@ mod tests {
             key_hash:     "somehash".to_string(),
             key_prefix:   "hzn_abcd".to_string(),
             permissions:  serde_json::json!({"scopes": ["read"]}),
-            expires_at:   None,
-            last_used_at: None,
-            last_used_ip: None,
-            created_at:   chrono::NaiveDateTime::default(),
-            updated_at:   chrono::NaiveDateTime::default(),
+            expires_at:   Some(now),
+            last_used_at: Some(now),
+            last_used_ip: Some("192.168.1.1".to_string()),
+            created_at:   now,
+            updated_at:   now,
         };
 
         let detail = api_key_model_to_detail(&model);
@@ -805,9 +981,36 @@ mod tests {
         assert_eq!(detail.name, "test key");
         assert_eq!(detail.key_prefix, "hzn_abcd");
         assert_eq!(detail.user_id, "usr_test");
+        assert!(detail.expires_at.is_some());
+        assert!(detail.last_used_at.is_some());
+        assert_eq!(detail.last_used_ip, Some("192.168.1.1".to_string()));
+    }
+
+    #[test]
+    fn test_api_key_model_to_detail_minimal() {
+        let now = chrono::NaiveDateTime::default();
+        let model = entity::api_keys::Model {
+            id:           "ak_minimal".to_string(),
+            user_id:      "usr_test".to_string(),
+            name:         "minimal key".to_string(),
+            key_hash:     "hash".to_string(),
+            key_prefix:   "hzn_xyz".to_string(),
+            permissions:  serde_json::json!({}),
+            expires_at:   None,
+            last_used_at: None,
+            last_used_ip: None,
+            created_at:   now,
+            updated_at:   now,
+        };
+
+        let detail = api_key_model_to_detail(&model);
+        assert_eq!(detail.id, "ak_minimal");
         assert!(detail.expires_at.is_none());
         assert!(detail.last_used_at.is_none());
+        assert!(detail.last_used_ip.is_none());
     }
+
+    // ==================== API Key List Query Tests ====================
 
     #[test]
     fn test_api_key_list_query_defaults() {
@@ -818,23 +1021,120 @@ mod tests {
         };
         assert_eq!(q.page(), 1);
         assert_eq!(q.per_page(), 20);
+        assert_eq!(q.search, None);
     }
 
     #[test]
-    fn test_api_key_list_query_clamp() {
+    fn test_api_key_list_query_custom_values() {
+        let q = ApiKeyListQuery {
+            page:     Some(5),
+            per_page: Some(50),
+            search:   Some("test_key".to_string()),
+        };
+        assert_eq!(q.page(), 5);
+        assert_eq!(q.per_page(), 50);
+        assert_eq!(q.search, Some("test_key".to_string()));
+    }
+
+    #[test]
+    fn test_api_key_list_query_page_clamp_minimum() {
         let q = ApiKeyListQuery {
             page:     Some(0),
+            per_page: None,
+            search:   None,
+        };
+        assert_eq!(q.page(), 1, "Page 0 should be clamped to 1");
+    }
+
+    #[test]
+    fn test_api_key_list_query_per_page_clamp_maximum() {
+        let q = ApiKeyListQuery {
+            page:     None,
             per_page: Some(999),
             search:   None,
         };
-        assert_eq!(q.page(), 1);
-        assert_eq!(q.per_page(), 100);
+        assert_eq!(q.per_page(), 100, "Per page 999 should be clamped to 100");
     }
 
     #[test]
-    fn test_check_permissions_case_insensitive_method() {
-        let perms = serde_json::json!({"methods": ["GET"]});
-        assert!(check_api_key_permissions(&perms, "/api/v1/health", "get"));
-        assert!(check_api_key_permissions(&perms, "/api/v1/health", "Get"));
+    fn test_api_key_list_query_per_page_clamp_minimum() {
+        let q = ApiKeyListQuery {
+            page:     None,
+            per_page: Some(1),
+            search:   None,
+        };
+        assert_eq!(q.per_page(), 1, "Per page 1 should be allowed");
+    }
+
+    #[test]
+    fn test_api_key_list_query_search_with_special_chars() {
+        let q = ApiKeyListQuery {
+            page:     None,
+            per_page: None,
+            search:   Some("test@#$%".to_string()),
+        };
+        assert_eq!(q.search, Some("test@#$%".to_string()));
+    }
+
+    // ==================== Edge Cases & Security Tests ====================
+
+    #[test]
+    fn test_permissions_endpoint_matching_precedence() {
+        // More specific patterns should be checked, and protected endpoints need admin scope
+        let perms = serde_json::json!({
+            "endpoints": ["/api/v1/health", "/api/v1/assets/*"],
+            "scopes": ["admin"]
+        });
+        
+        // Exact match works for non-protected endpoint
+        assert!(check_api_key_permissions(&perms, "/api/v1/health", "GET"));
+        
+        // Glob match works for non-protected endpoint
+        assert!(check_api_key_permissions(&perms, "/api/v1/assets/123", "GET"));
+        
+        // Unauthorized endpoint (not in permissions)
+        assert!(!check_api_key_permissions(&perms, "/api/v1/teams", "GET"));
+    }
+
+    #[test]
+    fn test_api_key_generation_sufficient_entropy() {
+        let key1 = generate_api_key();
+        let key2 = generate_api_key();
+        let key3 = generate_api_key();
+        
+        // Keys should be different (extremely unlikely to collide randomly)
+        assert_ne!(key1, key2);
+        assert_ne!(key2, key3);
+        assert_ne!(key1, key3);
+        
+        // Should maintain 32 bytes of entropy
+        let hex_part1 = &key1[API_KEY_PREFIX.len() ..];
+        assert_eq!(hex_part1.len(), 64); // 32 bytes = 64 hex chars
+    }
+
+    #[test]
+    fn test_hash_api_key_security_properties() {
+        let key = generate_api_key();
+        let hash1 = hash_api_key(&key);
+        let hash2 = hash_api_key(&key);
+        
+        // Deterministic
+        assert_eq!(hash1, hash2);
+        
+        // Not reversible (cryptographic property)
+        assert_ne!(hash1, key);
+        
+        // Good distribution (even minor changes produce completely different hash)
+        let modified_key = format!("{}a", &key[.. key.len() - 1]);
+        let hash3 = hash_api_key(&modified_key);
+        assert_ne!(hash1, hash3);
+    }
+
+    #[test]
+    fn test_permissions_with_mixed_case_endpoint_path() {
+        // Endpoint paths are case-sensitive
+        let perms = serde_json::json!({"endpoints": ["/api/v1/Assets/*"]});
+        assert!(check_api_key_permissions(&perms, "/api/v1/Assets/1", "GET"));
+        assert!(!check_api_key_permissions(&perms, "/api/v1/assets/1", "GET")); // Different case
     }
 }
