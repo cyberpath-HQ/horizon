@@ -133,8 +133,13 @@ pub fn validate_token(config: &JwtConfig, token: &str) -> Result<Claims> {
     validation.aud = Some(aud);
     validation.validate_exp = true;
 
-    let claims = jsonwebtoken::decode(token, &decoding_key, &validation)
-        .map_err(|e| AppError::unauthorized(format!("Token validation failed: {}", e)))?;
+    let claims = jsonwebtoken::decode(token, &decoding_key, &validation).map_err(|e| {
+        match e.kind() {
+            jsonwebtoken::errors::ErrorKind::ExpiredSignature => AppError::JwtExpired,
+            jsonwebtoken::errors::ErrorKind::InvalidSignature => AppError::JwtInvalidSignature,
+            _ => AppError::JwtInvalidToken,
+        }
+    })?;
 
     Ok(claims.claims)
 }

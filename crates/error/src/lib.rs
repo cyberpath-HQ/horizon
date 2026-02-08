@@ -32,6 +32,15 @@ pub enum AppError {
         message: String,
     },
 
+    #[error("JwtExpired: Token has expired")]
+    JwtExpired,
+
+    #[error("JwtInvalidSignature: Invalid token signature")]
+    JwtInvalidSignature,
+
+    #[error("JwtInvalidToken: Invalid token")]
+    JwtInvalidToken,
+
     #[error("Forbidden: {message}")]
     Forbidden {
         message: String,
@@ -226,6 +235,9 @@ impl AppError {
             AppError::Unauthorized {
                 ..
             } => http::StatusCode::UNAUTHORIZED,
+            AppError::JwtExpired => http::StatusCode::UNAUTHORIZED,
+            AppError::JwtInvalidSignature => http::StatusCode::UNAUTHORIZED,
+            AppError::JwtInvalidToken => http::StatusCode::UNAUTHORIZED,
             AppError::Forbidden {
                 ..
             } => http::StatusCode::FORBIDDEN,
@@ -268,6 +280,9 @@ impl AppError {
             AppError::Unauthorized {
                 ..
             } => "UNAUTHORIZED",
+            AppError::JwtExpired => "JWT_EXPIRED",
+            AppError::JwtInvalidSignature => "JWT_INVALID_SIGNATURE",
+            AppError::JwtInvalidToken => "JWT_INVALID_TOKEN",
             AppError::Forbidden {
                 ..
             } => "FORBIDDEN",
@@ -313,6 +328,9 @@ impl AppError {
                 message,
                 ..
             } => message.clone(),
+            AppError::JwtExpired => "Token has expired".to_string(),
+            AppError::JwtInvalidSignature => "Invalid token signature".to_string(),
+            AppError::JwtInvalidToken => "Invalid token".to_string(),
             AppError::Forbidden {
                 message,
                 ..
@@ -389,6 +407,9 @@ impl AppError {
                     message: format!("{}: {}", context_msg, message),
                 }
             },
+            AppError::JwtExpired => self,
+            AppError::JwtInvalidSignature => self,
+            AppError::JwtInvalidToken => self,
             AppError::Forbidden {
                 message,
             } => {

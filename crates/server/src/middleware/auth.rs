@@ -10,6 +10,7 @@ use axum::{
 };
 use serde_json::json;
 use auth::jwt::{extract_bearer_token, validate_token};
+use error::AppError;
 
 use crate::{token_blacklist::hash_token_for_blacklist, AppState};
 
@@ -72,18 +73,17 @@ pub async fn auth_middleware(mut request: Request, next: Next) -> Response {
     // Validate token
     let claims = match validate_token(jwt_config, &token) {
         Ok(claims) => claims,
-        Err(e) => {
-            // Map specific JWT errors to appropriate responses
-            let error_msg = e.to_string().to_lowercase();
-            if error_msg.contains("expired") {
-                return create_auth_error_response("Token has expired");
-            }
-            else if error_msg.contains("signature") {
-                return create_auth_error_response("Invalid token signature");
-            }
-            else {
-                return create_auth_error_response("Invalid token");
-            }
+        Err(AppError::JwtExpired) => {
+            return create_auth_error_response("Token has expired");
+        },
+        Err(AppError::JwtInvalidSignature) => {
+            return create_auth_error_response("Invalid token signature");
+        },
+        Err(AppError::JwtInvalidToken) => {
+            return create_auth_error_response("Invalid token");
+        },
+        Err(_) => {
+            return create_auth_error_response("Authentication failed");
         },
     };
 
