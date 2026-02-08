@@ -43,6 +43,8 @@ pub fn init_with_config(config: LoggingConfig) -> Result<(), tracing::subscriber
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
     use super::*;
 
     #[test]

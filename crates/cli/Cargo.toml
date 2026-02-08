@@ -16,6 +16,19 @@ categories.workspace = true
 clap = { version = "4.5.56", features = ["derive", "env"] }
 clap_complete = "4.5.65"
 
+# Web framework
+axum = { workspace = true }
+
+# HTTP support for TLS
+hyper = { version = "1.8.1", features = ["full"] }
+hyper-util = { version = "0.1.20", features = ["full"] }
+
+# TLS support (for HTTPS implementation)
+rustls = { version = "0.23.36", features = ["ring"] }
+tokio-rustls = "0.26.4"
+rustls-pemfile = "2.2.0"
+rustls-pki-types = "1.14"
+
 # Logging
 logging = { path = "../logging" }
 
@@ -26,12 +39,24 @@ anyhow = { workspace = true }
 # Migration
 migration = { path = "../migration" }
 
+# Server
+server = { path = "../server" }
+
+# Tower for Service trait
+tower = { workspace = true }
+
+# Redis for token blacklisting
+redis = { workspace = true }
+
 # Core dependencies
 tokio = { workspace = true, features = ["full"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+
+# Internal crates
+auth = { path = "../auth" }
 
 [lints]
 workspace = true

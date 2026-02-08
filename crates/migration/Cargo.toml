@@ -12,6 +12,7 @@ path = "src/lib.rs"
 [dependencies]
 tokio = { version = "1.49.0", features = ["macros", "rt", "rt-multi-thread"] }
 dotenvy = {version = "0.15.7", optional = true}
+serde_json = "1.0"
 
 [dependencies.sea-orm-migration]
 features = [

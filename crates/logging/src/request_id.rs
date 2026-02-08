@@ -3,7 +3,7 @@
 //! Utilities for generating and propagating request IDs across the application.
 //! Uses CUID2 for collision-resistant, URL-safe identifiers.
 
-use std::cell::RefCell;
+use std::{cell::RefCell, str::FromStr};
 
 thread_local! {
     /// Thread-local storage for request ID.
@@ -23,17 +23,6 @@ impl RequestId {
         Self(cuid)
     }
 
-    /// Generate a new request ID from a string.
-    #[inline]
-    pub fn from_str(s: &str) -> Result<Self, String> {
-        if s.len() >= 20 && s.len() <= 32 {
-            Ok(Self(s.to_string()))
-        }
-        else {
-            Err("Invalid request ID format".to_string())
-        }
-    }
-
     /// Get the request ID as a string.
     #[inline]
     pub fn as_str(&self) -> &str { &self.0 }
@@ -50,6 +39,19 @@ impl Default for RequestId {
 
 impl std::fmt::Display for RequestId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "{}", self.0) }
+}
+
+impl FromStr for RequestId {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.len() >= 20 && s.len() <= 32 {
+            Ok(Self(s.to_string()))
+        }
+        else {
+            Err("Invalid request ID format".to_string())
+        }
+    }
 }
 
 /// Set the current request ID for this thread.
@@ -99,6 +101,8 @@ pub fn extract_from_headers<_H>(_: &[_H]) -> Option<RequestId> { Some(RequestId:
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
     use super::*;
 
     #[test]

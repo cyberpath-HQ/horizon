@@ -1,12 +1,42 @@
 pub use sea_orm_migration::prelude::*;
 
-mod m20220101_000001_create_table;
+mod m00000000_000000_create_cuid_function;
+mod m20260203_000001_create_users_table;
+mod m20260203_0000025_add_teams_parent_fk;
+mod m20260203_000002_create_teams_table;
+mod m20260203_000003_create_team_members_table;
+mod m20260203_000004_add_teams_manager_fk;
+mod m20260203_000005_create_roles_table;
+mod m20260203_000006_create_user_roles_table;
+mod m20260203_000007_create_api_keys_table;
+mod m20260203_000008_create_refresh_tokens_table;
+mod m20260204_000009_create_user_sessions_table;
+mod m20260205_000001_add_updated_at_triggers;
+mod m20260207_000001_add_mfa_and_lockout_columns;
+mod m20260207_000002_create_api_key_usage_log_table;
 
 pub struct Migrator;
 
 #[async_trait::async_trait]
 impl MigratorTrait for Migrator {
-    fn migrations() -> Vec<Box<dyn MigrationTrait>> { vec![Box::new(m20220101_000001_create_table::Migration)] }
+    fn migrations() -> Vec<Box<dyn MigrationTrait>> {
+        vec![
+            Box::new(m00000000_000000_create_cuid_function::Migration),
+            Box::new(m20260203_000001_create_users_table::Migration),
+            Box::new(m20260203_000002_create_teams_table::Migration),
+            Box::new(m20260203_0000025_add_teams_parent_fk::Migration),
+            Box::new(m20260203_000003_create_team_members_table::Migration),
+            Box::new(m20260203_000004_add_teams_manager_fk::Migration),
+            Box::new(m20260203_000005_create_roles_table::Migration),
+            Box::new(m20260203_000006_create_user_roles_table::Migration),
+            Box::new(m20260203_000007_create_api_keys_table::Migration),
+            Box::new(m20260203_000008_create_refresh_tokens_table::Migration),
+            Box::new(m20260204_000009_create_user_sessions_table::Migration),
+            Box::new(m20260205_000001_add_updated_at_triggers::Migration),
+            Box::new(m20260207_000001_add_mfa_and_lockout_columns::Migration),
+            Box::new(m20260207_000002_create_api_key_usage_log_table::Migration),
+        ]
+    }
 }
 
 /// Database connection helper for CLI usage

@@ -10,9 +10,46 @@
 //! horizon --help   # Show help
 //! ```
 
+use std::net::SocketAddr;
+
+use tokio::net::TcpListener;
+use axum;
 use clap::{Args, CommandFactory as _, Parser, Subcommand};
 use error::{AppError, Result};
 use migration::{Migrator, MigratorTrait as _};
+use server::{router::create_app_router, AppState};
+use auth::JwtConfig;
+use tokio_rustls::TlsAcceptor;
+use rustls::pki_types::pem::PemObject;
+use tower::Service;
+use hyper_util::{
+    rt::{TokioExecutor, TokioIo},
+    server::conn::auto::Builder,
+};
+
+/// Load certificates from a PEM file
+fn load_certs(path: &str) -> std::io::Result<Vec<rustls::pki_types::CertificateDer<'static>>> {
+    let cert_pem = std::fs::read(path)?;
+    let mut certs = Vec::new();
+    for cert in rustls::pki_types::CertificateDer::pem_slice_iter(&cert_pem) {
+        certs.push(cert.map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?);
+    }
+    if certs.is_empty() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "No certificates found in file",
+        ));
+    }
+    Ok(certs)
+}
+
+/// Load private key from a PEM file
+fn load_private_key(path: &str) -> std::io::Result<rustls::pki_types::PrivateKeyDer<'static>> {
+    let key_pem = std::fs::read(path)?;
+    let key = rustls::pki_types::PrivateKeyDer::from_pem_slice(&key_pem)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+    Ok(key)
+}
 
 /// Database configuration for CLI
 #[derive(Debug, Clone)]
@@ -57,8 +94,7 @@ impl Default for DatabaseConfig {
 pub fn build_database_url(config: &DatabaseConfig) -> String {
     format!(
         "postgres://{}:{}@{}:{}/{}?sslmode={}",
-        config.username, config.password, config.host, config.port, config.database,
-        config.ssl_mode
+        config.username, config.password, config.host, config.port, config.database, config.ssl_mode
     )
 }
 
@@ -168,7 +204,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn serve(_args: &ServeArgs) -> Result<()> {
+async fn serve(args: &ServeArgs) -> Result<()> {
     logging::info!(target: "serve", "Starting API server...");
 
     // Build database URL from configuration
@@ -184,16 +220,143 @@ async fn serve(_args: &ServeArgs) -> Result<()> {
     // Run migrations automatically on startup
     logging::info!(target: "serve", "Running database migrations...");
     Migrator::up(&db, None).await.map_err(AppError::database)?;
-
     logging::info!(target: "serve", "Database migrations completed successfully");
 
-    // TODO: Implement server startup
-    // - Set up Axum router
-    // - Apply middleware
-    // - Start listening
+    // Initialize Redis client for token blacklisting
+    let redis_url = std::env::var("HORIZON_REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
+    let redis_client =
+        redis::Client::open(redis_url).map_err(|e| anyhow::anyhow!("Failed to connect to Redis: {}", e))?;
 
-    logging::info!(target: "serve", "Server functionality to be implemented");
+    // Create application state
+    let jwt_config = JwtConfig::default();
+    let state = AppState {
+        db,
+        jwt_config,
+        redis: redis_client,
+        start_time: std::time::Instant::now(),
+    };
+
+    // Create the Axum router
+    let app = create_app_router(state.clone());
+
+    // Parse the bind address
+    let address: SocketAddr = format!("{}:{}", args.host, args.port)
+        .parse()
+        .map_err(|e| anyhow::anyhow!("Invalid address: {}", e))?;
+
+    // Start the server (HTTP or HTTPS)
+    if args.tls {
+        // TLS is enabled - require certificate and key paths
+        let tls_cert_path = args
+            .tls_cert
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("TLS certificate path is required when TLS is enabled"))?;
+        let tls_key_path = args
+            .tls_key
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("TLS key path is required when TLS is enabled"))?;
+
+        logging::info!(target: "serve", "Initializing TLS with cert={}, key={}", tls_cert_path, tls_key_path);
+
+        // Load TLS certificate and key
+        let certs = load_certs(tls_cert_path)?;
+        let key = load_private_key(tls_key_path)?;
+
+        let tls_config = rustls::ServerConfig::builder()
+            .with_no_client_auth()
+            .with_single_cert(certs, key)
+            .map_err(|e| anyhow::anyhow!("Failed to configure TLS: {}", e))?;
+
+        // Create TLS acceptor
+        let tls_acceptor = TlsAcceptor::from(std::sync::Arc::new(tls_config));
+
+        logging::info!(target: "serve", %address, "Starting HTTPS server (TLS enabled)...");
+
+        let listener = tokio::net::TcpListener::bind(address)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to bind address: {}", e))?;
+
+        // Use hyper to serve with TLS
+        loop {
+            tokio::select! {
+                _ = shutdown_signal() => {
+                    logging::info!(target: "serve", "Received shutdown signal, stopping HTTPS server...");
+                    break;
+                }
+                result = listener.accept() => {
+                    let (tcp_stream, peer_addr) = result?;
+                    let tls_acceptor = tls_acceptor.clone();
+                    let app = app.clone();
+
+                    tokio::spawn(async move {
+                        let tls_stream = match tls_acceptor.accept(tcp_stream).await {
+                            Ok(stream) => stream,
+                            Err(e) => {
+                                tracing::warn!("TLS handshake failed: {}", e);
+                                return;
+                            },
+                        };
+
+                        let hyper_service =
+                            hyper::service::service_fn(move |mut request: hyper::Request<hyper::body::Incoming>| {
+                                request.extensions_mut().insert(axum::extract::ConnectInfo(peer_addr));
+                                let mut app = app.clone();
+                                async move { app.call(request).await }
+                            });
+
+                        if let Err(err) = Builder::new(TokioExecutor::new())
+                            .serve_connection(TokioIo::new(tls_stream), hyper_service)
+                            .await
+                        {
+                            tracing::warn!("Error serving connection: {}", err);
+                        }
+                    });
+                }
+            }
+        }
+    }
+    else {
+        // HTTP mode
+        logging::info!(target: "serve", %address, "Starting HTTP server...");
+
+        let listener = TcpListener::bind(&address)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to bind to {}: {}", address, e))?;
+
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<SocketAddr>(),
+        )
+        .with_graceful_shutdown(shutdown_signal())
+        .await
+        .map_err(|e| anyhow::anyhow!("HTTP server error: {}", e))?;
+    }
+
     Ok(())
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("Failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("Failed to install terminate handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
 }
 
 async fn migrate(args: &MigrateArgs) -> Result<()> {
@@ -381,21 +544,95 @@ mod tests {
 
     #[test]
     fn test_validate_returns_ok() {
+        // Save original env vars
+        let orig_host = std::env::var("HORIZON_DATABASE_HOST").ok();
+        let orig_port = std::env::var("HORIZON_DATABASE_PORT").ok();
+        let orig_name = std::env::var("HORIZON_DATABASE_NAME").ok();
+        let orig_user = std::env::var("HORIZON_DATABASE_USER").ok();
+        let orig_pass = std::env::var("HORIZON_DATABASE_PASSWORD").ok();
+
         // Set required env vars
         unsafe {
             std::env::set_var("HORIZON_DATABASE_HOST", "localhost");
+        }
+        unsafe {
             std::env::set_var("HORIZON_DATABASE_PORT", "5432");
+        }
+        unsafe {
             std::env::set_var("HORIZON_DATABASE_NAME", "horizon");
+        }
+        unsafe {
             std::env::set_var("HORIZON_DATABASE_USER", "horizon");
+        }
+        unsafe {
             std::env::set_var("HORIZON_DATABASE_PASSWORD", "password");
         }
 
         let result = validate();
         assert!(result.is_ok());
+
+        // Restore original env vars
+        if let Some(v) = orig_host {
+            unsafe {
+                std::env::set_var("HORIZON_DATABASE_HOST", v);
+            }
+        }
+        else {
+            unsafe {
+                std::env::remove_var("HORIZON_DATABASE_HOST");
+            }
+        }
+        if let Some(v) = orig_port {
+            unsafe {
+                std::env::set_var("HORIZON_DATABASE_PORT", v);
+            }
+        }
+        else {
+            unsafe {
+                std::env::remove_var("HORIZON_DATABASE_PORT");
+            }
+        }
+        if let Some(v) = orig_name {
+            unsafe {
+                std::env::set_var("HORIZON_DATABASE_NAME", v);
+            }
+        }
+        else {
+            unsafe {
+                std::env::remove_var("HORIZON_DATABASE_NAME");
+            }
+        }
+        if let Some(v) = orig_user {
+            unsafe {
+                std::env::set_var("HORIZON_DATABASE_USER", v);
+            }
+        }
+        else {
+            unsafe {
+                std::env::remove_var("HORIZON_DATABASE_USER");
+            }
+        }
+        if let Some(v) = orig_pass {
+            unsafe {
+                std::env::set_var("HORIZON_DATABASE_PASSWORD", v);
+            }
+        }
+        else {
+            unsafe {
+                std::env::remove_var("HORIZON_DATABASE_PASSWORD");
+            }
+        }
     }
 
     #[test]
     fn test_validate_missing_vars() {
+        // Save original env vars
+        let orig_host = std::env::var("HORIZON_DATABASE_HOST").ok();
+        let orig_port = std::env::var("HORIZON_DATABASE_PORT").ok();
+        let orig_name = std::env::var("HORIZON_DATABASE_NAME").ok();
+        let orig_user = std::env::var("HORIZON_DATABASE_USER").ok();
+        let orig_pass = std::env::var("HORIZON_DATABASE_PASSWORD").ok();
+
         // Clear env vars
         unsafe {
             std::env::remove_var("HORIZON_DATABASE_HOST");
@@ -407,6 +644,33 @@ mod tests {
 
         let result = validate();
         assert!(result.is_err());
+
+        // Restore original env vars
+        if let Some(v) = orig_host {
+            unsafe {
+                std::env::set_var("HORIZON_DATABASE_HOST", v);
+            }
+        }
+        if let Some(v) = orig_port {
+            unsafe {
+                std::env::set_var("HORIZON_DATABASE_PORT", v);
+            }
+        }
+        if let Some(v) = orig_name {
+            unsafe {
+                std::env::set_var("HORIZON_DATABASE_NAME", v);
+            }
+        }
+        if let Some(v) = orig_user {
+            unsafe {
+                std::env::set_var("HORIZON_DATABASE_USER", v);
+            }
+        }
+        if let Some(v) = orig_pass {
+            unsafe {
+                std::env::set_var("HORIZON_DATABASE_PASSWORD", v);
+            }
+        }
     }
 
     #[test]
