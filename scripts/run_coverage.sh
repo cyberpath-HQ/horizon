@@ -2,12 +2,26 @@
 
 # Script to run code coverage using grcov
 # Excludes src-tauri from coverage
+# Requires PostgreSQL and Redis to be running
 
 set -e
 
-echo "Installing grcov if not present..."
-cargo install grcov || echo "grcov already installed"
+# Check if DATABASE_URL is set, otherwise use default test database
+if [ -z "$DATABASE_URL" ]; then
+    export DATABASE_URL="postgres://horizon:horizon_test_password@localhost:5432/horizon_test"
+fi
 
+# Check if REDIS_URL is set, otherwise use default test Redis
+if [ -z "$REDIS_URL" ]; then
+    export REDIS_URL="redis://localhost:6379"
+fi
+
+echo "Using DATABASE_URL: $DATABASE_URL"
+echo "Using REDIS_URL: $REDIS_URL"
+
+cargo run --package migration --features cli -- fresh
+
+echo "Installing grcov if not present..."
 echo "Creating profile directory..."
 mkdir -p target/profraw
 mkdir -p target/coverage
