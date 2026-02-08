@@ -284,7 +284,7 @@ async fn serve(args: &ServeArgs) -> Result<()> {
                     break;
                 }
                 result = listener.accept() => {
-                    let (tcp_stream, _) = result?;
+                    let (tcp_stream, peer_addr) = result?;
                     let tls_acceptor = tls_acceptor.clone();
                     let app = app.clone();
 
@@ -298,7 +298,8 @@ async fn serve(args: &ServeArgs) -> Result<()> {
                         };
 
                         let hyper_service =
-                            hyper::service::service_fn(move |request: hyper::Request<hyper::body::Incoming>| {
+                            hyper::service::service_fn(move |mut request: hyper::Request<hyper::body::Incoming>| {
+                                request.extensions_mut().insert(axum::extract::ConnectInfo(peer_addr));
                                 let mut app = app.clone();
                                 async move { app.call(request).await }
                             });
