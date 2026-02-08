@@ -322,10 +322,13 @@ async fn serve(args: &ServeArgs) -> Result<()> {
             .await
             .map_err(|e| anyhow::anyhow!("Failed to bind to {}: {}", address, e))?;
 
-        axum::serve(listener, app)
-            .with_graceful_shutdown(shutdown_signal())
-            .await
-            .map_err(|e| anyhow::anyhow!("HTTP server error: {}", e))?;
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<SocketAddr>(),
+        )
+        .with_graceful_shutdown(shutdown_signal())
+        .await
+        .map_err(|e| anyhow::anyhow!("HTTP server error: {}", e))?;
     }
 
     Ok(())
