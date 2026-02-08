@@ -33,30 +33,7 @@ pub struct AppState {
     pub start_time: std::time::Instant,
 }
 
-/// JWT configuration for token generation and validation
-#[derive(Clone, Debug)]
-pub struct JwtConfig {
-    /// Secret key for signing tokens (base64 encoded)
-    pub secret:             String,
-    /// Token expiration time in seconds
-    pub expiration_seconds: u64,
-    /// Token issuer
-    pub issuer:             String,
-    /// Audience claim
-    pub audience:           String,
-}
-
-impl Default for JwtConfig {
-    fn default() -> Self {
-        Self {
-            secret:             std::env::var("HORIZON_JWT_SECRET")
-                .expect("HORIZON_JWT_SECRET environment variable must be set"),
-            expiration_seconds: 3600, // 1 hour
-            issuer:             "horizon".to_string(),
-            audience:           "horizon-api".to_string(),
-        }
-    }
-}
+use ::auth::JwtConfig;
 
 /// Server initialization result
 #[derive(Debug)]

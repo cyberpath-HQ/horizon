@@ -9,12 +9,9 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use serde_json::json;
-
 use auth::jwt::{extract_bearer_token, validate_token};
-use crate::{
-    token_blacklist::hash_token_for_blacklist,
-    AppState,
-};
+
+use crate::{token_blacklist::hash_token_for_blacklist, AppState};
 
 /// User information extracted from JWT token
 #[derive(Debug, Clone)]
@@ -139,9 +136,9 @@ fn create_auth_error_response(message: &str) -> Response {
 mod tests {
     use axum::http::Request;
     use tower::ServiceExt;
+    use auth::jwt::extract_bearer_token;
 
     use super::*;
-    use auth::jwt::extract_bearer_token;
 
     #[tokio::test]
     async fn test_extract_bearer_token() {
