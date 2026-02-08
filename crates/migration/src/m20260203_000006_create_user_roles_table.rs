@@ -115,6 +115,57 @@ impl MigrationTrait for Migration {
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        // Drop indexes first
+        manager
+            .drop_index(
+                Index::drop()
+                    .name("idx_user_roles_expires_at")
+                    .table(UserRoles::Table)
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .drop_index(
+                Index::drop()
+                    .name("idx_user_roles_role_id")
+                    .table(UserRoles::Table)
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .drop_index(
+                Index::drop()
+                    .name("idx_user_roles_user_id")
+                    .table(UserRoles::Table)
+                    .to_owned(),
+            )
+            .await?;
+
+        // Drop unique index
+        manager
+            .get_connection()
+            .execute_unprepared(r#"DROP INDEX IF EXISTS "idx_user_roles_user_role_scope_unique""#)
+            .await?;
+
+        // Drop foreign keys
+        manager
+            .drop_foreign_key(
+                ForeignKey::drop()
+                    .name("fk_user_roles_role_id")
+                    .table(UserRoles::Table)
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .drop_foreign_key(
+                ForeignKey::drop()
+                    .name("fk_user_roles_user_id")
+                    .table(UserRoles::Table)
+                    .to_owned(),
+            )
+            .await?;
+
+        // Drop table
         manager
             .drop_table(Table::drop().table(UserRoles::Table).to_owned())
             .await?;
