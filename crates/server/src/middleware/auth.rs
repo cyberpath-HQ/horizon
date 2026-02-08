@@ -10,8 +10,8 @@ use axum::{
 };
 use serde_json::json;
 
+use auth::jwt::{extract_bearer_token, validate_token};
 use crate::{
-    auth::jwt::{extract_bearer_token, validate_token},
     token_blacklist::hash_token_for_blacklist,
     AppState,
 };
@@ -141,7 +141,7 @@ mod tests {
     use tower::ServiceExt;
 
     use super::*;
-    use crate::auth::jwt::extract_bearer_token;
+    use auth::jwt::extract_bearer_token;
 
     #[tokio::test]
     async fn test_extract_bearer_token() {
