@@ -322,7 +322,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 #### C-02: Authentication Pages
 
 - Implement login page with email/password form
-- Implement registration page with validation
+- Implement setup page with validation
 - Implement MFA verification page
 - Create password reset request and reset pages
 - Implement session timeout and refresh handling
