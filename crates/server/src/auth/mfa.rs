@@ -5,6 +5,7 @@
 const REFRESH_TOKEN_TTL_SECONDS: u64 = 30 * 24 * 60 * 60;
 
 use auth::{
+    jwt::create_access_token,
     mfa::{
         check_backup_code_valid,
         deserialize_backup_codes,
@@ -24,7 +25,6 @@ use error::{AppError, Result};
 use sea_orm::{ActiveModelTrait, EntityTrait, Set};
 use tracing::info;
 
-use auth::jwt::create_access_token;
 use crate::{
     dto::{
         auth::{AuthTokens, AuthenticatedUser, SuccessResponse},
@@ -293,7 +293,7 @@ pub async fn mfa_verify_backup_code_handler(
     let codes_json = db_user
         .backup_codes
         .as_ref()
-        .and_then(|v| v.as_str().map(|s| s.to_string()))
+        .map(|v| v.to_string())
         .ok_or_else(|| AppError::bad_request("No backup codes available"))?;
 
     let hashed_codes = deserialize_backup_codes(&codes_json)
@@ -402,10 +402,7 @@ pub async fn mfa_disable_handler(
 
     if !totp_valid {
         // Try as backup code
-        let codes_json = db_user
-            .backup_codes
-            .as_ref()
-            .and_then(|v| v.as_str().map(|s| s.to_string()));
+        let codes_json = db_user.backup_codes.as_ref().map(|v| v.to_string());
 
         let backup_valid = if let Some(json) = codes_json {
             if let Ok(hashed_codes) = deserialize_backup_codes(&json) {
@@ -527,14 +524,9 @@ pub async fn mfa_status_handler(state: &AppState, user: MiddlewareUser) -> Resul
         .ok_or_else(|| AppError::not_found("User not found"))?;
 
     let backup_codes_remaining = if let Some(codes_value) = &db_user.backup_codes {
-        if let Some(json) = codes_value.as_str() {
-            deserialize_backup_codes(json)
-                .map(|c| c.len())
-                .unwrap_or(0)
-        }
-        else {
-            0
-        }
+        deserialize_backup_codes(&codes_value.to_string())
+            .map(|c| c.len())
+            .unwrap_or(0)
     }
     else {
         0

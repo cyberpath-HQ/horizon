@@ -39,8 +39,12 @@ pub struct MfaVerifyRequest {
 /// Request to verify MFA using a backup code
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Validate)]
 pub struct MfaBackupCodeRequest {
-    /// The backup code (format: XXXX-XXXX-XXXX-XXXX)
-    #[validate(length(equal = 19, message = "Backup code must be in format XXXX-XXXX-XXXX-XXXX"))]
+    /// The backup code (format: XXXX-XXXX-XXXX-XXXX or without hyphens)
+    #[validate(length(
+        min = 16,
+        max = 19,
+        message = "Backup code must be 16-19 characters (XXXX-XXXX-XXXX-XXXX format or without hyphens)"
+    ))]
     pub backup_code: String,
 }
 

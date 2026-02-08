@@ -82,7 +82,7 @@ pub fn hash_backup_codes(codes: &[String], salt: &str) -> Vec<String> {
         .iter()
         .map(|code| {
             let normalized = normalize_backup_code(code);
-            let salted = format!("{}{}", salt, normalized);
+            let salted = format!("{}:{}", salt, normalized);
             blake3::hash(salted.as_bytes()).to_hex().to_string()
         })
         .collect()
@@ -124,7 +124,7 @@ pub fn verify_totp_code(secret: &str, code: &str, issuer: &str, account_name: &s
 /// Verify and consume a backup code
 pub fn verify_and_consume_backup_code(code: &str, stored_codes: Vec<String>, salt: &str) -> Result<Vec<String>> {
     let normalized_code = normalize_backup_code(code);
-    let salted = format!("{}{}", salt, normalized_code);
+    let salted = format!("{}:{}", salt, normalized_code);
     let hashed_input = blake3::hash(salted.as_bytes()).to_hex().to_string();
     if let Some(pos) = stored_codes.iter().position(|h| h == &hashed_input) {
         let mut codes = stored_codes;
@@ -139,7 +139,7 @@ pub fn verify_and_consume_backup_code(code: &str, stored_codes: Vec<String>, sal
 /// Check if a backup code is valid without consuming it
 pub fn check_backup_code_valid(code: &str, stored_codes: &[String], salt: &str) -> bool {
     let normalized_code = normalize_backup_code(code);
-    let salted = format!("{}{}", salt, normalized_code);
+    let salted = format!("{}:{}", salt, normalized_code);
     let hashed_input = blake3::hash(salted.as_bytes()).to_hex().to_string();
     stored_codes.contains(&hashed_input)
 }
@@ -228,7 +228,7 @@ mod tests {
         // In a real test, you'd mock the current time
         let _result = verify_totp_code(secret, "123456", issuer, account_name);
         // We can't assert the exact result without controlling time, but ensure it doesn't panic
-        assert!(_result.is_ok() || _result.is_err()); // Just check it returns a result
+        // The function call itself ensures no panic
     }
 
     #[test]
