@@ -20,7 +20,10 @@ tower-http = { workspace = true, features = ["cors", "trace", "timeout"] }
 http = { workspace = true }
 
 # ==================== DATABASE ====================
-sea-orm = { workspace = true, features = ["runtime-tokio-rustls", "sqlx-postgres"] }
+sea-orm = { workspace = true, features = [
+    "runtime-tokio-rustls",
+    "sqlx-postgres",
+] }
 
 # ==================== AUTHENTICATION ====================
 jsonwebtoken = { workspace = true }
@@ -46,6 +49,7 @@ error = { path = "../error" }
 auth = { path = "../auth" }
 entity = { path = "../entity" }
 migration = { path = "../migration" }
+permissions-macro = { path = "../permissions-macro" }
 
 # ==================== UTILITIES ====================
 chrono = { workspace = true }
@@ -62,4 +66,8 @@ tokio = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }
-sea-orm = { workspace = true, features = ["runtime-tokio-rustls", "sqlx-postgres", "sqlx-sqlite"] }
+sea-orm = { workspace = true, features = [
+    "runtime-tokio-rustls",
+    "sqlx-postgres",
+    "sqlx-sqlite",
+] }

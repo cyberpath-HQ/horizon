@@ -9,7 +9,7 @@ members = [
     "crates/auth",
     "crates/server",
     "crates/ui/src-tauri"
-]
+, "crates/permissions-macro"]
 
 [workspace.package]
 authors = ["Emanuele (Ebalo) Balsamo <emanuele.balsamo@cyberpath-hq.com>"]
