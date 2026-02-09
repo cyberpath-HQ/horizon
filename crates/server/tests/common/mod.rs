@@ -1,7 +1,7 @@
 //! # Common Test Utilities
 //!
-//! Provides shared test infrastructure including database setup, Redis connections,
-//! and test fixtures for integration tests.
+//! Provides shared test infrastructure using real PostgreSQL and Redis.
+//! Tests assume Docker services are running (see docker-compose.yml).
 
 use std::sync::Once;
 
@@ -25,43 +25,48 @@ pub fn init_test_env() {
     });
 }
 
-/// Database connection for tests
+/// Get database connection using DATABASE_URL from environment
+pub async fn get_real_db() -> Result<DbConn, String> {
+    init_test_env();
+
+    let database_url = std::env::var("DATABASE_URL")
+        .map_err(|_| "DATABASE_URL must be set for tests. Make sure Docker is running.")?;
+
+    Database::connect(&database_url)
+        .await
+        .map_err(|e| format!("Failed to connect to database: {}", e))
+}
+
+/// Get Redis client using REDIS_URL or constructed from environment
+pub fn get_real_redis() -> Result<Client, String> {
+    init_test_env();
+
+    let redis_url = std::env::var("REDIS_URL").unwrap_or_else(|_| {
+        let host = std::env::var("REDIS_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+        let port = std::env::var("REDIS_PORT").unwrap_or_else(|_| "6379".to_string());
+        let password = std::env::var("REDIS_PASSWORD").unwrap_or_default();
+        let db = std::env::var("REDIS_DB").unwrap_or_else(|_| "0".to_string());
+
+        if password.is_empty() {
+            format!("redis://{}:{}/{}", host, port, db)
+        }
+        else {
+            format!("redis://:{}@{}:{}/{}", password, host, port, db)
+        }
+    });
+
+    Client::open(redis_url).map_err(|e| format!("Failed to create Redis client: {}", e))
+}
+
+/// Database connection for tests (uses real PostgreSQL)
 pub struct TestDb {
     pub conn: DbConn,
 }
 
 impl TestDb {
-    /// Create a new test database connection
-    ///
-    /// Connects to the test database specified by DATABASE_URL env var.
-    /// For testing, defaults to an in-memory SQLite database if DATABASE_URL is not set
-    /// or if it points to a PostgreSQL instance that's not available.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the database connection fails
+    /// Create a new test database connection using real PostgreSQL
     pub async fn new() -> Result<Self, String> {
-        // Try to connect to the configured database first
-        if let Ok(database_url) = std::env::var("DATABASE_URL") {
-            match Database::connect(&database_url).await {
-                Ok(conn) => {
-                    return Ok(Self {
-                        conn,
-                    })
-                },
-                Err(_) => {
-                    // If the configured database is not available, fall back to SQLite
-                    eprintln!("Warning: Configured database not available, falling back to SQLite for tests");
-                },
-            }
-        }
-
-        // Fall back to in-memory SQLite for testing
-        let sqlite_url = "sqlite::memory:".to_string();
-        let conn = Database::connect(&sqlite_url)
-            .await
-            .map_err(|e| format!("Failed to connect to test SQLite database: {}", e))?;
-
+        let conn = get_real_db().await?;
         Ok(Self {
             conn,
         })
@@ -71,91 +76,24 @@ impl TestDb {
     pub fn get_connection(&self) -> &DbConn { &self.conn }
 }
 
-/// Redis connection for tests
+/// Redis connection for tests (uses real Redis)
 pub struct TestRedis {
     pub client: Client,
 }
 
 impl TestRedis {
-    /// Create a new Redis test connection
-    ///
-    /// Connects to the test Redis instance specified by REDIS_URL env var,
-    /// or constructs URL from REDIS_HOST, REDIS_PORT, etc. if REDIS_URL is not set.
-    /// For tests, defaults to localhost if the configured host is not available.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the Redis connection fails
+    /// Create a new Redis test connection using real Redis
     pub fn new() -> Result<Self, String> {
-        let redis_url = std::env::var("REDIS_URL").unwrap_or_else(|_| {
-            let host = std::env::var("REDIS_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
-            let port = std::env::var("REDIS_PORT").unwrap_or_else(|_| "6379".to_string());
-            let password = std::env::var("REDIS_PASSWORD").unwrap_or_default();
-            let db = std::env::var("REDIS_DB").unwrap_or_else(|_| "0".to_string());
-
-            if password.is_empty() {
-                format!("redis://{}:{}/{}", host, port, db)
-            }
-            else {
-                format!("redis://:{}@{}:{}/{}", password, host, port, db)
-            }
-        });
-
-        // Try to create the client, and if it fails with connection issues, try localhost
-        match Client::open(redis_url.clone()) {
-            Ok(client) => {
-                // Test the connection to make sure it's actually available
-                if let Ok(mut conn) = client.get_connection() {
-                    if redis::cmd("PING").query::<String>(&mut conn).is_ok() {
-                        return Ok(Self {
-                            client,
-                        });
-                    }
-                }
-
-                // If connection fails, try localhost as fallback for tests
-                let fallback_url = format!(
-                    "redis://127.0.0.1:{}/{}",
-                    std::env::var("REDIS_PORT").unwrap_or_else(|_| "6379".to_string()),
-                    std::env::var("REDIS_DB").unwrap_or_else(|_| "0".to_string())
-                );
-                let fallback_client = match Client::open(fallback_url.clone()) {
-                    Ok(client) => client,
-                    Err(e) => {
-                        return Err(format!(
-                            "Failed to create Redis client (tried {} and {}): {}",
-                            redis_url, fallback_url, e
-                        ))
-                    },
-                };
-
-                // Test the fallback connection
-                if let Ok(mut conn) = fallback_client.get_connection() {
-                    if redis::cmd("PING").query::<String>(&mut conn).is_ok() {
-                        return Ok(Self {
-                            client: fallback_client,
-                        });
-                    }
-                }
-
-                // If both connections fail, return an error
-                Err(format!(
-                    "No Redis server available (tried {} and {})",
-                    redis_url, fallback_url
-                ))
-            },
-            Err(e) => Err(format!("Failed to create Redis client: {}", e)),
-        }
+        let client = get_real_redis()?;
+        Ok(Self {
+            client,
+        })
     }
 
     /// Get a reference to the Redis client
     pub fn get_client(&self) -> &Client { &self.client }
 
     /// Get a connection to Redis
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the connection fails
     pub async fn get_connection(&self) -> Result<redis::aio::MultiplexedConnection, String> {
         self.client
             .get_multiplexed_async_connection()
@@ -164,10 +102,6 @@ impl TestRedis {
     }
 
     /// Clear all Redis data (for test isolation)
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails
     pub async fn flush_all(&self) -> Result<(), String> {
         let mut conn = self.get_connection().await?;
         let _: () = redis::cmd("FLUSHALL")
@@ -179,10 +113,8 @@ impl TestRedis {
 }
 
 /// Clean up all test data from the database
-/// This deletes all rows from tables that might have test data
 pub async fn cleanup_test_data(db: &DbConn) -> Result<(), String> {
-    // We don't run actual cleanup in tests - just return Ok
-    // The unique IDs ensure test isolation
+    // Tests use UUID-based IDs for isolation, cleanup happens per-test or via test infrastructure
     Ok(())
 }
 
@@ -203,9 +135,9 @@ impl Default for UserFixture {
             .unwrap()
             .as_nanos();
         Self {
-            id:       format!("test-user-{}-{}", uuid, timestamp),
-            email:    format!("test-{}-{}@example.com", uuid, timestamp),
-            username: format!("testuser_{}_{:08x}", uuid.simple(), timestamp as u32),
+            id:       format!("test-user-{}", uuid),
+            email:    format!("test-{}@example.com", uuid),
+            username: format!("testuser_{}", uuid.simple()),
             password: "TestPassword123!".to_string(),
         }
     }
@@ -254,9 +186,10 @@ pub struct TeamFixture {
 
 impl Default for TeamFixture {
     fn default() -> Self {
+        let uuid = uuid::Uuid::new_v4();
         Self {
-            id:          "test-team-123".to_string(),
-            name:        "Test Team".to_string(),
+            id:          format!("test-team-{}", uuid),
+            name:        format!("Test Team {}", uuid.simple()),
             description: Some("A test team for integration tests".to_string()),
         }
     }

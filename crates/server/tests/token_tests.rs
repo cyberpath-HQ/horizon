@@ -19,7 +19,7 @@ use tokio::time::sleep;
 async fn test_blacklist_token() {
     init_test_env();
 
-    let redis = match TestRedis::new() {
+    let redis: common::TestRedis = match TestRedis::new() {
         Ok(r) => r,
         Err(e) => {
             eprintln!("Warning: Skipping test - {}", e);
@@ -54,7 +54,7 @@ async fn test_blacklist_token() {
 async fn test_non_blacklisted_token() {
     init_test_env();
 
-    let redis = match TestRedis::new() {
+    let redis: common::TestRedis = match TestRedis::new() {
         Ok(r) => r,
         Err(e) => {
             eprintln!("Warning: Skipping test - {}", e);
@@ -84,7 +84,7 @@ async fn test_non_blacklisted_token() {
 async fn test_remove_from_blacklist() {
     init_test_env();
 
-    let redis = match TestRedis::new() {
+    let redis: common::TestRedis = match TestRedis::new() {
         Ok(r) => r,
         Err(e) => {
             eprintln!("Warning: Skipping test - {}", e);
@@ -126,7 +126,7 @@ async fn test_remove_from_blacklist() {
 async fn test_token_blacklist_ttl_expiration() {
     init_test_env();
 
-    let redis = match TestRedis::new() {
+    let redis: common::TestRedis = match TestRedis::new() {
         Ok(r) => r,
         Err(e) => {
             eprintln!("Warning: Skipping test - {}", e);
@@ -168,7 +168,7 @@ async fn test_token_blacklist_ttl_expiration() {
 async fn test_blacklist_multiple_tokens() {
     init_test_env();
 
-    let redis = match TestRedis::new() {
+    let redis: common::TestRedis = match TestRedis::new() {
         Ok(r) => r,
         Err(e) => {
             eprintln!("Warning: Skipping test - {}", e);
@@ -204,7 +204,7 @@ async fn test_blacklist_multiple_tokens() {
 async fn test_blacklist_already_expired_token() {
     init_test_env();
 
-    let redis = match TestRedis::new() {
+    let redis: common::TestRedis = match TestRedis::new() {
         Ok(r) => r,
         Err(e) => {
             eprintln!("Warning: Skipping test - {}", e);

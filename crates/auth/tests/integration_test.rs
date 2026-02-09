@@ -50,8 +50,31 @@ fn unique_email(prefix: &str, counter: &mut u32) -> String {
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
-            .as_millis()
+            .as_nanos()
     )
+}
+
+/// Helper to generate unique username for test users
+fn unique_username(prefix: &str, counter: &mut u32) -> String {
+    *counter += 1;
+    format!(
+        "test_{}_{}_{}",
+        prefix,
+        counter,
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    )
+}
+
+/// Helper function to clean up test users
+async fn cleanup_test_users(db: &DatabaseConnection) {
+    users::Entity::delete_many()
+        .filter(users::Column::Email.contains("test_"))
+        .exec(db)
+        .await
+        .expect("Failed to cleanup test users");
 }
 
 #[tokio::test]
@@ -64,7 +87,7 @@ async fn test_get_user_roles_with_no_roles() {
     // Create a test user without any roles
     let user = users::ActiveModel {
         email: Set(unique_email("no_roles", &mut counter)),
-        username: Set(format!("test_user_{}", counter)),
+        username: Set(unique_username("no_roles", &mut counter)),
         password_hash: Set("hashed_password".to_string()),
         status: Set(UserStatus::Active),
         mfa_enabled: Set(false),
@@ -90,6 +113,7 @@ async fn test_get_user_roles_with_no_roles() {
         .expect("Failed to delete test user");
 }
 
+#[serial_test::serial]
 #[tokio::test]
 async fn test_get_user_roles_with_single_role() {
     let db = get_test_db()
@@ -100,7 +124,7 @@ async fn test_get_user_roles_with_single_role() {
     // Create a test user
     let user = users::ActiveModel {
         email: Set(unique_email("single_role", &mut counter)),
-        username: Set(format!("test_user_{}", counter)),
+        username: Set(unique_username("single_role", &mut counter)),
         password_hash: Set("hashed_password".to_string()),
         status: Set(UserStatus::Active),
         mfa_enabled: Set(false),
@@ -137,7 +161,7 @@ async fn test_get_user_roles_with_single_role() {
         .expect("Failed to get user roles");
 
     assert_eq!(roles.len(), 1, "User should have exactly one role");
-    assert_eq!(roles[0], role.name, "Role name should match");
+    assert_eq!(roles[0], role.slug, "Role name should match");
 
     // Cleanup
     user_roles::Entity::delete_many()
@@ -152,6 +176,7 @@ async fn test_get_user_roles_with_single_role() {
         .expect("Failed to delete test user");
 }
 
+#[serial_test::serial]
 #[tokio::test]
 async fn test_get_user_roles_with_multiple_roles() {
     let db = get_test_db()
@@ -162,7 +187,7 @@ async fn test_get_user_roles_with_multiple_roles() {
     // Create a test user
     let user = users::ActiveModel {
         email: Set(unique_email("multi_roles", &mut counter)),
-        username: Set(format!("test_user_{}", counter)),
+        username: Set(unique_username("multi_roles", &mut counter)),
         password_hash: Set("hashed_password".to_string()),
         status: Set(UserStatus::Active),
         mfa_enabled: Set(false),
@@ -214,9 +239,9 @@ async fn test_get_user_roles_with_multiple_roles() {
     // Verify all assigned roles are returned
     for role in &available_roles {
         assert!(
-            user_roles_result.contains(&role.name),
+            user_roles_result.contains(&role.slug),
             "Should contain assigned role: {}",
-            role.name
+            role.slug
         );
     }
 
@@ -243,7 +268,7 @@ async fn test_get_user_roles_filters_expired_roles() {
     // Create a test user
     let user = users::ActiveModel {
         email: Set(unique_email("expired_roles", &mut counter)),
-        username: Set(format!("test_user_{}", counter)),
+        username: Set(unique_username("multi_roles", &mut counter)),
         password_hash: Set("hashed_password".to_string()),
         status: Set(UserStatus::Active),
         mfa_enabled: Set(false),
@@ -297,6 +322,7 @@ async fn test_get_user_roles_filters_expired_roles() {
         .expect("Failed to delete test user");
 }
 
+#[serial_test::serial]
 #[tokio::test]
 async fn test_assign_role_to_user_success() {
     let db = get_test_db()
@@ -307,7 +333,7 @@ async fn test_assign_role_to_user_success() {
     // Create a test user
     let user = users::ActiveModel {
         email: Set(unique_email("assign_role", &mut counter)),
-        username: Set(format!("test_user_{}", counter)),
+        username: Set(unique_username("multi_roles", &mut counter)),
         password_hash: Set("hashed_password".to_string()),
         status: Set(UserStatus::Active),
         mfa_enabled: Set(false),
@@ -343,8 +369,8 @@ async fn test_assign_role_to_user_success() {
 
     assert_eq!(user_roles_result.len(), 1, "User should have one role");
     assert_eq!(
-        user_roles_result[0], role.name,
-        "Assigned role should be returned"
+        user_roles_result[0], role.slug,
+        "Assigned role slug should be returned"
     );
 
     // Cleanup
@@ -370,7 +396,7 @@ async fn test_assign_role_with_scope() {
     // Create a test user
     let user = users::ActiveModel {
         email: Set(unique_email("scoped_role", &mut counter)),
-        username: Set(format!("test_user_{}", counter)),
+        username: Set(unique_username("multi_roles", &mut counter)),
         password_hash: Set("hashed_password".to_string()),
         status: Set(UserStatus::Active),
         mfa_enabled: Set(false),
@@ -432,7 +458,7 @@ async fn test_assign_role_with_expiration() {
     // Create a test user
     let user = users::ActiveModel {
         email: Set(unique_email("expiring_role", &mut counter)),
-        username: Set(format!("test_user_{}", counter)),
+        username: Set(unique_username("multi_roles", &mut counter)),
         password_hash: Set("hashed_password".to_string()),
         status: Set(UserStatus::Active),
         mfa_enabled: Set(false),
@@ -548,7 +574,7 @@ async fn test_permission_service_check_permission_for_user_without_roles() {
     // Create a test user without roles
     let user = users::ActiveModel {
         email: Set(unique_email("no_perm", &mut counter)),
-        username: Set(format!("test_user_{}", counter)),
+        username: Set(unique_username("multi_roles", &mut counter)),
         password_hash: Set("hashed_password".to_string()),
         status: Set(UserStatus::Active),
         mfa_enabled: Set(false),
@@ -804,7 +830,7 @@ async fn test_get_user_roles_consistent_across_calls() {
     // Create a test user with a role
     let user = users::ActiveModel {
         email: Set(unique_email("consistent_roles", &mut counter)),
-        username: Set(format!("test_user_{}", counter)),
+        username: Set(unique_username("multi_roles", &mut counter)),
         password_hash: Set("hashed_password".to_string()),
         status: Set(UserStatus::Active),
         mfa_enabled: Set(false),
@@ -867,7 +893,7 @@ async fn test_assign_role_with_all_scope_types() {
     // Create a test user
     let user = users::ActiveModel {
         email: Set(unique_email("all_scopes", &mut counter)),
-        username: Set(format!("test_user_{}", counter)),
+        username: Set(unique_username("multi_roles", &mut counter)),
         password_hash: Set("hashed_password".to_string()),
         status: Set(UserStatus::Active),
         mfa_enabled: Set(false),
@@ -940,6 +966,510 @@ async fn test_assign_role_with_all_scope_types() {
         .await
         .expect("Failed to delete user roles");
 
+    users::Entity::delete_by_id(&created_user.id)
+        .exec(&db)
+        .await
+        .expect("Failed to delete test user");
+}
+
+#[serial_test::serial]
+#[tokio::test]
+async fn test_permission_service_team_member_permissions() {
+    let db = get_test_db()
+        .await
+        .expect("Failed to connect to test database");
+
+    // Clean up any leftover test data
+    cleanup_test_users(&db).await;
+
+    let mut counter = 0;
+
+    // Create test user
+    let user = users::ActiveModel {
+        email: Set(unique_email("team_perms", &mut counter)),
+        username: Set(unique_username("team_perms", &mut counter)),
+        password_hash: Set("hashed_password".to_string()),
+        status: Set(UserStatus::Active),
+        mfa_enabled: Set(false),
+        ..Default::default()
+    };
+    let created_user = user.insert(&db).await.expect("Failed to create test user");
+
+    // Get role
+    let role = roles::Entity::find()
+        .one(&db)
+        .await
+        .expect("Failed to query roles")
+        .expect("No roles found in database");
+
+    // Assign team member permissions
+    let mut role_permissions = serde_json::Value::Array(vec![
+        serde_json::Value::String("teams:members_read".to_string()),
+        serde_json::Value::String("teams:members_add".to_string()),
+    ]);
+    let role_update = entity::roles::ActiveModel {
+        id: Set(role.id.clone()),
+        permissions: Set(role_permissions),
+        ..Default::default()
+    };
+    role_update
+        .update(&db)
+        .await
+        .expect("Failed to update role");
+
+    let user_role = user_roles::ActiveModel {
+        user_id: Set(created_user.id.clone()),
+        role_id: Set(role.id.clone()),
+        scope_type: Set(RoleScopeType::Team),
+        scope_id: Set(Some("team-test".to_string())),
+        expires_at: Set(None),
+        ..Default::default()
+    };
+    user_role.insert(&db).await.expect("Failed to assign role");
+
+    // Create service and check team permissions
+    let service = PermissionService::new(db.clone());
+
+    // Should allow members_read
+    let result1 = service
+        .check_permission(&created_user.id, Permission::Teams(TeamAction::MembersRead))
+        .await
+        .expect("Permission check should not error");
+
+    assert_eq!(
+        result1,
+        PermissionCheckResult::Allowed,
+        "Should allow members_read permission"
+    );
+
+    // Should allow members_add
+    let result2 = service
+        .check_permission(&created_user.id, Permission::Teams(TeamAction::MembersAdd))
+        .await
+        .expect("Permission check should not error");
+
+    assert_eq!(
+        result2,
+        PermissionCheckResult::Allowed,
+        "Should allow members_add permission"
+    );
+
+    // Should deny teams:read (member permission, not team management)
+    let result3 = service
+        .check_permission(&created_user.id, Permission::Teams(TeamAction::Read))
+        .await
+        .expect("Permission check should not error");
+
+    assert_eq!(
+        result3,
+        PermissionCheckResult::Denied,
+        "Should deny teams:read for member-only permissions"
+    );
+
+    // Cleanup
+    user_roles::Entity::delete_many()
+        .filter(user_roles::Column::UserId.eq(&created_user.id))
+        .exec(&db)
+        .await
+        .expect("Failed to delete user roles");
+    users::Entity::delete_by_id(&created_user.id)
+        .exec(&db)
+        .await
+        .expect("Failed to delete test user");
+}
+
+#[serial_test::serial]
+#[tokio::test]
+async fn test_permission_service_team_management_permissions() {
+    let db = get_test_db()
+        .await
+        .expect("Failed to connect to test database");
+    let mut counter = 0;
+
+    // Create test user
+    let user = users::ActiveModel {
+        email: Set(unique_email("team_mgmt", &mut counter)),
+        username: Set(unique_username("team_perms", &mut counter)),
+        password_hash: Set("hashed_password".to_string()),
+        status: Set(UserStatus::Active),
+        mfa_enabled: Set(false),
+        ..Default::default()
+    };
+    let created_user = user.insert(&db).await.expect("Failed to create test user");
+
+    // Get role
+    let role = roles::Entity::find()
+        .one(&db)
+        .await
+        .expect("Failed to query roles")
+        .expect("No roles found in database");
+
+    // Assign team management permissions
+    let mut role_permissions = serde_json::Value::Array(vec![
+        serde_json::Value::String("teams:read".to_string()),
+        serde_json::Value::String("teams:update".to_string()),
+        serde_json::Value::String("teams:delete".to_string()),
+        serde_json::Value::String("teams:create".to_string()),
+    ]);
+    let role_update = entity::roles::ActiveModel {
+        id: Set(role.id.clone()),
+        permissions: Set(role_permissions),
+        ..Default::default()
+    };
+    role_update
+        .update(&db)
+        .await
+        .expect("Failed to update role");
+
+    let user_role = user_roles::ActiveModel {
+        user_id: Set(created_user.id.clone()),
+        role_id: Set(role.id.clone()),
+        scope_type: Set(RoleScopeType::Global),
+        scope_id: Set(None),
+        expires_at: Set(None),
+        ..Default::default()
+    };
+    user_role.insert(&db).await.expect("Failed to assign role");
+
+    // Create service and check team management permissions
+    let service = PermissionService::new(db.clone());
+
+    // Should allow all management permissions
+    let result1 = service
+        .check_permission(&created_user.id, Permission::Teams(TeamAction::Read))
+        .await
+        .expect("Permission check should not error");
+
+    assert_eq!(
+        result1,
+        PermissionCheckResult::Allowed,
+        "Should allow teams:read"
+    );
+
+    let result2 = service
+        .check_permission(&created_user.id, Permission::Teams(TeamAction::Update))
+        .await
+        .expect("Permission check should not error");
+
+    assert_eq!(
+        result2,
+        PermissionCheckResult::Allowed,
+        "Should allow teams:update"
+    );
+
+    let result3 = service
+        .check_permission(&created_user.id, Permission::Teams(TeamAction::Delete))
+        .await
+        .expect("Permission check should not error");
+
+    assert_eq!(
+        result3,
+        PermissionCheckResult::Allowed,
+        "Should allow teams:delete"
+    );
+
+    let result4 = service
+        .check_permission(&created_user.id, Permission::Teams(TeamAction::Create))
+        .await
+        .expect("Permission check should not error");
+
+    assert_eq!(
+        result4,
+        PermissionCheckResult::Allowed,
+        "Should allow teams:create"
+    );
+
+    // Cleanup
+    user_roles::Entity::delete_many()
+        .filter(user_roles::Column::UserId.eq(&created_user.id))
+        .exec(&db)
+        .await
+        .expect("Failed to delete user roles");
+    users::Entity::delete_by_id(&created_user.id)
+        .exec(&db)
+        .await
+        .expect("Failed to delete test user");
+}
+
+#[serial_test::serial]
+#[tokio::test]
+async fn test_permission_service_team_scope_isolation() {
+    let db = get_test_db()
+        .await
+        .expect("Failed to connect to test database");
+    let mut counter = 0;
+
+    // Create first user with team-scoped permission for team A
+    let user1 = users::ActiveModel {
+        email: Set(unique_email("scope_isolation", &mut counter)),
+        username: Set(unique_username("team_perms", &mut counter)),
+        password_hash: Set("hashed_password".to_string()),
+        status: Set(UserStatus::Active),
+        mfa_enabled: Set(false),
+        ..Default::default()
+    };
+    let created_user = user1.insert(&db).await.expect("Failed to create test user");
+
+    // Get role
+    let role = roles::Entity::find()
+        .one(&db)
+        .await
+        .expect("Failed to query roles")
+        .expect("No roles found in database");
+
+    let mut role_permissions = serde_json::Value::Array(vec![serde_json::Value::String("teams:read".to_string())]);
+    let role_update = entity::roles::ActiveModel {
+        id: Set(role.id.clone()),
+        permissions: Set(role_permissions),
+        ..Default::default()
+    };
+    role_update
+        .update(&db)
+        .await
+        .expect("Failed to update role");
+
+    let user_role = user_roles::ActiveModel {
+        user_id: Set(created_user.id.clone()),
+        role_id: Set(role.id.clone()),
+        scope_type: Set(RoleScopeType::Team),
+        scope_id: Set(Some("team-a".to_string())),
+        expires_at: Set(None),
+        ..Default::default()
+    };
+    user_role.insert(&db).await.expect("Failed to assign role");
+
+    // Create service and check team-scoped permission
+    let service = PermissionService::new(db.clone());
+
+    // Should allow permission for correct scope
+    let result1 = service
+        .check_scoped_permission(
+            &created_user.id,
+            Permission::Teams(TeamAction::Read),
+            RoleScopeType::Team,
+            "team-a",
+        )
+        .await
+        .expect("Permission check should not error");
+
+    assert_eq!(
+        result1,
+        PermissionCheckResult::Allowed,
+        "Should allow permission for correct team scope"
+    );
+
+    // Should deny permission for different scope
+    let result2 = service
+        .check_scoped_permission(
+            &created_user.id,
+            Permission::Teams(TeamAction::Read),
+            RoleScopeType::Team,
+            "team-b",
+        )
+        .await
+        .expect("Permission check should not error");
+
+    assert_eq!(
+        result2,
+        PermissionCheckResult::Denied,
+        "Should deny permission for different team scope"
+    );
+
+    // Cleanup
+    user_roles::Entity::delete_many()
+        .filter(user_roles::Column::UserId.eq(&created_user.id))
+        .exec(&db)
+        .await
+        .expect("Failed to delete user roles");
+    users::Entity::delete_by_id(&created_user.id)
+        .exec(&db)
+        .await
+        .expect("Failed to delete test user");
+}
+
+#[serial_test::serial]
+#[tokio::test]
+async fn test_permission_service_api_key_permissions() {
+    let db = get_test_db()
+        .await
+        .expect("Failed to connect to test database");
+    let mut counter = 0;
+
+    // Create test user
+    let user = users::ActiveModel {
+        email: Set(unique_email("api_key_perms", &mut counter)),
+        username: Set(unique_username("team_perms", &mut counter)),
+        password_hash: Set("hashed_password".to_string()),
+        status: Set(UserStatus::Active),
+        mfa_enabled: Set(false),
+        ..Default::default()
+    };
+    let created_user = user.insert(&db).await.expect("Failed to create test user");
+
+    // Get role
+    let role = roles::Entity::find()
+        .one(&db)
+        .await
+        .expect("Failed to query roles")
+        .expect("No roles found in database");
+
+    // Assign API key permissions
+    let mut role_permissions = serde_json::Value::Array(vec![
+        serde_json::Value::String("api_keys:read".to_string()),
+        serde_json::Value::String("api_keys:rotate".to_string()),
+    ]);
+    let role_update = entity::roles::ActiveModel {
+        id: Set(role.id.clone()),
+        permissions: Set(role_permissions),
+        ..Default::default()
+    };
+    role_update
+        .update(&db)
+        .await
+        .expect("Failed to update role");
+
+    let user_role = user_roles::ActiveModel {
+        user_id: Set(created_user.id.clone()),
+        role_id: Set(role.id.clone()),
+        scope_type: Set(RoleScopeType::Global),
+        scope_id: Set(None),
+        expires_at: Set(None),
+        ..Default::default()
+    };
+    user_role.insert(&db).await.expect("Failed to assign role");
+
+    // Create service and check API key permissions
+    let service = PermissionService::new(db.clone());
+
+    // Should allow read permission
+    let result1 = service
+        .check_permission(&created_user.id, Permission::ApiKeys(ApiKeyAction::Read))
+        .await
+        .expect("Permission check should not error");
+
+    assert_eq!(
+        result1,
+        PermissionCheckResult::Allowed,
+        "Should allow api_keys:read"
+    );
+
+    // Should allow rotate permission
+    let result2 = service
+        .check_permission(&created_user.id, Permission::ApiKeys(ApiKeyAction::Rotate))
+        .await
+        .expect("Permission check should not error");
+
+    assert_eq!(
+        result2,
+        PermissionCheckResult::Allowed,
+        "Should allow api_keys:rotate"
+    );
+
+    // Should deny delete permission
+    let result3 = service
+        .check_permission(&created_user.id, Permission::ApiKeys(ApiKeyAction::Delete))
+        .await
+        .expect("Permission check should not error");
+
+    assert_eq!(
+        result3,
+        PermissionCheckResult::Denied,
+        "Should deny api_keys:delete"
+    );
+
+    // Cleanup
+    user_roles::Entity::delete_many()
+        .filter(user_roles::Column::UserId.eq(&created_user.id))
+        .exec(&db)
+        .await
+        .expect("Failed to delete user roles");
+    users::Entity::delete_by_id(&created_user.id)
+        .exec(&db)
+        .await
+        .expect("Failed to delete test user");
+}
+
+#[serial_test::serial]
+#[tokio::test]
+async fn test_permission_service_role_inheritance() {
+    let db = get_test_db()
+        .await
+        .expect("Failed to connect to test database");
+    let mut counter = 0;
+
+    // Create test user
+    let user = users::ActiveModel {
+        email: Set(unique_email("role_inherit", &mut counter)),
+        username: Set(unique_username("team_perms", &mut counter)),
+        password_hash: Set("hashed_password".to_string()),
+        status: Set(UserStatus::Active),
+        mfa_enabled: Set(false),
+        ..Default::default()
+    };
+    let created_user = user.insert(&db).await.expect("Failed to create test user");
+
+    // Get base role
+    let base_role = roles::Entity::find()
+        .one(&db)
+        .await
+        .expect("Failed to query roles")
+        .expect("No roles found in database");
+
+    // Assign base role with read permission
+    let mut base_perms = serde_json::Value::Array(vec![serde_json::Value::String("users:read".to_string())]);
+    let base_role_update = entity::roles::ActiveModel {
+        id: Set(base_role.id.clone()),
+        permissions: Set(base_perms),
+        ..Default::default()
+    };
+    base_role_update
+        .update(&db)
+        .await
+        .expect("Failed to update role");
+
+    let user_role = user_roles::ActiveModel {
+        user_id: Set(created_user.id.clone()),
+        role_id: Set(base_role.id.clone()),
+        scope_type: Set(RoleScopeType::Global),
+        scope_id: Set(None),
+        expires_at: Set(None),
+        ..Default::default()
+    };
+    user_role.insert(&db).await.expect("Failed to assign role");
+
+    // Create service and check inherited permission
+    let service = PermissionService::new(db.clone());
+
+    // Should grant read permission from base role
+    let result = service
+        .check_permission(&created_user.id, Permission::Users(UserAction::Read))
+        .await
+        .expect("Permission check should not error");
+
+    assert_eq!(
+        result,
+        PermissionCheckResult::Allowed,
+        "Should grant permission from inherited role"
+    );
+
+    // Should deny write permission
+    let result2 = service
+        .check_permission(&created_user.id, Permission::Users(UserAction::Update))
+        .await
+        .expect("Permission check should not error");
+
+    assert_eq!(
+        result2,
+        PermissionCheckResult::Denied,
+        "Should deny permission not in inherited role"
+    );
+
+    // Cleanup
+    user_roles::Entity::delete_many()
+        .filter(user_roles::Column::UserId.eq(&created_user.id))
+        .exec(&db)
+        .await
+        .expect("Failed to delete user roles");
     users::Entity::delete_by_id(&created_user.id)
         .exec(&db)
         .await

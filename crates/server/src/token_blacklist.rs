@@ -228,7 +228,8 @@ mod tests {
 
     #[test]
     fn test_hash_token_deterministic() {
-        let token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.test";
+        let token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.\
+                     eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.test";
         let hash1 = hash_token_for_blacklist(token);
         let hash2 = hash_token_for_blacklist(token);
 
@@ -342,28 +343,36 @@ mod tests {
 
     #[test]
     fn test_blacklist_stats_structure() {
-        let stats = BlacklistStats { total_tokens: 42 };
+        let stats = BlacklistStats {
+            total_tokens: 42,
+        };
 
         assert_eq!(stats.total_tokens, 42);
     }
 
     #[test]
     fn test_blacklist_stats_zero() {
-        let stats = BlacklistStats { total_tokens: 0 };
+        let stats = BlacklistStats {
+            total_tokens: 0,
+        };
 
         assert_eq!(stats.total_tokens, 0);
     }
 
     #[test]
     fn test_blacklist_stats_large_number() {
-        let stats = BlacklistStats { total_tokens: 1_000_000_000 };
+        let stats = BlacklistStats {
+            total_tokens: 1_000_000_000,
+        };
 
         assert_eq!(stats.total_tokens, 1_000_000_000);
     }
 
     #[test]
     fn test_blacklist_stats_clone() {
-        let stats1 = BlacklistStats { total_tokens: 100 };
+        let stats1 = BlacklistStats {
+            total_tokens: 100,
+        };
         let stats2 = stats1.clone();
 
         // Cloned stats should have same value
@@ -373,9 +382,15 @@ mod tests {
 
     #[test]
     fn test_blacklist_stats_equality() {
-        let stats1 = BlacklistStats { total_tokens: 50 };
-        let stats2 = BlacklistStats { total_tokens: 50 };
-        let stats3 = BlacklistStats { total_tokens: 51 };
+        let stats1 = BlacklistStats {
+            total_tokens: 50,
+        };
+        let stats2 = BlacklistStats {
+            total_tokens: 50,
+        };
+        let stats3 = BlacklistStats {
+            total_tokens: 51,
+        };
 
         assert_eq!(stats1, stats2);
         assert_ne!(stats1, stats3);
@@ -383,7 +398,9 @@ mod tests {
 
     #[test]
     fn test_blacklist_stats_debug_format() {
-        let stats = BlacklistStats { total_tokens: 25 };
+        let stats = BlacklistStats {
+            total_tokens: 25,
+        };
         let debug_str = format!("{:?}", stats);
 
         assert!(debug_str.contains("BlacklistStats"));
@@ -433,7 +450,7 @@ mod tests {
         let mut hashes = Vec::new();
 
         // Call hash function many times
-        for _ in 0..100 {
+        for _ in 0 .. 100 {
             hashes.push(hash_token_for_blacklist(token));
         }
 
@@ -447,14 +464,14 @@ mod tests {
         let base = "base.token.string";
         let mut variations = vec![];
 
-        for i in 0..10 {
+        for i in 0 .. 10 {
             let variant = format!("{}.{}", base, i);
             variations.push(hash_token_for_blacklist(&variant));
         }
 
         // Check that all hashes are unique
-        for i in 0..variations.len() {
-            for j in (i + 1)..variations.len() {
+        for i in 0 .. variations.len() {
+            for j in (i + 1) .. variations.len() {
                 assert_ne!(
                     variations[i], variations[j],
                     "Hashes for variant {} and {} should be different",
@@ -469,20 +486,29 @@ mod tests {
         // Generate hashes from many different tokens
         let mut hashes = HashSet::new();
 
-        for i in 0..50 {
+        for i in 0 .. 50 {
             let token = format!("token_{}_unique_input", i);
             let hash = hash_token_for_blacklist(&token);
             hashes.insert(hash);
         }
 
         // All 50 hashes should be unique
-        assert_eq!(hashes.len(), 50, "Expected 50 unique hashes, got {}", hashes.len());
+        assert_eq!(
+            hashes.len(),
+            50,
+            "Expected 50 unique hashes, got {}",
+            hashes.len()
+        );
     }
 
     #[test]
     fn test_blacklist_stats_field_independence() {
-        let stats1 = BlacklistStats { total_tokens: 10 };
-        let stats2 = BlacklistStats { total_tokens: 20 };
+        let stats1 = BlacklistStats {
+            total_tokens: 10,
+        };
+        let stats2 = BlacklistStats {
+            total_tokens: 20,
+        };
 
         // Modifying one shouldn't affect the other
         assert_ne!(stats1.total_tokens, stats2.total_tokens);

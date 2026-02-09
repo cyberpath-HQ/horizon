@@ -1,6 +1,6 @@
 use auth::password::{hash_password, verify_password};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use secrecy::SecretString;
+use secrecy::{ExposeSecret, SecretString};
 
 fn bench_hash_password(c: &mut Criterion) {
     c.bench_function("hash_password", |b| {

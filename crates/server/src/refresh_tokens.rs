@@ -243,13 +243,17 @@ mod tests {
 
     #[test]
     fn test_generate_refresh_token_multiple_calls() {
-        let tokens: Vec<String> = (0..10).map(|_| generate_refresh_token()).collect();
-        
+        let tokens: Vec<String> = (0 .. 10).map(|_| generate_refresh_token()).collect();
+
         // All tokens should be unique
         for (i, token1) in tokens.iter().enumerate() {
             for (j, token2) in tokens.iter().enumerate() {
                 if i != j {
-                    assert_ne!(token1, token2, "Tokens at index {} and {} should be different", i, j);
+                    assert_ne!(
+                        token1, token2,
+                        "Tokens at index {} and {} should be different",
+                        i, j
+                    );
                 }
             }
         }
@@ -258,10 +262,12 @@ mod tests {
     #[test]
     fn test_generate_refresh_token_format() {
         let token = generate_refresh_token();
-        
+
         // Should only contain URL-safe base64 characters
-        assert!(token.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_'));
-        
+        assert!(token
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_'));
+
         // Should not contain padding or other base64 chars
         assert!(!token.contains('='));
         assert!(!token.contains('+'));
@@ -270,7 +276,7 @@ mod tests {
 
     #[test]
     fn test_generate_refresh_token_length() {
-        for _ in 0..100 {
+        for _ in 0 .. 100 {
             let token = generate_refresh_token();
             // 32 bytes -> 43 chars in URL-safe base64 without padding
             assert_eq!(token.len(), 43, "Token length should always be 43");
@@ -293,7 +299,7 @@ mod tests {
     #[test]
     fn test_refresh_token_hash_deterministic() {
         let token = "consistent-token-value";
-        let hashes: Vec<String> = (0..5)
+        let hashes: Vec<String> = (0 .. 5)
             .map(|_| blake3::hash(token.as_bytes()).to_hex().to_string())
             .collect();
 
@@ -334,8 +340,8 @@ mod tests {
     #[test]
     fn test_refresh_token_model_structure() {
         let token = RefreshToken {
-            id: "token-id-123".to_string(),
-            user_id: "user-456".to_string(),
+            id:         "token-id-123".to_string(),
+            user_id:    "user-456".to_string(),
             token_hash: "abc123def456".to_string(),
             expires_at: Utc::now(),
             revoked_at: None,
@@ -353,8 +359,8 @@ mod tests {
     fn test_refresh_token_model_revoked() {
         let revoked_time = Utc::now();
         let token = RefreshToken {
-            id: "revoked-token".to_string(),
-            user_id: "user-789".to_string(),
+            id:         "revoked-token".to_string(),
+            user_id:    "user-789".to_string(),
             token_hash: "hash789".to_string(),
             expires_at: Utc::now(),
             revoked_at: Some(revoked_time),
@@ -369,8 +375,8 @@ mod tests {
     #[test]
     fn test_refresh_token_model_clone() {
         let original = RefreshToken {
-            id: "token-clone-test".to_string(),
-            user_id: "user-clone".to_string(),
+            id:         "token-clone-test".to_string(),
+            user_id:    "user-clone".to_string(),
             token_hash: "hash-clone".to_string(),
             expires_at: Utc::now(),
             revoked_at: None,
@@ -387,8 +393,8 @@ mod tests {
     #[test]
     fn test_refresh_token_model_debug() {
         let token = RefreshToken {
-            id: "debug-token".to_string(),
-            user_id: "debug-user".to_string(),
+            id:         "debug-token".to_string(),
+            user_id:    "debug-user".to_string(),
             token_hash: "debug-hash".to_string(),
             expires_at: Utc::now(),
             revoked_at: None,
@@ -404,14 +410,12 @@ mod tests {
     #[test]
     fn test_base64_encoding_url_safe() {
         let test_bytes = [
-            0xFF, 0xFE, 0xFD, 0xFC, 0xFB, 0xFA, 0xF9, 0xF8,
-            0xF7, 0xF6, 0xF5, 0xF4, 0xF3, 0xF2, 0xF1, 0xF0,
-            0xEF, 0xEE, 0xED, 0xEC, 0xEB, 0xEA, 0xE9, 0xE8,
-            0xE7, 0xE6, 0xE5, 0xE4, 0xE3, 0xE2, 0xE1, 0xE0,
+            0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8, 0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0, 0xef, 0xee,
+            0xed, 0xec, 0xeb, 0xea, 0xe9, 0xe8, 0xe7, 0xe6, 0xe5, 0xe4, 0xe3, 0xe2, 0xe1, 0xe0,
         ];
 
         let encoded = general_purpose::URL_SAFE_NO_PAD.encode(&test_bytes);
-        
+
         // Should use URL-safe alphabet (no + or /)
         assert!(!encoded.contains('+'));
         assert!(!encoded.contains('/'));
@@ -424,8 +428,8 @@ mod tests {
 
     #[test]
     fn test_refresh_token_entropy() {
-        let tokens: Vec<String> = (0..50).map(|_| generate_refresh_token()).collect();
-        
+        let tokens: Vec<String> = (0 .. 50).map(|_| generate_refresh_token()).collect();
+
         // All tokens should be unique (no duplicates)
         let mut seen = std::collections::HashSet::new();
         for token in &tokens {

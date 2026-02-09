@@ -127,6 +127,7 @@ quickcheck = { version = "1.0.3" }
 wiremock = { version = "0.6.5" }
 tempfile = "3.24.0"
 dotenv = "0.15.0"
+serial_test = "3.0"
 
 [profile.release]
 codegen-units = 1           # Single codegen unit for better optimizations

@@ -10,7 +10,7 @@ use error::Result;
 /// Load roles for a specific user
 ///
 /// Queries the user_roles table for the given user ID, joins with the roles table
-/// to get role names, and filters out expired roles.
+/// to get role slugs, and filters out expired roles.
 ///
 /// # Arguments
 ///
@@ -19,7 +19,7 @@ use error::Result;
 ///
 /// # Returns
 ///
-/// Returns `Ok(Vec<String>)` with the role names, or `Err(AppError)` for database errors.
+/// Returns `Ok(Vec<String>)` with the role slugs, or `Err(AppError)` for database errors.
 ///
 /// # Example
 /// ```ignore
@@ -44,13 +44,13 @@ pub async fn get_user_roles(db: &DatabaseConnection, user_id: &str) -> Result<Ve
         .all(db)
         .await?;
 
-    // Extract role names from the joined results
-    let role_names: Vec<String> = active_user_roles
+    // Extract role slugs from the joined results
+    let role_slugs: Vec<String> = active_user_roles
         .into_iter()
-        .filter_map(|(_, role): (_, Option<_>)| role.map(|role| role.name.clone()))
+        .filter_map(|(_, role): (_, Option<_>)| role.map(|role| role.slug.clone()))
         .collect();
 
-    if role_names.is_empty() {
+    if role_slugs.is_empty() {
         // For users without explicit roles, return empty vec.
         // The application should handle users without roles appropriately,
         // such as denying access or assigning a default role at the application level.
@@ -64,11 +64,11 @@ pub async fn get_user_roles(db: &DatabaseConnection, user_id: &str) -> Result<Ve
 
     info!(
         user_id = %user_id,
-        roles = ?role_names,
+        roles = ?role_slugs,
         "Successfully loaded user roles"
     );
 
-    Ok(role_names)
+    Ok(role_slugs)
 }
 
 /// Assign a role to a user

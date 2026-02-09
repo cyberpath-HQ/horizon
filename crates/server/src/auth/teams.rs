@@ -597,7 +597,7 @@ pub async fn list_team_members_handler(
 /// # Returns
 ///
 /// `true` if the user can manage the team
-async fn can_manage_team(state: &AppState, user: &AuthenticatedUser, team: &entity::teams::Model) -> Result<bool> {
+pub async fn can_manage_team(state: &AppState, user: &AuthenticatedUser, team: &entity::teams::Model) -> Result<bool> {
     // System admins can manage any team
     if user
         .roles

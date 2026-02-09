@@ -40,10 +40,10 @@ fn base64_encode(input: &str) -> String {
 
 /// Create test app state
 async fn create_test_app_state() -> AppState {
-    let test_db = TestDb::new()
+    let test_db: common::TestDb = TestDb::new()
         .await
         .expect("Failed to create test database connection");
-    let test_redis = TestRedis::new().expect("Failed to create test Redis connection");
+    let test_redis: common::TestRedis = TestRedis::new().expect("Failed to create test Redis connection");
 
     let jwt_config = auth::JwtConfig {
         secret:             base64_encode("test-jwt-secret-for-integration-tests-32bytes-long!!"),

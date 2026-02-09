@@ -462,16 +462,34 @@ mod tests {
     #[test]
     fn test_rate_limit_for_path_login_variations() {
         // Test that substring matching works for various login path variations
-        assert_eq!(rate_limit_for_path("/auth/login").max_requests, RATE_LIMIT_LOGIN.max_requests);
-        assert_eq!(rate_limit_for_path("/v1/auth/login").max_requests, RATE_LIMIT_LOGIN.max_requests);
-        assert_eq!(rate_limit_for_path("/api/auth/login").max_requests, RATE_LIMIT_LOGIN.max_requests);
+        assert_eq!(
+            rate_limit_for_path("/auth/login").max_requests,
+            RATE_LIMIT_LOGIN.max_requests
+        );
+        assert_eq!(
+            rate_limit_for_path("/v1/auth/login").max_requests,
+            RATE_LIMIT_LOGIN.max_requests
+        );
+        assert_eq!(
+            rate_limit_for_path("/api/auth/login").max_requests,
+            RATE_LIMIT_LOGIN.max_requests
+        );
     }
 
     #[test]
     fn test_rate_limit_for_path_mfa_variations() {
-        assert_eq!(rate_limit_for_path("/auth/mfa/verify").max_requests, RATE_LIMIT_MFA.max_requests);
-        assert_eq!(rate_limit_for_path("/auth/mfa/setup").max_requests, RATE_LIMIT_MFA.max_requests);
-        assert_eq!(rate_limit_for_path("/auth/mfa/disable").max_requests, RATE_LIMIT_MFA.max_requests);
+        assert_eq!(
+            rate_limit_for_path("/auth/mfa/verify").max_requests,
+            RATE_LIMIT_MFA.max_requests
+        );
+        assert_eq!(
+            rate_limit_for_path("/auth/mfa/setup").max_requests,
+            RATE_LIMIT_MFA.max_requests
+        );
+        assert_eq!(
+            rate_limit_for_path("/auth/mfa/disable").max_requests,
+            RATE_LIMIT_MFA.max_requests
+        );
     }
 
     // ==================== categorize_path tests ====================
@@ -692,7 +710,11 @@ mod tests {
         assert!(headers.contains_key("x-ratelimit-limit"));
         assert!(headers.contains_key("x-ratelimit-remaining"));
         assert_eq!(
-            headers.get("x-ratelimit-remaining").unwrap().to_str().unwrap(),
+            headers
+                .get("x-ratelimit-remaining")
+                .unwrap()
+                .to_str()
+                .unwrap(),
             "0"
         );
     }
@@ -704,15 +726,30 @@ mod tests {
         let response3 = create_rate_limit_response(100, 3600);
 
         assert_eq!(
-            response1.headers().get("retry-after").unwrap().to_str().unwrap(),
+            response1
+                .headers()
+                .get("retry-after")
+                .unwrap()
+                .to_str()
+                .unwrap(),
             "1"
         );
         assert_eq!(
-            response2.headers().get("retry-after").unwrap().to_str().unwrap(),
+            response2
+                .headers()
+                .get("retry-after")
+                .unwrap()
+                .to_str()
+                .unwrap(),
             "60"
         );
         assert_eq!(
-            response3.headers().get("retry-after").unwrap().to_str().unwrap(),
+            response3
+                .headers()
+                .get("retry-after")
+                .unwrap()
+                .to_str()
+                .unwrap(),
             "3600"
         );
     }
