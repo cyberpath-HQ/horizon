@@ -77,3 +77,11 @@ tracing-subscriber = { version = "0.3.19", features = [
     "ansi",
 ] }
 dotenv = { workspace = true }
+# Serial test execution for test isolation
+serial_test = { version = "2.0.0", default-features = false }
+# Async test utilities
+async-std = { version = "1.12" }
+# Mocking support
+mockall = "0.13"
+# Property-based testing
+proptest = { workspace = true }

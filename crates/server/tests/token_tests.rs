@@ -9,11 +9,13 @@ use std::time::Duration;
 use chrono::Utc;
 use common::{init_test_env, TestRedis};
 use redis::AsyncCommands;
+use serial_test::serial;
 use server::token_blacklist::TokenBlacklist;
 use tokio::time::sleep;
 
 /// Test blacklisting a token and checking it's in the blacklist
 #[tokio::test]
+#[serial]
 async fn test_blacklist_token() {
     init_test_env();
 
@@ -48,6 +50,7 @@ async fn test_blacklist_token() {
 
 /// Test that a token not in the blacklist returns false
 #[tokio::test]
+#[serial]
 async fn test_non_blacklisted_token() {
     init_test_env();
 
@@ -77,6 +80,7 @@ async fn test_non_blacklisted_token() {
 
 /// Test removing a token from the blacklist
 #[tokio::test]
+#[serial]
 async fn test_remove_from_blacklist() {
     init_test_env();
 
@@ -118,6 +122,7 @@ async fn test_remove_from_blacklist() {
 
 /// Test token expiration from blacklist via TTL
 #[tokio::test]
+#[serial]
 async fn test_token_blacklist_ttl_expiration() {
     init_test_env();
 
@@ -159,6 +164,7 @@ async fn test_token_blacklist_ttl_expiration() {
 
 /// Test blacklist with multiple tokens
 #[tokio::test]
+#[serial]
 async fn test_blacklist_multiple_tokens() {
     init_test_env();
 
@@ -194,6 +200,7 @@ async fn test_blacklist_multiple_tokens() {
 
 /// Test blacklist with already-expired token
 #[tokio::test]
+#[serial]
 async fn test_blacklist_already_expired_token() {
     init_test_env();
 
