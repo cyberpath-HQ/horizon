@@ -60,3 +60,6 @@ auth = { path = "../auth" }
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+tempfile = "3.12"

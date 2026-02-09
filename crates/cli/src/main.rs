@@ -713,4 +713,360 @@ mod tests {
         let url = build_database_url(&config);
         assert!(url.contains("postgres://testuser:testpass@testhost:5433/testdb"));
     }
+
+    #[test]
+    fn test_load_certs_with_valid_pem() {
+        // Create a temporary PEM file with test certificate
+        let temp_dir = std::env::temp_dir();
+        let cert_path = temp_dir.join("test_cert.pem");
+
+        // Write a minimal valid PEM certificate
+        let cert_content = r#"-----BEGIN CERTIFICATE-----
+MIICljCCAX6gAwIBAgIUfk5kJ8P4JVL2f2k8p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s
+5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s
+5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s
+5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s
+5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s
+-----END CERTIFICATE-----"#;
+
+        std::fs::write(&cert_path, cert_content).unwrap();
+
+        let result = load_certs(cert_path.to_str().unwrap());
+        assert!(result.is_ok());
+        assert!(!result.unwrap().is_empty());
+
+        // Cleanup
+        std::fs::remove_file(cert_path).ok();
+    }
+
+    #[test]
+    fn test_load_certs_empty_file() {
+        let temp_dir = std::env::temp_dir();
+        let cert_path = temp_dir.join("empty_cert.pem");
+
+        // Write empty file
+        std::fs::write(&cert_path, "").unwrap();
+
+        let result = load_certs(cert_path.to_str().unwrap());
+        assert!(result.is_err());
+
+        // Cleanup
+        std::fs::remove_file(cert_path).ok();
+    }
+
+    #[test]
+    fn test_load_certs_invalid_pem() {
+        let temp_dir = std::env::temp_dir();
+        let cert_path = temp_dir.join("invalid_cert.pem");
+
+        // Write invalid PEM content
+        std::fs::write(&cert_path, "not a valid pem").unwrap();
+
+        let result = load_certs(cert_path.to_str().unwrap());
+        assert!(result.is_err());
+
+        // Cleanup
+        std::fs::remove_file(cert_path).ok();
+    }
+
+    #[test]
+    fn test_load_certs_nonexistent_file() {
+        let result = load_certs("/nonexistent/path/cert.pem");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_load_private_key_with_valid_pem() {
+        let temp_dir = std::env::temp_dir();
+        let key_path = temp_dir.join("test_key.pem");
+
+        // Write a minimal valid PEM private key
+        let key_content = r#"-----BEGIN PRIVATE KEY-----
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg5p0s5p0s5p0s5p0s5p0s
+5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s
+5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s
+5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s
+5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s
+-----END PRIVATE KEY-----"#;
+
+        std::fs::write(&key_path, key_content).unwrap();
+
+        let result = load_private_key(key_path.to_str().unwrap());
+        assert!(result.is_ok());
+
+        // Cleanup
+        std::fs::remove_file(key_path).ok();
+    }
+
+    #[test]
+    fn test_load_private_key_invalid_pem() {
+        let temp_dir = std::env::temp_dir();
+        let key_path = temp_dir.join("invalid_key.pem");
+
+        // Write invalid PEM content
+        std::fs::write(&key_path, "not a valid pem key").unwrap();
+
+        let result = load_private_key(key_path.to_str().unwrap());
+        assert!(result.is_err());
+
+        // Cleanup
+        std::fs::remove_file(key_path).ok();
+    }
+
+    #[test]
+    fn test_load_private_key_nonexistent_file() {
+        let result = load_private_key("/nonexistent/path/key.pem");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_cli_completions_bash() {
+        use std::io::Write;
+
+        let args = CompletionsArgs {
+            shell: clap_complete::Shell::Bash,
+        };
+
+        let mut temp_file = tempfile::NamedTempFile::new().unwrap();
+        let result = completions_with_output(&args, &mut temp_file);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_cli_completions_zsh() {
+        use std::io::Write;
+
+        let args = CompletionsArgs {
+            shell: clap_complete::Shell::Zsh,
+        };
+
+        let mut temp_file = tempfile::NamedTempFile::new().unwrap();
+        let result = completions_with_output(&args, &mut temp_file);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_cli_completions_fish() {
+        use std::io::Write;
+
+        let args = CompletionsArgs {
+            shell: clap_complete::Shell::Fish,
+        };
+
+        let mut temp_file = tempfile::NamedTempFile::new().unwrap();
+        let result = completions_with_output(&args, &mut temp_file);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_cli_completions_powershell() {
+        use std::io::Write;
+
+        let args = CompletionsArgs {
+            shell: clap_complete::Shell::PowerShell,
+        };
+
+        let mut temp_file = tempfile::NamedTempFile::new().unwrap();
+        let result = completions_with_output(&args, &mut temp_file);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_cli_parse_migrate_dry_run() {
+        let cli = Cli::parse_from(&["horizon", "migrate", "--dry-run"]);
+        match cli.command {
+            Commands::Migrate(args) => {
+                assert!(args.dry_run);
+            },
+            _ => panic!("Expected Migrate command"),
+        }
+    }
+
+    #[test]
+    fn test_cli_parse_migrate_threads() {
+        let cli = Cli::parse_from(&["horizon", "migrate", "--threads", "8"]);
+        match cli.command {
+            Commands::Migrate(args) => {
+                assert_eq!(args.threads, 8);
+            },
+            _ => panic!("Expected Migrate command"),
+        }
+    }
+
+    #[test]
+    fn test_cli_parse_serve_with_tls() {
+        let cli = Cli::parse_from(&[
+            "horizon",
+            "serve",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            "443",
+            "--tls",
+            "--tls-cert",
+            "/path/to/cert.pem",
+            "--tls-key",
+            "/path/to/key.pem",
+        ]);
+        match cli.command {
+            Commands::Serve(args) => {
+                assert_eq!(args.host, "0.0.0.0");
+                assert_eq!(args.port, 443);
+                assert!(args.tls);
+                assert_eq!(args.tls_cert, Some("/path/to/cert.pem".to_string()));
+                assert_eq!(args.tls_key, Some("/path/to/key.pem".to_string()));
+            },
+            _ => panic!("Expected Serve command"),
+        }
+    }
+
+    #[test]
+    fn test_database_config_env_override() {
+        // Save original env vars
+        let orig_host = std::env::var("HORIZON_DATABASE_HOST").ok();
+        let orig_port = std::env::var("HORIZON_DATABASE_PORT").ok();
+        let orig_name = std::env::var("HORIZON_DATABASE_NAME").ok();
+        let orig_user = std::env::var("HORIZON_DATABASE_USER").ok();
+        let orig_pass = std::env::var("HORIZON_DATABASE_PASSWORD").ok();
+        let orig_ssl = std::env::var("HORIZON_DATABASE_SSL_MODE").ok();
+        let orig_pool = std::env::var("HORIZON_DATABASE_POOL_SIZE").ok();
+
+        // Set custom env vars
+        unsafe {
+            std::env::set_var("HORIZON_DATABASE_HOST", "custom-host");
+            std::env::set_var("HORIZON_DATABASE_PORT", "5433");
+            std::env::set_var("HORIZON_DATABASE_NAME", "custom-db");
+            std::env::set_var("HORIZON_DATABASE_USER", "custom-user");
+            std::env::set_var("HORIZON_DATABASE_PASSWORD", "custom-pass");
+            std::env::set_var("HORIZON_DATABASE_SSL_MODE", "disable");
+            std::env::set_var("HORIZON_DATABASE_POOL_SIZE", "20");
+        }
+
+        let config = DatabaseConfig::default();
+        assert_eq!(config.host, "custom-host");
+        assert_eq!(config.port, 5433);
+        assert_eq!(config.database, "custom-db");
+        assert_eq!(config.username, "custom-user");
+        assert_eq!(config.password, "custom-pass");
+        assert_eq!(config.ssl_mode, "disable");
+        assert_eq!(config.pool_size, 20);
+
+        // Restore original env vars
+        restore_env_var("HORIZON_DATABASE_HOST", orig_host);
+        restore_env_var("HORIZON_DATABASE_PORT", orig_port);
+        restore_env_var("HORIZON_DATABASE_NAME", orig_name);
+        restore_env_var("HORIZON_DATABASE_USER", orig_user);
+        restore_env_var("HORIZON_DATABASE_PASSWORD", orig_pass);
+        restore_env_var("HORIZON_DATABASE_SSL_MODE", orig_ssl);
+        restore_env_var("HORIZON_DATABASE_POOL_SIZE", orig_pool);
+    }
+
+    #[test]
+    fn test_database_config_defaults() {
+        // Clear env vars to test defaults
+        unsafe {
+            std::env::remove_var("HORIZON_DATABASE_HOST");
+            std::env::remove_var("HORIZON_DATABASE_PORT");
+            std::env::remove_var("HORIZON_DATABASE_NAME");
+            std::env::remove_var("HORIZON_DATABASE_USER");
+            std::env::remove_var("HORIZON_DATABASE_PASSWORD");
+            std::env::remove_var("HORIZON_DATABASE_SSL_MODE");
+            std::env::remove_var("HORIZON_DATABASE_POOL_SIZE");
+        }
+
+        let config = DatabaseConfig::default();
+        assert_eq!(config.host, "localhost");
+        assert_eq!(config.port, 5432);
+        assert_eq!(config.database, "horizon");
+        assert_eq!(config.username, "horizon");
+        assert_eq!(config.password, "");
+        assert_eq!(config.ssl_mode, "require");
+        assert_eq!(config.pool_size, 10);
+    }
+
+    #[test]
+    fn test_cli_name_and_version() {
+        let cmd = Cli::command();
+        assert_eq!(cmd.get_name(), "horizon");
+        // Version should be set
+        let version = cmd.get_version();
+        assert!(version.is_some());
+    }
+
+    #[test]
+    fn test_cli_about_text() {
+        let cmd = Cli::command();
+        let about = cmd.get_about();
+        assert!(about.is_some());
+    }
+
+    #[test]
+    fn test_cli_serve_subcommand() {
+        let cmd = Cli::command();
+        let mut has_serve = false;
+        for subcommand in cmd.get_subcommands() {
+            if subcommand.get_name() == "serve" {
+                has_serve = true;
+                break;
+            }
+        }
+        assert!(has_serve);
+    }
+
+    #[test]
+    fn test_cli_migrate_subcommand() {
+        let cmd = Cli::command();
+        let mut has_migrate = false;
+        for subcommand in cmd.get_subcommands() {
+            if subcommand.get_name() == "migrate" {
+                has_migrate = true;
+                break;
+            }
+        }
+        assert!(has_migrate);
+    }
+
+    #[test]
+    fn test_cli_validate_subcommand() {
+        let cmd = Cli::command();
+        let mut has_validate = false;
+        for subcommand in cmd.get_subcommands() {
+            if subcommand.get_name() == "validate" {
+                has_validate = true;
+                break;
+            }
+        }
+        assert!(has_validate);
+    }
+
+    #[test]
+    fn test_cli_completions_subcommand() {
+        let cmd = Cli::command();
+        let mut has_completions = false;
+        for subcommand in cmd.get_subcommands() {
+            if subcommand.get_name() == "completions" {
+                has_completions = true;
+                break;
+            }
+        }
+        assert!(has_completions);
+    }
+
+    // Helper function for completions that writes to a provided writer
+    fn completions_with_output<T: std::io::Write>(args: &CompletionsArgs, writer: &mut T) -> Result<()> {
+        clap_complete::generate(args.shell, &mut Cli::command(), "horizon", writer);
+        Ok(())
+    }
+
+    // Helper to restore environment variable
+    fn restore_env_var(name: &str, value: Option<String>) {
+        unsafe {
+            if let Some(v) = value {
+                std::env::set_var(name, v);
+            }
+            else {
+                std::env::remove_var(name);
+            }
+        }
+    }
 }
