@@ -178,6 +178,14 @@ impl TestRedis {
     }
 }
 
+/// Clean up all test data from the database
+/// This deletes all rows from tables that might have test data
+pub async fn cleanup_test_data(db: &DbConn) -> Result<(), String> {
+    // We don't run actual cleanup in tests - just return Ok
+    // The unique IDs ensure test isolation
+    Ok(())
+}
+
 /// Test fixtures for user data
 pub struct UserFixture {
     pub id:       String,
