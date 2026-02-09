@@ -196,18 +196,16 @@ pub struct UserFixture {
 
 impl Default for UserFixture {
     fn default() -> Self {
-        use std::sync::atomic::{AtomicU64, Ordering};
-        static COUNTER: AtomicU64 = AtomicU64::new(0);
-        let count = COUNTER.fetch_add(1, Ordering::SeqCst);
-        let pid = std::process::id();
+        // Use UUID for guaranteed uniqueness across test runs
+        let uuid = uuid::Uuid::new_v4();
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
-            .as_millis();
+            .as_nanos();
         Self {
-            id:       format!("test-user-{}-{}-{}", count, pid, timestamp),
-            email:    format!("test{}-{}-{}@example.com", count, pid, timestamp),
-            username: format!("testuser{}{}{}", count, pid, timestamp % 10000),
+            id:       format!("test-user-{}-{}", uuid, timestamp),
+            email:    format!("test-{}-{}@example.com", uuid, timestamp),
+            username: format!("testuser_{}_{:08x}", uuid.simple(), timestamp as u32),
             password: "TestPassword123!".to_string(),
         }
     }

@@ -8,6 +8,7 @@ use auth::secrecy::ExposeSecret;
 use chrono::Utc;
 use common::{init_test_env, TestDb, TestRedis};
 use entity::{refresh_tokens, sea_orm_active_enums::UserStatus, users, Users};
+use uuid::Uuid;
 use sea_orm::{ActiveModelTrait, ColumnTrait, QueryFilter, Set};
 use server::{
     auth::{
@@ -29,8 +30,8 @@ use tower::ServiceExt;
 
 const TEST_PASSWORD: &str = "SecureTestPassword123!";
 
-/// Get a unique ID for this test run
-fn get_unique_id() -> String { format!("{}-{}", std::process::id(), Utc::now().timestamp_millis()) }
+/// Get a unique ID for this test run (uses UUID for guaranteed uniqueness)
+fn get_unique_id() -> String { format!("{}", uuid::Uuid::new_v4()) }
 
 /// Base64 encode for JWT secret
 fn base64_encode(input: &str) -> String {

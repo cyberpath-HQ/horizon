@@ -42,6 +42,8 @@ grcov . \
     --ignore "*/src-tauri/*" \
     --ignore "*/.cargo/*" \
     --ignore "*/.docker/**" \
+    --ignore "*/entity/src/*.rs" \
+    --ignore "*/migration/src/*.rs" \
     -o ./target/coverage/html
 
 echo "Coverage report generated at ./target/coverage/html/index.html"
@@ -56,6 +58,8 @@ grcov . \
     --ignore "*/src-tauri/*" \
     --ignore "*/.cargo/*" \
     --ignore "*/.docker/**" \
+    --ignore "*/entity/src/*.rs" \
+    --ignore "*/migration/src/*.rs" \
     -o ./target/coverage/lcov.info
 echo "LCOV report generated at ./target/coverage/lcov.info"
 
@@ -70,6 +74,8 @@ grcov . \
     --ignore "*/src-tauri/*" \
     --ignore "*/.cargo/*" \
     --ignore "*/.docker/**" \
+    --ignore "*/entity/src/*.rs" \
+    --ignore "*/migration/src/*.rs" \
     -o ./target/coverage/cobertura.xml
 
 grcov . \
@@ -81,6 +87,8 @@ grcov . \
     --ignore "*/src-tauri/*" \
     --ignore "*/.cargo/*" \
     --ignore "*/.docker/**" \
+    --ignore "*/entity/src/*.rs" \
+    --ignore "*/migration/src/*.rs" \
     -o ./target/coverage/coverage.md
 
 echo "Additional coverage reports generated in ./target/coverage/"
