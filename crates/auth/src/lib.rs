@@ -14,7 +14,7 @@ pub mod permissions;
 pub mod roles;
 
 // Re-export commonly used types
-pub use permissions::{ApiKeyAction, Permission, PermissionService, TeamAction, UserAction};
+pub use permissions::{ApiKeyAction, Permission, PermissionCheckResult, PermissionService, TeamAction, UserAction};
 pub use jwt::{create_access_token, extract_bearer_token, validate_token, Claims, JwtConfig};
 pub use password::{hash_password, validate_password_strength, verify_password};
 pub use roles::{assign_role_to_user, get_user_roles};
