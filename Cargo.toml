@@ -145,7 +145,6 @@ debug = true
 
 [profile.dev]
 split-debuginfo = "unpacked"
-recursion-limit = 8192
 
 [workspace.lints.clippy]
 alloc_instead_of_core = "deny"
