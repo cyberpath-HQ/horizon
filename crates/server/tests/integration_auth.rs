@@ -877,6 +877,7 @@ async fn test_e2e_user_creation_requires_permission() {
                 .method(axum::http::Method::POST)
                 .header("Authorization", format!("Bearer {}", token))
                 .header("Content-Type", "application/json")
+                .extension(axum::Extension(jwt_config.clone()))
                 .uri("/api/v1/users")
                 .body(axum::body::Body::from(request_body.to_string()))
                 .unwrap(),
@@ -884,8 +885,14 @@ async fn test_e2e_user_creation_requires_permission() {
         .await
         .unwrap();
 
+    let status = response.status();
+    let b = response.into_body();
+    let body_bytes = axum::body::to_bytes(b, usize::MAX).await.unwrap();
+    println!("Response status: {}", status);
+    println!("Response body: {:?}", body_bytes);
+
     // Should succeed with 201 Created
-    assert_eq!(response.status(), axum::http::StatusCode::CREATED);
+    assert_eq!(status, axum::http::StatusCode::CREATED);
 
     // Cleanup
     entity::users::Entity::delete_many()
@@ -944,6 +951,12 @@ async fn test_e2e_user_read_without_permission_returns_403() {
 
     let app: axum::Router = router::create_router(state);
 
+    // Clean up any existing test user with the same email
+    let _ = entity::users::Entity::delete_many()
+        .filter(entity::users::Column::Email.eq("regular_user_read@example.com"))
+        .exec(&db.conn)
+        .await;
+
     // Create regular user without users:read permission
     let regular_fixture = UserFixture::default()
         .with_email("regular_user_read@example.com")
@@ -987,6 +1000,7 @@ async fn test_e2e_user_read_without_permission_returns_403() {
                 .method(axum::http::Method::GET)
                 .header("Authorization", format!("Bearer {}", token))
                 .header("Content-Type", "application/json")
+                .extension(axum::Extension(jwt_config.clone()))
                 .uri("/api/v1/users")
                 .body(axum::body::Body::empty())
                 .unwrap(),
@@ -994,8 +1008,14 @@ async fn test_e2e_user_read_without_permission_returns_403() {
         .await
         .unwrap();
 
+    let status = response.status();
+    let b = response.into_body();
+    let body_bytes = axum::body::to_bytes(b, usize::MAX).await.unwrap();
+    println!("Response status: {}", status);
+    println!("Response body: {:?}", body_bytes);
+
     // Should return 403 Forbidden
-    assert_eq!(response.status(), axum::http::StatusCode::FORBIDDEN);
+    assert_eq!(status, axum::http::StatusCode::FORBIDDEN);
 
     // Cleanup
     entity::users::Entity::delete_many()

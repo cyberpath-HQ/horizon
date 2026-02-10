@@ -38,6 +38,7 @@ pub fn create_router(state: AppState) -> Router {
         // User endpoints
         .route("/api/v1/users/me", get(get_my_profile_handler))
         .route("/api/v1/users/me", put(update_my_profile_handler))
+        .route("/api/v1/users", post(create_user_handler))
         .route("/api/v1/users", get(list_users_handler))
         // Team endpoints
         .route("/api/v1/teams", post(create_team_handler))
