@@ -30,7 +30,7 @@ impl Default for JwtConfig {
         let secret = std::env::var("HORIZON_JWT_SECRET").unwrap_or_else(|_| {
             #[cfg(test)]
             {
-                "dGVzdC1zZWNyZXQta2V5LXRoYXQtaXMtYXQtbGVhc3QtMzItYnl0ZXMtbG9uZw==".to_string()
+                base64::encode(b"test-secret-key-at-least-32-bytes-long")
             }
             #[cfg(not(test))]
             {
