@@ -44,7 +44,7 @@ cargo test --doc
 cargo fmt --all
 
 # Lint with all features
-cargo clippy --all-features
+./scripts/run-clippy.sh
 
 # Check for missing documentation
 cargo doc --all-features --no-deps
@@ -227,7 +227,7 @@ Before marking any task complete:
 
 1. Code compiles: `cargo build --all-features`
 2. Tests pass: `cargo test --all-features`
-3. Linting clean: `cargo clippy --all-features -- -D warnings`
+3. Linting clean: `/scripts/run-clippy.sh` 
 4. Formatting correct: `cargo fmt --all`
 5. Documentation builds: `cargo doc --all-features --no-deps`
 6. Coverage: At least 90% test coverage, verified with `./scripts/run_coverage.sh` and output file checked in `target/coverage/html/index.html` file. NEVER USE `cargo tarpaulin` as it is not reliable.

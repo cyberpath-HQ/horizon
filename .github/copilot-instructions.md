@@ -8,7 +8,7 @@
 - Build: `cargo build` (workspace setup with crates/sentinel/)
 - Test: `cargo test` (run from root)
 - Format: `cargo fmt --all`
-- Lint: `cargo clippy --all-features -- -D warnings`
+- Lint: `./scripts/run-clippy.sh` (runs clippy with all features and strict warnings)
 
 ## Quality Assurance
 
