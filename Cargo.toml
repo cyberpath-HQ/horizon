@@ -42,6 +42,7 @@ serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.149" }
 prost = { version = "0.14.3" }
 prost-build = { version = "0.14.3" }
+derivative = "2.2.0"
 
 # ==================== ERROR HANDLING ====================
 thiserror = { version = "2.0.18" }
