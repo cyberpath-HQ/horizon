@@ -7,7 +7,6 @@ use std::collections::HashSet;
 
 use sea_orm::{sea_query::Condition, ColumnTrait, EntityTrait, QueryFilter};
 use serde::{Deserialize, Serialize};
-use tracing::debug;
 use error::Result;
 
 use crate::roles;
@@ -362,7 +361,7 @@ impl PermissionService {
     }
 
     /// Get all permissions inherited by a role
-    async fn get_role_inheritance(&self, db: &sea_orm::DbConn, role_id: &str) -> Result<HashSet<String>> {
+    async fn _get_role_inheritance(&self, db: &sea_orm::DbConn, role_id: &str) -> Result<HashSet<String>> {
         let mut all_permissions = HashSet::new();
         let mut to_visit = vec![role_id.to_string()];
 
