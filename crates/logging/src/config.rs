@@ -128,6 +128,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[serial_test::serial]
     fn test_config_default() {
         // Ensure HORIZON_ENV is not set for this test
         let orig = std::env::var("HORIZON_ENV").ok();
