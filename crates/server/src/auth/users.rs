@@ -240,7 +240,7 @@ pub async fn list_users_handler(
         0
     }
     else {
-        (total + per_page - 1) / per_page
+        total.div_ceil(per_page)
     };
 
     let users = base_query
