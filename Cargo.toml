@@ -33,6 +33,7 @@ http = { version = "1.0" }
 
 # ==================== DATABASE ====================
 sea-orm = { version = "2.0.0-rc.31", features = ["runtime-tokio-rustls", "sqlx-postgres"] }
+sea-orm-migration = { version = "2.0.0-rc.31", features = ["runtime-tokio-rustls", "sqlx-postgres"] }
 tokio-postgres = { version = "0.7.16" }
 redis = { version = "1.0.3", features = ["tokio-rustls-comp"] }
 
