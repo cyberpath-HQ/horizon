@@ -17,7 +17,9 @@ use syn::{
 /// Arguments for the with_permission macro
 #[derive(Debug)]
 enum PermissionMode {
+    /// All specified permissions must be granted (AND logic)
     All(Vec<Expr>),
+    /// At least one specified permission must be granted (OR logic)
     Any(Vec<Expr>),
 }
 
@@ -32,28 +34,37 @@ impl Parse for PermissionMode {
             match mode_name.as_str() {
                 "all" => {
                     let permissions = parse_permission_list(input)?;
-                    Ok(PermissionMode::All(permissions))
+                    Ok(Self::All(permissions))
                 },
                 "any" => {
                     let permissions = parse_permission_list(input)?;
-                    Ok(PermissionMode::Any(permissions))
+                    Ok(Self::Any(permissions))
                 },
                 _ => {
-                    return Err(syn::Error::new(
+                    Err(syn::Error::new(
                         ident.span(),
                         "Expected 'all' or 'any' before '='",
-                    ));
+                    ))
                 },
             }
         }
         else {
             // No mode specifier, default to 'all' and parse permission list
             let permissions = parse_permission_list(input)?;
-            Ok(PermissionMode::All(permissions))
+            Ok(Self::All(permissions))
         }
     }
 }
 
+/// Parses a comma-separated list of permission expressions from the token stream.
+///
+/// # Arguments
+///
+/// * `input` - The parse stream to read permission expressions from
+///
+/// # Returns
+///
+/// A vector of parsed `Expr` representing the permissions, or an error if parsing fails
 fn parse_permission_list(input: ParseStream) -> syn::Result<Vec<Expr>> {
     let mut permissions = Vec::new();
 
@@ -168,6 +179,10 @@ pub fn with_permission(args: TokenStream, input: TokenStream) -> TokenStream {
 
     // Wrap the function body with permission checking
     let original_block = input_fn.block;
+    #[allow(
+        clippy::expect_used,
+        reason = "Generated code always parses correctly in procedural macro context"
+    )]
     let new_block = syn::parse2(quote! {
         {
             #permission_check
