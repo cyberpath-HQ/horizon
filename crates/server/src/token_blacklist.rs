@@ -2,11 +2,8 @@
 //!
 //! Manages Redis-based token blacklisting for immediate token invalidation.
 
-use std::collections::HashSet;
-
 use chrono::{DateTime, Utc};
 use redis::{AsyncCommands, RedisResult};
-use tracing::debug;
 use error::Result;
 
 /// Token blacklist service for managing revoked tokens in Redis
@@ -182,7 +179,7 @@ impl TokenBlacklist {
                         }
                         // If ttl_value > 0, key still has time remaining
                     },
-                    Err(e) => {
+                    Err(_e) => {
                         // debug!(key = %key, error = %e, "Error checking TTL during cleanup");
                         continue;
                     },
@@ -484,7 +481,7 @@ mod tests {
     #[test]
     fn test_hash_token_entropy() {
         // Generate hashes from many different tokens
-        let mut hashes = HashSet::new();
+        let mut hashes = std::collections::HashSet::new();
 
         for i in 0 .. 50 {
             let token = format!("token_{}_unique_input", i);

@@ -167,7 +167,7 @@ pub async fn create_user_handler(
         ..Default::default()
     };
 
-    let created_user = new_user.insert(&state.db).await.map_err(|e| {
+    let _created_user = new_user.insert(&state.db).await.map_err(|e| {
         AppError::Database {
             message: e.to_string(),
         }

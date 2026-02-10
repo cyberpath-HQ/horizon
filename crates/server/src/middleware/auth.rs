@@ -13,7 +13,7 @@ use serde_json::json;
 use auth::jwt::{extract_bearer_token, validate_token};
 use error::AppError;
 
-use crate::{token_blacklist::hash_token_for_blacklist, AppState};
+use crate::AppState;
 
 /// User information extracted from JWT token
 #[derive(Debug, Clone)]

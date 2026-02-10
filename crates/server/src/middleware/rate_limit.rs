@@ -141,7 +141,7 @@ fn extract_client_ip(request: &Request, peer_addr: &SocketAddr) -> String {
 /// 3. Uses Redis ZRANGEBYSCORE + ZADD for sliding window counting
 /// 4. Returns 429 Too Many Requests when the limit is exceeded
 /// 5. Adds rate limit headers (X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After)
-pub async fn rate_limit_middleware(mut request: Request, next: Next) -> Response {
+pub async fn rate_limit_middleware(request: Request, next: Next) -> Response {
     // Get peer address from ConnectInfo extension (set by tower service)
     let peer_addr = request
         .extensions()

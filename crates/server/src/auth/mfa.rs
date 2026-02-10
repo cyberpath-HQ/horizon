@@ -7,7 +7,6 @@ const REFRESH_TOKEN_TTL_SECONDS: u64 = 30 * 24 * 60 * 60;
 use auth::{
     jwt::create_access_token,
     mfa::{
-        check_backup_code_valid,
         deserialize_backup_codes,
         generate_backup_codes,
         generate_mfa_setup,

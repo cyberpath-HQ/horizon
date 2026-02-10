@@ -3,7 +3,7 @@
 //! Configures API routes for the Horizon application.
 
 use axum::{
-    extract::{Extension, FromRequestParts, Path, Query, State},
+    extract::{Extension, Path, Query, State},
     http::HeaderMap,
     middleware,
     response::{IntoResponse, Json, Response},
@@ -423,7 +423,7 @@ async fn get_api_key_usage_handler(
 /// Returns overall system health status based on component status.
 /// If any critical component is unhealthy, the overall status becomes "unhealthy".
 async fn health_check_handler(State(state): State<AppState>) -> Result<Json<serde_json::Value>> {
-    let request_start = std::time::Instant::now();
+    let _request_start = std::time::Instant::now();
     let mut status = "healthy";
     let mut checks = serde_json::json!({
         "status": status,
