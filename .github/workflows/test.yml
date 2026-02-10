@@ -57,7 +57,7 @@ jobs:
           DATABASE_URL: postgres://horizon:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/horizon_test
 
       - name: Run tests
-        run: cargo test --workspace --verbose --exclude ui
+        run: ./scripts/run-test.sh
         env:
           DATABASE_URL: postgres://horizon:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/horizon_test
           REDIS_URL: redis://localhost:6379
