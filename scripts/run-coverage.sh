@@ -26,12 +26,20 @@ POSTGRES_AVAILABLE=false
 # Try using sqlx to connect (most reliable check with our tools)
 if command -v sqlx &> /dev/null; then
     # Try connecting to the default postgres database to verify PostgreSQL is running
-    DB_USER=$(echo "$DATABASE_URL" | sed -E 's|postgres://([^:]+):([^@]+)@([^:]+):([0-9]+)/(.+)|\1|')
-    DB_PASS=$(echo "$DATABASE_URL" | sed -E 's|postgres://([^:]+):([^@]+)@([^:]+):([0-9]+)/(.+)|\2|')
-    DB_HOST=$(echo "$DATABASE_URL" | sed -E 's|postgres://([^:]+):([^@]+)@([^:]+):([0-9]+)/(.+)|\3|')
-    DB_PORT=$(echo "$DATABASE_URL" | sed -E 's|postgres://([^:]+):([^@]+)@([^:]+):([0-9]+)/(.+)|\4|')
+    # Parse URL allowing optional password: postgres://user(:pass)?@host:port/db
+    DB_USER=$(echo "$DATABASE_URL" | sed -E 's|postgres://([^:@]+)(:([^@]+))?@([^:]+):([0-9]+)/(.+)|\1|')
+    DB_PASS=$(echo "$DATABASE_URL" | sed -E 's|postgres://([^:@]+)(:([^@]+))?@([^:]+):([0-9]+)/(.+)|\3|')
+    DB_HOST=$(echo "$DATABASE_URL" | sed -E 's|postgres://([^:@]+)(:([^@]+))?@([^:]+):([0-9]+)/(.+)|\4|')
+    DB_PORT=$(echo "$DATABASE_URL" | sed -E 's|postgres://([^:@]+)(:([^@]+))?@([^:]+):([0-9]+)/(.+)|\5|')
 
-    if export DATABASE_URL="postgres://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/postgres" && \
+    # Construct URL for sqlx, omitting password if not present
+    if [ -n "$DB_PASS" ]; then
+        TEST_URL="postgres://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/postgres"
+    else
+        TEST_URL="postgres://${DB_USER}@${DB_HOST}:${DB_PORT}/postgres"
+    fi
+
+    if export DATABASE_URL="$TEST_URL" && \
        timeout 10 sqlx database create &>/dev/null; then
         POSTGRES_AVAILABLE=true
     fi
@@ -39,12 +47,15 @@ fi
 
 # Try using psql if available
 if [ "$POSTGRES_AVAILABLE" = false ] && command -v psql &> /dev/null; then
-    DB_USER=$(echo "$DATABASE_URL" | sed -E 's|postgres://([^:]+):([^@]+)@([^:]+):([0-9]+)/(.+)|\1|')
-    DB_PASS=$(echo "$DATABASE_URL" | sed -E 's|postgres://([^:]+):([^@]+)@([^:]+):([0-9]+)/(.+)|\2|')
-    DB_HOST=$(echo "$DATABASE_URL" | sed -E 's|postgres://([^:]+):([^@]+)@([^:]+):([0-9]+)/(.+)|\3|')
-    DB_PORT=$(echo "$DATABASE_URL" | sed -E 's|postgres://([^:]+):([^@]+)@([^:]+):([0-9]+)/(.+)|\4|')
+    DB_USER=$(echo "$DATABASE_URL" | sed -E 's|postgres://([^:@]+)(:([^@]+))?@([^:]+):([0-9]+)/(.+)|\1|')
+    DB_PASS=$(echo "$DATABASE_URL" | sed -E 's|postgres://([^:@]+)(:([^@]+))?@([^:]+):([0-9]+)/(.+)|\3|')
+    DB_HOST=$(echo "$DATABASE_URL" | sed -E 's|postgres://([^:@]+)(:([^@]+))?@([^:]+):([0-9]+)/(.+)|\4|')
+    DB_PORT=$(echo "$DATABASE_URL" | sed -E 's|postgres://([^:@]+)(:([^@]+))?@([^:]+):([0-9]+)/(.+)|\5|')
 
-    if export PGPASSWORD="$DB_PASS" && timeout 10 psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -c "SELECT 1;" &>/dev/null; then
+    if [ -n "$DB_PASS" ]; then
+        export PGPASSWORD="$DB_PASS"
+    fi
+    if timeout 10 psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -c "SELECT 1;" &>/dev/null; then
         POSTGRES_AVAILABLE=true
     fi
     unset PGPASSWORD 2>/dev/null || true
