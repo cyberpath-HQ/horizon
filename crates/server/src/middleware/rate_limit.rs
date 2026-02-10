@@ -124,7 +124,12 @@ fn extract_client_ip(request: &Request, peer_addr: &SocketAddr) -> String {
         .and_then(|v| v.to_str().ok())
         .and_then(|s| {
             let ip = s.split(',').next().unwrap_or("").trim();
-            if ip.is_empty() { None } else { Some(ip.to_string()) }
+            if ip.is_empty() {
+                None
+            }
+            else {
+                Some(ip.to_string())
+            }
         })
         .or_else(|| {
             request

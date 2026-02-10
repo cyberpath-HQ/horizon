@@ -500,8 +500,8 @@ pub async fn authenticate_api_key(
         .ok_or_else(|| AppError::unauthorized("Invalid API key"))?;
 
     // Check expiration
-    if let Some(expires_at) = api_key.expires_at
-        && expires_at < Utc::now().naive_utc()
+    if let Some(expires_at) = api_key.expires_at &&
+        expires_at < Utc::now().naive_utc()
     {
         return Err(AppError::unauthorized("API key has expired"));
     }

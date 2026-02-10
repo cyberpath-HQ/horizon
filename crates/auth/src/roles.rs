@@ -314,7 +314,10 @@ mod tests {
             assert!(!user_id.is_empty());
             assert!(!role.is_empty());
             // Verify scope type is valid
-            assert!(matches!(scope_type, RoleScopeType::Global | RoleScopeType::Team | RoleScopeType::Asset));
+            assert!(matches!(
+                scope_type,
+                RoleScopeType::Global | RoleScopeType::Team | RoleScopeType::Asset
+            ));
             // Verify scope_id and expires are handled correctly
             if scope_id.is_some() {
                 assert!(scope_id.as_ref().unwrap().len() > 0);
