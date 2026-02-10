@@ -37,7 +37,7 @@ pub struct UserProfileResponse {
 }
 
 /// Request to create a new user
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Validate)]
+#[derive(Clone, PartialEq, Eq, Deserialize, Validate)]
 pub struct CreateUserRequest {
     /// User's email address
     #[validate(email(message = "Invalid email format"))]
