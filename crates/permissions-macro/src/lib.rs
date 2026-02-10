@@ -210,13 +210,33 @@ fn generate_all_permission_check(permissions: &[Expr]) -> proc_macro2::TokenStre
             #(#permission_exprs),*
         ];
 
+        // Create permission service
+        let permission_service = auth::permissions::PermissionService::new(state.db.clone());
+
         // Check ALL required permissions - all must be granted (AND logic)
         for perm in &required_permissions {
-            let perm_str = perm.to_string();
-            if !user.roles.contains(&perm_str) {
-                return Err(error::AppError::forbidden(
-                    format!("Missing required permission: {}", perm_str)
-                ));
+            match permission_service.check_permission(&user.id, perm.clone()).await {
+                Ok(auth::permissions::PermissionCheckResult::Allowed) => {
+                    // Permission granted, continue
+                },
+                Ok(auth::permissions::PermissionCheckResult::Denied) => {
+                    return Err(error::AppError::forbidden(
+                        format!("Missing required permission: {:?}", perm)
+                    ));
+                },
+                Ok(auth::permissions::PermissionCheckResult::RequiresContext { .. }) => {
+                    return Err(error::AppError::forbidden(
+                        format!("Permission requires additional context: {:?}", perm)
+                    ));
+                },
+                Ok(auth::permissions::PermissionCheckResult::Unauthenticated) => {
+                    return Err(error::AppError::unauthorized("User not authenticated"));
+                },
+                Err(e) => {
+                    // Database error, fail closed
+                    tracing::error!("Failed to check permission: {}", e);
+                    return Err(error::AppError::internal("Permission check failed"));
+                },
             }
         }
     }
@@ -240,13 +260,29 @@ fn generate_any_permission_check(permissions: &[Expr]) -> proc_macro2::TokenStre
         let mut has_permission = false;
         let mut denied_permissions = Vec::new();
 
+        // Create permission service
+        let permission_service = auth::permissions::PermissionService::new(state.db.clone());
+
         for perm in &required_permissions {
-            let perm_str = perm.to_string();
-            if user.roles.contains(&perm_str) {
-                has_permission = true;
-                break; // Found one allowed permission, we're done
-            } else {
-                denied_permissions.push(perm_str);
+            match permission_service.check_permission(&user.id, perm.clone()).await {
+                Ok(auth::permissions::PermissionCheckResult::Allowed) => {
+                    has_permission = true;
+                    break; // Found one allowed permission, we're done
+                },
+                Ok(auth::permissions::PermissionCheckResult::Denied) => {
+                    denied_permissions.push(format!("{:?}", perm));
+                },
+                Ok(auth::permissions::PermissionCheckResult::RequiresContext { .. }) => {
+                    denied_permissions.push(format!("{:?} (requires context)", perm));
+                },
+                Ok(auth::permissions::PermissionCheckResult::Unauthenticated) => {
+                    return Err(error::AppError::unauthorized("User not authenticated"));
+                },
+                Err(e) => {
+                    // Database error, fail closed
+                    tracing::error!("Failed to check permission: {}", e);
+                    return Err(error::AppError::internal("Permission check failed"));
+                },
             }
         }
 
