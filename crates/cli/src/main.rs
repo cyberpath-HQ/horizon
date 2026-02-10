@@ -91,10 +91,32 @@ impl Default for DatabaseConfig {
 
 /// Builds the DATABASE_URL from DatabaseConfig
 pub fn build_database_url(config: &DatabaseConfig) -> String {
+    // Percent-encode username and password for PostgreSQL URI
+    let encoded_username = percent_encode_username_password(&config.username);
+    let encoded_password = percent_encode_username_password(&config.password);
     format!(
         "postgres://{}:{}@{}:{}/{}?sslmode={}",
-        config.username, config.password, config.host, config.port, config.database, config.ssl_mode
+        encoded_username, encoded_password, config.host, config.port, config.database, config.ssl_mode
     )
+}
+
+/// Simple percent-encoding for username/password in PostgreSQL URIs
+/// Encodes @, :, /, ?, #, [, ], and % as required
+fn percent_encode_username_password(s: &str) -> String {
+    s.chars().fold(String::new(), |mut acc, c| {
+        match c {
+            '@' => acc.push_str("%40"),
+            ':' => acc.push_str("%3A"),
+            '/' => acc.push_str("%2F"),
+            '?' => acc.push_str("%3F"),
+            '#' => acc.push_str("%23"),
+            '[' => acc.push_str("%5B"),
+            ']' => acc.push_str("%5D"),
+            '%' => acc.push_str("%25"),
+            c => acc.push(c),
+        }
+        acc
+    })
 }
 
 /// Horizon CMDB - Configuration Management Database
@@ -1158,10 +1180,10 @@ MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg5p0s5p0s5p0s5p0s5p0s
         };
 
         let url = build_database_url(&config);
-        // The URL should contain the special characters as-is (no automatic encoding in format!)
+        // The URL should contain percent-encoded special characters
         assert_eq!(
             url,
-            "postgres://user@domain:pass:word@123@localhost:5432/test_db?sslmode=require"
+            "postgres://user%40domain:pass%3Aword%40123@localhost:5432/test_db?sslmode=require"
         );
     }
 
@@ -1223,7 +1245,9 @@ MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg5p0s5p0s5p0s5p0s5p0s
             tls_cert: None,
             tls_key:  Some("/path/to/key".to_string()),
         };
-        // This would be validated at runtime in serve(), but we can test the struct
+        assert!(args.tls);
+        assert!(args.tls_cert.is_none());
+        assert!(args.tls_key.is_some());
 
         // TLS enabled but missing key
         let args = ServeArgs {
@@ -1233,7 +1257,9 @@ MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg5p0s5p0s5p0s5p0s5p0s
             tls_cert: Some("/path/to/cert".to_string()),
             tls_key:  None,
         };
-        // This would be validated at runtime in serve(), but we can test the struct
+        assert!(args.tls);
+        assert!(args.tls_cert.is_some());
+        assert!(args.tls_key.is_none());
     }
 
     // Test migrate args with all options
