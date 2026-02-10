@@ -922,6 +922,8 @@ MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg5p0s5p0s5p0s5p0s5p0s
 
     #[test]
     fn test_database_config_env_override() {
+        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+
         // Clear env vars first
         unsafe {
             std::env::remove_var("HORIZON_DATABASE_HOST");
