@@ -15,7 +15,7 @@ jobs:
         image: postgres:18-alpine
         env:
           POSTGRES_USER: horizon
-          POSTGRES_PASSWORD: horizon_test_password
+          POSTGRES_PASSWORD: horizon_secret_password_change_in_production
           POSTGRES_DB: horizon_test
         options: >-
           --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
@@ -30,7 +30,7 @@ jobs:
           - 6379:6379
 
     env:
-      DATABASE_URL: postgres://horizon:horizon_test_password@localhost:5432/horizon_test
+      DATABASE_URL: postgres://horizon:horizon_secret_password_change_in_production@localhost:5432/horizon_test
       REDIS_URL: redis://localhost:6379
       RUST_BACKTRACE: 1
 
@@ -53,17 +53,10 @@ jobs:
       - name: Install grcov
         run: cargo install grcov
 
-      - name: Run database migrations
-        run: |
-          cargo build --release -p migration
-          cargo run --release -p migration -- run
-        env:
-          DATABASE_URL: postgres://horizon:horizon_test_password@localhost:5432/horizon_test
-
       - name: Generate coverage reports
         run: bash ./scripts/run_coverage.sh
         env:
-          DATABASE_URL: postgres://horizon:horizon_test_password@localhost:5432/horizon_test
+          DATABASE_URL: postgres://horizon:horizon_secret_password_change_in_production@localhost:5432/horizon_test
           REDIS_URL: redis://localhost:6379
 
       - name: Upload coverage to Codecov
