@@ -77,7 +77,9 @@ pub fn create_router(state: AppState) -> Router {
     let all_routes = public_routes
         .merge(protected_routes)
         .merge(health_route)
-        .with_state(state);
+        .with_state(state.clone())
+        // Add Extension layer so middleware can access state from extensions
+        .layer(Extension(state));
 
     // Apply rate limiting to all routes (ConnectInfo will be provided by the tower service)
     all_routes.layer(middleware::from_fn(
