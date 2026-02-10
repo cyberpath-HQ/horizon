@@ -204,7 +204,7 @@ fn generate_all_permission_check(permissions: &[Expr]) -> proc_macro2::TokenStre
         // Verify required variables are in scope: state (AppState), user (MiddlewareUser)
         // This code requires the handler to have access to:
         // - state: &AppState (contains db connection)
-        // - user: MiddlewareUser (contains user.id)
+        // - user: MiddlewareUser (contains user.id and roles from JWT)
 
         let required_permissions = vec![
             #(#permission_exprs),*
@@ -215,7 +215,7 @@ fn generate_all_permission_check(permissions: &[Expr]) -> proc_macro2::TokenStre
 
         // Check ALL required permissions - all must be granted (AND logic)
         for perm in &required_permissions {
-            match permission_service.check_permission(&user.id, perm.clone()).await {
+            match permission_service.check_permission_with_jwt_roles(&user.id, perm.clone(), &user.roles).await {
                 Ok(auth::permissions::PermissionCheckResult::Allowed) => {
                     // Permission granted, continue
                 },
@@ -250,7 +250,7 @@ fn generate_any_permission_check(permissions: &[Expr]) -> proc_macro2::TokenStre
         // Verify required variables are in scope: state (AppState), user (MiddlewareUser)
         // This code requires the handler to have access to:
         // - state: &AppState (contains db connection)
-        // - user: MiddlewareUser (contains user.id)
+        // - user: MiddlewareUser (contains user.id and roles from JWT)
 
         let required_permissions = vec![
             #(#permission_exprs),*
@@ -264,7 +264,7 @@ fn generate_any_permission_check(permissions: &[Expr]) -> proc_macro2::TokenStre
         let permission_service = auth::permissions::PermissionService::new(state.db.clone());
 
         for perm in &required_permissions {
-            match permission_service.check_permission(&user.id, perm.clone()).await {
+            match permission_service.check_permission_with_jwt_roles(&user.id, perm.clone(), &user.roles).await {
                 Ok(auth::permissions::PermissionCheckResult::Allowed) => {
                     has_permission = true;
                     break; // Found one allowed permission, we're done

@@ -258,7 +258,7 @@ impl PermissionService {
     /// }
     /// ```
     pub async fn check_permission(&self, user_id: &str, permission: Permission) -> Result<PermissionCheckResult> {
-        // Get all roles for the user
+        // Get all roles for the user from database
         let roles = match roles::get_user_roles(&self.db, user_id).await {
             Ok(roles) => roles,
             Err(e) => {
@@ -268,6 +268,52 @@ impl PermissionService {
         };
 
         self.check_permission_for_roles(&roles, permission).await
+    }
+
+    /// Check if a user has a specific permission, also considering JWT roles
+    ///
+    /// This method combines JWT roles (passed directly) with database roles
+    /// for permission checking. JWT roles are checked first for direct permission matches.
+    ///
+    /// # Arguments
+    ///
+    /// * `user_id` - The user ID to check permissions for
+    /// * `permission` - The permission to check
+    /// * `jwt_roles` - Roles from the JWT token (permission strings like "users:create")
+    ///
+    /// # Returns
+    ///
+    /// `PermissionCheckResult::Allowed` if the user has the permission,
+    /// `PermissionCheckResult::Denied` otherwise
+    pub async fn check_permission_with_jwt_roles(
+        &self,
+        user_id: &str,
+        permission: Permission,
+        jwt_roles: &[String],
+    ) -> Result<PermissionCheckResult> {
+        // First check JWT roles for direct permission matches
+        let permission_str = permission.to_string();
+        for jwt_role in jwt_roles {
+            if jwt_role == &permission_str {
+                tracing::debug!(
+                    user_id = %user_id,
+                    permission = %permission_str,
+                    "Permission granted by JWT role"
+                );
+                return Ok(PermissionCheckResult::Allowed);
+            }
+        }
+
+        // Then get database roles and check them
+        let db_roles = match roles::get_user_roles(&self.db, user_id).await {
+            Ok(roles) => roles,
+            Err(e) => {
+                tracing::warn!("Failed to get user roles for permission check: {}", e);
+                vec![]
+            },
+        };
+
+        self.check_permission_for_roles(&db_roles, permission).await
     }
 
     /// Check if a set of roles has a specific permission
