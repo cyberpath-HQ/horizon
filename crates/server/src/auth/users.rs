@@ -105,12 +105,12 @@ pub async fn update_my_profile_handler(
 /// # Returns
 ///
 /// Created user profile response
-// #[with_permission(Permission::Users(UserAction::Create))]
+#[with_permission(Permission::Users(UserAction::Create))]
 pub async fn create_user_handler(
     state: &AppState,
+    user: crate::middleware::auth::AuthenticatedUser,
     req: crate::dto::users::CreateUserRequest,
 ) -> Result<(axum::http::StatusCode, String)> {
-    eprintln!("Handler called");
     // Validate request
     req.validate().map_err(|e| {
         AppError::Validation {

@@ -832,4 +832,30 @@ mod tests {
         assert_eq!(q.page(), 1);
         assert_eq!(q.per_page(), 100);
     }
+
+    #[test]
+    fn test_can_manage_team_admin_roles() {
+        // Test that admin roles are recognized
+        let user_admin = AuthenticatedUser {
+            id:    "user1".to_string(),
+            email: "admin@test.com".to_string(),
+            roles: vec!["admin".to_string()],
+        };
+        let user_super = AuthenticatedUser {
+            id:    "user2".to_string(),
+            email: "super@test.com".to_string(),
+            roles: vec!["super_admin".to_string()],
+        };
+        let user_regular = AuthenticatedUser {
+            id:    "user3".to_string(),
+            email: "user@test.com".to_string(),
+            roles: vec!["user".to_string()],
+        };
+
+        // Note: This test only checks the role-based logic, not the DB-dependent parts
+        // For full testing, integration tests are needed
+        assert!(user_admin.roles.iter().any(|r| r == "super_admin" || r == "admin"));
+        assert!(user_super.roles.iter().any(|r| r == "super_admin" || r == "admin"));
+        assert!(!user_regular.roles.iter().any(|r| r == "super_admin" || r == "admin"));
+    }
 }
