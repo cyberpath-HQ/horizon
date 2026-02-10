@@ -279,10 +279,15 @@ impl PermissionService {
     ///
     /// `PermissionCheckResult::Allowed` if the roles have the permission,
     /// `PermissionCheckResult::Denied` otherwise
-    pub async fn check_permission_for_roles(&self, roles: &[String], permission: Permission) -> Result<PermissionCheckResult> {
+    pub async fn check_permission_for_roles(
+        &self,
+        roles: &[String],
+        permission: Permission,
+    ) -> Result<PermissionCheckResult> {
         let permission_str = permission.to_string();
 
-        // debug!(roles = ?roles, permission = %permission, permission_str = %permission_str, "Checking permission for roles");
+        // debug!(roles = ?roles, permission = %permission, permission_str = %permission_str, "Checking
+        // permission for roles");
 
         // First, check for direct permission matches (for JWT roles that are permission strings)
         for role in roles {
@@ -333,7 +338,7 @@ impl PermissionService {
             None => {
                 // Role doesn't exist, so permission is not granted
                 return Ok(PermissionCheckResult::Denied);
-            }
+            },
         };
 
         // Parse role permissions from JSON

@@ -43,7 +43,11 @@ pub struct CreateUserRequest {
     #[validate(email(message = "Invalid email format"))]
     pub email:    String,
     /// User's username
-    #[validate(length(min = 3, max = 50, message = "Username must be between 3 and 50 characters"))]
+    #[validate(length(
+        min = 3,
+        max = 50,
+        message = "Username must be between 3 and 50 characters"
+    ))]
     pub username: String,
     /// User's password
     #[validate(length(min = 8, message = "Password must be at least 8 characters"))]
