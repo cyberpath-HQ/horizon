@@ -1,4 +1,4 @@
-#![recursion_limit = "8192"]
+#![recursion_limit = "16384"]
 #![type_length_limit = "4194304"]
 #![allow(
     clippy::all,
