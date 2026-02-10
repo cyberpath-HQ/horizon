@@ -7,7 +7,11 @@ mod session_tests {
     #[test]
     fn test_session_creation_structure() {
         // Test basic session structure is valid
-        assert!(true);
+        // TODO: Implement session creation and test actual structure
+        // For now, verify that session IDs can be generated
+        let session_id = cuid2::cuid();
+        assert!(!session_id.is_empty());
+        assert!(session_id.len() > 10);
     }
 
     #[test]
@@ -17,7 +21,7 @@ mod session_tests {
         let now = Utc::now();
         let session_duration = chrono::Duration::hours(24);
         let expires_at = now + session_duration;
-        
+
         assert!(expires_at > now);
     }
 

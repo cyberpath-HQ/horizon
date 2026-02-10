@@ -225,8 +225,7 @@ mod tests {
 
     #[test]
     fn test_hash_token_deterministic() {
-        let token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.\
-                     eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.test";
+        let token = "test.jwt.token";
         let hash1 = hash_token_for_blacklist(token);
         let hash2 = hash_token_for_blacklist(token);
 

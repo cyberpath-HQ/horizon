@@ -104,7 +104,7 @@ impl TestRedis {
     /// Clear all Redis data (for test isolation)
     pub async fn flush_all(&self) -> Result<(), String> {
         let mut conn = self.get_connection().await?;
-        let _: () = redis::cmd("FLUSHALL")
+        let _: () = redis::cmd("FLUSHDB")
             .query_async(&mut conn)
             .await
             .map_err(|e| format!("Failed to flush Redis: {}", e))?;
