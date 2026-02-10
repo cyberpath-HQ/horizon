@@ -6,6 +6,7 @@ use entity::{roles::Entity as RolesEntity, sea_orm_active_enums::RoleScopeType, 
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 use tracing::info;
 use error::Result;
+use chrono;
 
 /// Load roles for a specific user
 ///
@@ -312,9 +313,15 @@ mod tests {
         for (user_id, role, scope_type, scope_id, expires) in test_cases {
             assert!(!user_id.is_empty());
             assert!(!role.is_empty());
-            assert_eq!(scope_type, scope_type);
-            assert_eq!(scope_id.is_some(), scope_id.is_some());
-            assert_eq!(expires.is_some(), expires.is_some());
+            // Verify scope type is valid
+            assert!(matches!(scope_type, RoleScopeType::Global | RoleScopeType::Team | RoleScopeType::Asset));
+            // Verify scope_id and expires are handled correctly
+            if scope_id.is_some() {
+                assert!(scope_id.as_ref().unwrap().len() > 0);
+            }
+            if expires.is_some() {
+                assert!(expires.unwrap() > chrono::Utc::now());
+            }
         }
     }
 

@@ -33,9 +33,7 @@ use entity::{
 
 /// Helper function to get test database connection from DATABASE_URL environment variable
 async fn get_test_db() -> Result<DatabaseConnection, sea_orm::DbErr> {
-    let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
-        "postgres://horizon:horizon_secret_password_change_in_production@localhost:5432/horizon".to_string()
-    });
+    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL environment variable must be set for tests");
 
     Database::connect(&database_url).await
 }
