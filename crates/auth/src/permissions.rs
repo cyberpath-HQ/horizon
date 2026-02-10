@@ -261,7 +261,10 @@ impl PermissionService {
         // Get all roles for the user
         let roles = match roles::get_user_roles(&self.db, user_id).await {
             Ok(roles) => roles,
-            Err(_) => vec![], // If database error, treat as no roles
+            Err(e) => {
+                tracing::warn!("Failed to get user roles for permission check: {}", e);
+                vec![] // If database error, treat as no roles
+            },
         };
 
         self.check_permission_for_roles(&roles, permission).await
