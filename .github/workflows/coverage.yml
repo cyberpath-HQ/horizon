@@ -54,7 +54,7 @@ jobs:
         run: cargo install grcov
 
       - name: Generate coverage reports
-        run: bash ./scripts/run_coverage.sh
+        run: bash ./scripts/run-coverage.sh
         env:
           DATABASE_URL: postgres://horizon:horizon_secret_password_change_in_production@localhost:5432/horizon_test
           REDIS_URL: redis://localhost:6379
