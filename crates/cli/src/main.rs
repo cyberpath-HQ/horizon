@@ -13,15 +13,14 @@
 use std::net::SocketAddr;
 
 use tokio::net::TcpListener;
-use axum;
 use clap::{Args, CommandFactory as _, Parser, Subcommand};
 use error::{AppError, Result};
 use migration::{Migrator, MigratorTrait as _};
 use server::{router::create_app_router, AppState};
 use auth::JwtConfig;
 use tokio_rustls::TlsAcceptor;
-use rustls::pki_types::pem::PemObject;
-use tower::Service;
+use rustls::pki_types::pem::PemObject as _;
+use tower::Service as _;
 use hyper_util::{
     rt::{TokioExecutor, TokioIo},
     server::conn::auto::Builder,
@@ -103,6 +102,7 @@ pub fn build_database_url(config: &DatabaseConfig) -> String {
 #[command(name = "horizon")]
 #[command(author, version, about, long_about = None)]
 struct Cli {
+    /// The command to run
     #[command(subcommand)]
     command: Commands,
 
@@ -115,6 +115,7 @@ struct Cli {
     log_format: String,
 }
 
+/// Available commands for the Horizon CLI
 #[derive(Subcommand, Debug)]
 enum Commands {
     /// Start the API server
@@ -130,6 +131,7 @@ enum Commands {
     Validate,
 }
 
+/// Arguments for the serve command
 #[derive(Args, Debug)]
 struct ServeArgs {
     /// Server host to bind to
@@ -153,6 +155,7 @@ struct ServeArgs {
     tls_key: Option<String>,
 }
 
+/// Arguments for the migrate command
 #[derive(Args, Debug)]
 struct MigrateArgs {
     /// Run migrations in dry-run mode (no changes)
@@ -176,6 +179,7 @@ struct MigrateArgs {
     threads: u8,
 }
 
+/// Arguments for the completions command
 #[derive(Args, Debug)]
 struct CompletionsArgs {
     /// Shell to generate completions for
@@ -204,6 +208,12 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
+/// Starts the API server with optional TLS support
+#[allow(
+    clippy::cognitive_complexity,
+    clippy::integer_division_remainder_used,
+    reason = "Complex server setup is intentional"
+)]
 async fn serve(args: &ServeArgs) -> Result<()> {
     logging::info!(target: "serve", "Starting API server...");
 
@@ -223,7 +233,7 @@ async fn serve(args: &ServeArgs) -> Result<()> {
     logging::info!(target: "serve", "Database migrations completed successfully");
 
     // Initialize Redis client for token blacklisting
-    let redis_url = std::env::var("HORIZON_REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
+    let redis_url = std::env::var("HORIZON_REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_owned());
     let redis_client =
         redis::Client::open(redis_url).map_err(|e| anyhow::anyhow!("Failed to connect to Redis: {}", e))?;
 
@@ -335,8 +345,17 @@ async fn serve(args: &ServeArgs) -> Result<()> {
     Ok(())
 }
 
+/// Waits for shutdown signals (Ctrl+C or SIGTERM)
+#[allow(
+    clippy::integer_division_remainder_used,
+    reason = "tokio::select! macro triggers false positive"
+)]
 async fn shutdown_signal() {
     let ctrl_c = async {
+        #[allow(
+            clippy::expect_used,
+            reason = "Signal handlers are essential for graceful shutdown"
+        )]
         tokio::signal::ctrl_c()
             .await
             .expect("Failed to install Ctrl+C handler");
@@ -344,6 +363,10 @@ async fn shutdown_signal() {
 
     #[cfg(unix)]
     let terminate = async {
+        #[allow(
+            clippy::expect_used,
+            reason = "Signal handlers are essential for graceful shutdown"
+        )]
         tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
             .expect("Failed to install terminate handler")
             .recv()
@@ -359,6 +382,11 @@ async fn shutdown_signal() {
     }
 }
 
+/// Runs database migrations
+#[allow(
+    clippy::cognitive_complexity,
+    reason = "Migration logic requires comprehensive error handling"
+)]
 async fn migrate(args: &MigrateArgs) -> Result<()> {
     logging::info!(target: "migrate",
         dry_run = %args.dry_run,
@@ -417,6 +445,7 @@ async fn migrate(args: &MigrateArgs) -> Result<()> {
     Ok(())
 }
 
+/// Generates shell completions for the CLI
 fn completions(args: &CompletionsArgs) -> Result<()> {
     clap_complete::generate(
         args.shell,
@@ -427,6 +456,7 @@ fn completions(args: &CompletionsArgs) -> Result<()> {
     Ok(())
 }
 
+/// Validates the CLI configuration
 fn validate() -> Result<()> {
     // Check required environment variables
     let required_vars = [
