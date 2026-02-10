@@ -8,9 +8,9 @@ mod error_response_tests {
 
     #[test]
     fn test_error_creation() {
-        let _error = AppError::not_found("User not found");
-        // Just verify it can be created
-        assert!(true);
+        let error = AppError::not_found("User not found");
+        // Verify it can be created and has the correct variant
+        assert!(matches!(error, AppError::NotFound(_)));
     }
 
     #[test]
