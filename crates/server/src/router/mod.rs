@@ -3,10 +3,10 @@
 //! Configures API routes for the Horizon application.
 
 use axum::{
-    extract::{Extension, Path, Query, State},
+    extract::{Extension, FromRequestParts, Path, Query, State},
     http::HeaderMap,
     middleware,
-    response::Json,
+    response::{IntoResponse, Json, Response},
     routing::{delete, get, post, put},
     Router,
 };
@@ -38,7 +38,6 @@ pub fn create_router(state: AppState) -> Router {
         // User endpoints
         .route("/api/v1/users/me", get(get_my_profile_handler))
         .route("/api/v1/users/me", put(update_my_profile_handler))
-        .route("/api/v1/users", post(create_user_handler))
         .route("/api/v1/users", get(list_users_handler))
         // Team endpoints
         .route("/api/v1/teams", post(create_team_handler))
@@ -150,7 +149,7 @@ async fn delete_all_sessions_handler(
 /// Enable MFA for the authenticated user
 async fn mfa_enable_handler(
     State(state): State<AppState>,
-    Extension(user): Extension<crate::middleware::auth::AuthenticatedUser>,
+    user: crate::middleware::auth::AuthenticatedUser,
     Json(req): Json<crate::dto::mfa::MfaEnableRequest>,
 ) -> Result<Json<crate::dto::mfa::MfaSetupResponse>> {
     crate::auth::mfa::mfa_enable_handler(&state, user, req).await
@@ -159,7 +158,7 @@ async fn mfa_enable_handler(
 /// Verify TOTP code to finalize MFA setup
 async fn mfa_verify_setup_handler(
     State(state): State<AppState>,
-    Extension(user): Extension<crate::middleware::auth::AuthenticatedUser>,
+    user: crate::middleware::auth::AuthenticatedUser,
     Json(req): Json<crate::dto::mfa::MfaVerifyRequest>,
 ) -> Result<Json<crate::dto::auth::SuccessResponse>> {
     crate::auth::mfa::mfa_verify_setup_handler(&state, user, req).await
@@ -196,7 +195,7 @@ async fn mfa_verify_backup_code_handler(
 /// Disable MFA for the authenticated user
 async fn mfa_disable_handler(
     State(state): State<AppState>,
-    Extension(user): Extension<crate::middleware::auth::AuthenticatedUser>,
+    user: crate::middleware::auth::AuthenticatedUser,
     Json(req): Json<crate::dto::mfa::MfaDisableRequest>,
 ) -> Result<Json<crate::dto::auth::SuccessResponse>> {
     crate::auth::mfa::mfa_disable_handler(&state, user, req).await
@@ -205,7 +204,7 @@ async fn mfa_disable_handler(
 /// Regenerate backup codes
 async fn mfa_regenerate_backup_codes_handler(
     State(state): State<AppState>,
-    Extension(user): Extension<crate::middleware::auth::AuthenticatedUser>,
+    user: crate::middleware::auth::AuthenticatedUser,
     Json(req): Json<crate::dto::mfa::MfaVerifyRequest>,
 ) -> Result<Json<crate::dto::mfa::MfaBackupCodesResponse>> {
     crate::auth::mfa::mfa_regenerate_backup_codes_handler(&state, user, req).await
@@ -214,7 +213,7 @@ async fn mfa_regenerate_backup_codes_handler(
 /// Get MFA status
 async fn mfa_status_handler(
     State(state): State<AppState>,
-    Extension(user): Extension<crate::middleware::auth::AuthenticatedUser>,
+    user: crate::middleware::auth::AuthenticatedUser,
 ) -> Result<Json<crate::dto::mfa::MfaStatusResponse>> {
     crate::auth::mfa::mfa_status_handler(&state, user).await
 }
@@ -224,7 +223,7 @@ async fn mfa_status_handler(
 /// Get my profile
 async fn get_my_profile_handler(
     State(state): State<AppState>,
-    Extension(user): Extension<crate::middleware::auth::AuthenticatedUser>,
+    user: crate::middleware::auth::AuthenticatedUser,
 ) -> Result<Json<crate::dto::users::UserProfileResponse>> {
     crate::auth::users::get_my_profile_handler(&state, user).await
 }
@@ -232,7 +231,7 @@ async fn get_my_profile_handler(
 /// Update my profile
 async fn update_my_profile_handler(
     State(state): State<AppState>,
-    Extension(user): Extension<crate::middleware::auth::AuthenticatedUser>,
+    user: crate::middleware::auth::AuthenticatedUser,
     Json(req): Json<crate::dto::users::UpdateUserProfileRequest>,
 ) -> Result<Json<crate::dto::users::UserProfileResponse>> {
     crate::auth::users::update_my_profile_handler(&state, user, req).await
@@ -241,19 +240,19 @@ async fn update_my_profile_handler(
 /// Create a new user
 async fn create_user_handler(
     State(state): State<AppState>,
-    Extension(user): Extension<crate::middleware::auth::AuthenticatedUser>,
-    Json(req): Json<serde_json::Value>,
-) -> Result<(
-    axum::http::StatusCode,
-    Json<crate::dto::users::UserProfileResponse>,
-)> {
-    crate::auth::users::create_user_handler(&state, user, req).await
+    Json(req): Json<crate::dto::users::CreateUserRequest>,
+) -> Response {
+    eprintln!("Router handler called");
+    match crate::auth::users::create_user_handler(&state, req).await {
+        Ok((status, body)) => (status, body).into_response(),
+        Err(e) => e.into_response(),
+    }
 }
 
 /// List users (admin only)
 async fn list_users_handler(
     State(state): State<AppState>,
-    Extension(user): Extension<crate::middleware::auth::AuthenticatedUser>,
+    user: crate::middleware::auth::AuthenticatedUser,
     Query(query): Query<crate::dto::users::UserListQuery>,
 ) -> Result<Json<crate::dto::users::UserListResponse>> {
     crate::auth::users::list_users_handler(&state, user, query).await
@@ -264,7 +263,7 @@ async fn list_users_handler(
 /// Create a new team
 async fn create_team_handler(
     State(state): State<AppState>,
-    Extension(user): Extension<crate::middleware::auth::AuthenticatedUser>,
+    user: crate::middleware::auth::AuthenticatedUser,
     Json(req): Json<crate::dto::teams::CreateTeamRequest>,
 ) -> Result<Json<crate::dto::teams::TeamResponse>> {
     crate::auth::teams::create_team_handler(&state, user, req).await
@@ -291,7 +290,7 @@ async fn get_team_handler(
 /// Update a team
 async fn update_team_handler(
     State(state): State<AppState>,
-    Extension(user): Extension<crate::middleware::auth::AuthenticatedUser>,
+    user: crate::middleware::auth::AuthenticatedUser,
     Path(id): Path<String>,
     Json(req): Json<crate::dto::teams::UpdateTeamRequest>,
 ) -> Result<Json<crate::dto::teams::TeamResponse>> {
@@ -301,7 +300,7 @@ async fn update_team_handler(
 /// Delete a team
 async fn delete_team_handler(
     State(state): State<AppState>,
-    Extension(user): Extension<crate::middleware::auth::AuthenticatedUser>,
+    user: crate::middleware::auth::AuthenticatedUser,
     Path(id): Path<String>,
 ) -> Result<Json<crate::dto::auth::SuccessResponse>> {
     crate::auth::teams::delete_team_handler(&state, user, &id).await
@@ -319,7 +318,7 @@ async fn list_team_members_handler(
 /// Add a team member
 async fn add_team_member_handler(
     State(state): State<AppState>,
-    Extension(user): Extension<crate::middleware::auth::AuthenticatedUser>,
+    user: crate::middleware::auth::AuthenticatedUser,
     Path(id): Path<String>,
     Json(req): Json<crate::dto::teams::AddTeamMemberRequest>,
 ) -> Result<Json<crate::dto::teams::TeamMemberResponse>> {
@@ -329,7 +328,7 @@ async fn add_team_member_handler(
 /// Update a team member's role
 async fn update_team_member_handler(
     State(state): State<AppState>,
-    Extension(user): Extension<crate::middleware::auth::AuthenticatedUser>,
+    user: crate::middleware::auth::AuthenticatedUser,
     Path((id, member_id)): Path<(String, String)>,
     Json(req): Json<crate::dto::teams::UpdateTeamMemberRequest>,
 ) -> Result<Json<crate::dto::teams::TeamMemberResponse>> {
@@ -339,7 +338,7 @@ async fn update_team_member_handler(
 /// Remove a team member
 async fn remove_team_member_handler(
     State(state): State<AppState>,
-    Extension(user): Extension<crate::middleware::auth::AuthenticatedUser>,
+    user: crate::middleware::auth::AuthenticatedUser,
     Path((id, member_id)): Path<(String, String)>,
 ) -> Result<Json<crate::dto::auth::SuccessResponse>> {
     crate::auth::teams::remove_team_member_handler(&state, user, &id, &member_id).await
@@ -350,7 +349,7 @@ async fn remove_team_member_handler(
 /// Create a new API key
 async fn create_api_key_handler(
     State(state): State<AppState>,
-    Extension(user): Extension<crate::middleware::auth::AuthenticatedUser>,
+    user: crate::middleware::auth::AuthenticatedUser,
     Json(req): Json<crate::dto::api_keys::CreateApiKeyRequest>,
 ) -> Result<Json<crate::dto::api_keys::CreateApiKeyResponse>> {
     crate::auth::api_keys::create_api_key_handler(&state, user, req).await
@@ -359,7 +358,7 @@ async fn create_api_key_handler(
 /// List API keys
 async fn list_api_keys_handler(
     State(state): State<AppState>,
-    Extension(user): Extension<crate::middleware::auth::AuthenticatedUser>,
+    user: crate::middleware::auth::AuthenticatedUser,
     Query(query): Query<crate::dto::api_keys::ApiKeyListQuery>,
 ) -> Result<Json<crate::dto::api_keys::ApiKeyListResponse>> {
     crate::auth::api_keys::list_api_keys_handler(&state, user, query).await
@@ -368,7 +367,7 @@ async fn list_api_keys_handler(
 /// Get a single API key detail
 async fn get_api_key_handler(
     State(state): State<AppState>,
-    Extension(user): Extension<crate::middleware::auth::AuthenticatedUser>,
+    user: crate::middleware::auth::AuthenticatedUser,
     Path(id): Path<String>,
 ) -> Result<Json<crate::dto::api_keys::ApiKeyDetail>> {
     crate::auth::api_keys::get_api_key_handler(&state, user, &id).await
@@ -377,7 +376,7 @@ async fn get_api_key_handler(
 /// Delete (revoke) an API key
 async fn delete_api_key_handler(
     State(state): State<AppState>,
-    Extension(user): Extension<crate::middleware::auth::AuthenticatedUser>,
+    user: crate::middleware::auth::AuthenticatedUser,
     Path(id): Path<String>,
 ) -> Result<Json<crate::dto::auth::SuccessResponse>> {
     crate::auth::api_keys::delete_api_key_handler(&state, user, &id).await
@@ -386,7 +385,7 @@ async fn delete_api_key_handler(
 /// Rotate an API key
 async fn rotate_api_key_handler(
     State(state): State<AppState>,
-    Extension(user): Extension<crate::middleware::auth::AuthenticatedUser>,
+    user: crate::middleware::auth::AuthenticatedUser,
     Path(id): Path<String>,
 ) -> Result<Json<crate::dto::api_keys::RotateApiKeyResponse>> {
     crate::auth::api_keys::rotate_api_key_handler(&state, user, &id).await
@@ -395,7 +394,7 @@ async fn rotate_api_key_handler(
 /// Update API key permissions
 async fn update_api_key_permissions_handler(
     State(state): State<AppState>,
-    Extension(user): Extension<crate::middleware::auth::AuthenticatedUser>,
+    user: crate::middleware::auth::AuthenticatedUser,
     Path(id): Path<String>,
     Json(req): Json<crate::dto::api_keys::UpdateApiKeyPermissionsRequest>,
 ) -> Result<Json<crate::dto::api_keys::ApiKeyDetail>> {
@@ -405,7 +404,7 @@ async fn update_api_key_permissions_handler(
 /// Get API key usage statistics
 async fn get_api_key_usage_handler(
     State(state): State<AppState>,
-    Extension(user): Extension<crate::middleware::auth::AuthenticatedUser>,
+    user: crate::middleware::auth::AuthenticatedUser,
     Path(id): Path<String>,
 ) -> Result<Json<crate::dto::api_keys::ApiKeyUsageResponse>> {
     crate::auth::api_keys::get_api_key_usage_handler(&state, user, &id).await

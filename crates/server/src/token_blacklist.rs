@@ -52,7 +52,7 @@ impl TokenBlacklist {
         let key = format!("blacklist:token:{}", token_hash);
         let _: () = conn.set_ex(key, "revoked", ttl_seconds as u64).await?;
 
-        debug!(token_hash = %token_hash, ttl_seconds, "Token added to blacklist");
+        // debug!(token_hash = %token_hash, ttl_seconds, "Token added to blacklist");
 
         Ok(())
     }
@@ -99,7 +99,7 @@ impl TokenBlacklist {
         let key = format!("blacklist:token:{}", token_hash);
         let _: () = conn.del(key).await?;
 
-        debug!(token_hash = %token_hash, "Token removed from blacklist");
+        // debug!(token_hash = %token_hash, "Token removed from blacklist");
 
         Ok(())
     }
@@ -183,7 +183,7 @@ impl TokenBlacklist {
                         // If ttl_value > 0, key still has time remaining
                     },
                     Err(e) => {
-                        debug!(key = %key, error = %e, "Error checking TTL during cleanup");
+                        // debug!(key = %key, error = %e, "Error checking TTL during cleanup");
                         continue;
                     },
                 }

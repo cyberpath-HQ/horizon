@@ -195,36 +195,13 @@ fn generate_all_permission_check(permissions: &[Expr]) -> proc_macro2::TokenStre
             #(#permission_exprs),*
         ];
 
-        // Create permission service from the state's database connection
-        let permission_service = auth::permissions::PermissionService::new(state.db.clone());
-
         // Check ALL required permissions - all must be granted (AND logic)
         for perm in &required_permissions {
-            match permission_service.check_permission(&user.id, perm.clone()).await {
-                Ok(auth::permissions::PermissionCheckResult::Allowed) => {
-                    // Continue to next permission check
-                },
-                Ok(auth::permissions::PermissionCheckResult::Denied) => {
-                    return Err(error::AppError::forbidden(
-                        format!("Missing required permission: {}", perm.to_string())
-                    ));
-                },
-                Ok(auth::permissions::PermissionCheckResult::RequiresContext { scope_type, scope_id }) => {
-                    return Err(error::AppError::forbidden(
-                        format!(
-                            "Permission '{}' requires context: {} {}",
-                            perm.to_string(),
-                            scope_type,
-                            scope_id.unwrap_or_else(|| "unspecified".to_string())
-                        )
-                    ));
-                },
-                Ok(auth::permissions::PermissionCheckResult::Unauthenticated) => {
-                    return Err(error::AppError::unauthorized("User authentication required for this action"));
-                },
-                Err(e) => {
-                    return Err(error::AppError::internal(format!("Failed to check permissions: {}", e)));
-                },
+            let perm_str = perm.to_string();
+            if !user.roles.contains(&perm_str) {
+                return Err(error::AppError::forbidden(
+                    format!("Missing required permission: {}", perm_str)
+                ));
             }
         }
     }
@@ -244,36 +221,17 @@ fn generate_any_permission_check(permissions: &[Expr]) -> proc_macro2::TokenStre
             #(#permission_exprs),*
         ];
 
-        // Create permission service from the state's database connection
-        let permission_service = auth::permissions::PermissionService::new(state.db.clone());
-
         // Check ANY required permission - at least one must be granted (OR logic)
         let mut has_permission = false;
         let mut denied_permissions = Vec::new();
 
         for perm in &required_permissions {
-            match permission_service.check_permission(&user.id, perm.clone()).await {
-                Ok(auth::permissions::PermissionCheckResult::Allowed) => {
-                    has_permission = true;
-                    break; // Found one allowed permission, we're done
-                },
-                Ok(auth::permissions::PermissionCheckResult::Denied) => {
-                    denied_permissions.push(perm.to_string());
-                },
-                Ok(auth::permissions::PermissionCheckResult::RequiresContext { scope_type, scope_id }) => {
-                    denied_permissions.push(format!(
-                        "{} requires context: {} {}",
-                        perm.to_string(),
-                        scope_type,
-                        scope_id.unwrap_or_else(|| "unspecified".to_string())
-                    ));
-                },
-                Ok(auth::permissions::PermissionCheckResult::Unauthenticated) => {
-                    return Err(error::AppError::unauthorized("User authentication required for this action"));
-                },
-                Err(e) => {
-                    return Err(error::AppError::internal(format!("Failed to check permissions: {}", e)));
-                },
+            let perm_str = perm.to_string();
+            if user.roles.contains(&perm_str) {
+                has_permission = true;
+                break; // Found one allowed permission, we're done
+            } else {
+                denied_permissions.push(perm_str);
             }
         }
 

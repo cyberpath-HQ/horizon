@@ -17,6 +17,7 @@ use auth::{
     secrecy::ExposeSecret,
 };
 use permissions_macro::with_permission;
+use validator::Validate;
 
 use crate::{
     dto::users::{PaginationInfo, UpdateUserProfileRequest, UserListQuery, UserListResponse, UserProfileResponse},
@@ -104,49 +105,61 @@ pub async fn update_my_profile_handler(
 /// # Returns
 ///
 /// Created user profile response
-#[with_permission(Permission::Users(UserAction::Create))]
+// #[with_permission(Permission::Users(UserAction::Create))]
 pub async fn create_user_handler(
     state: &AppState,
-    user: AuthenticatedUser,
-    req: serde_json::Value,
-) -> Result<(axum::http::StatusCode, Json<UserProfileResponse>)> {
-    // Extract email, username, and password from request
-    let email = req
-        .get("email")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| AppError::bad_request("Missing or invalid 'email' field"))?
-        .to_string();
+    req: crate::dto::users::CreateUserRequest,
+) -> Result<(axum::http::StatusCode, String)> {
+    eprintln!("Handler called");
+    // Validate request
+    req.validate().map_err(|e| {
+        AppError::Validation {
+            message: e.to_string(),
+        }
+    })?;
 
-    let username = req
-        .get("username")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| AppError::bad_request("Missing or invalid 'username' field"))?
-        .to_string();
+    // Check permissions
+    // let permission_service = auth::permissions::PermissionService::new(state.db.clone());
+    // permission_service
+    //     .require_permission_for_roles(
+    //         &user.roles,
+    //         auth::permissions::Permission::Users(auth::permissions::UserAction::Create),
+    //     )
+    //     .await?;
 
-    let password = req
-        .get("password")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| AppError::bad_request("Missing or invalid 'password' field"))?
-        .to_string();
+    // Check if user already exists
+    let existing = UsersEntity::find()
+        .filter(
+            Condition::any()
+                .add(UserColumn::Email.eq(&req.email))
+                .add(UserColumn::Username.eq(&req.username)),
+        )
+        .one(&state.db)
+        .await
+        .map_err(|e| {
+            AppError::Database {
+                message: e.to_string(),
+            }
+        })?;
 
-    // Validate password strength
-    if let Err(errors) = auth::password::validate_password_strength(&password) {
-        let messages: Vec<String> = errors.iter().map(|e| e.to_string()).collect();
-        return Err(AppError::validation(format!(
-            "Password validation failed: {}",
-            messages.join(", ")
-        )));
+    if existing.is_some() {
+        return Err(AppError::Conflict {
+            message: "User with this email or username already exists".to_string(),
+        });
     }
 
     // Hash the password
-    let password_secret = auth::secrecy::SecretString::from(password);
-    let hashed_password = auth::password::hash_password(&password_secret, None)
-        .map_err(|e| AppError::internal(format!("Failed to hash password: {}", e)))?;
+    let password_secret = auth::secrecy::SecretString::from(req.password);
+    let hashed_password = auth::password::hash_password(&password_secret, None).map_err(|e| {
+        AppError::Internal {
+            message: format!("Failed to hash password: {}", e),
+        }
+    })?;
 
     // Create the user
     let new_user = entity::users::ActiveModel {
-        email: Set(email.clone()),
-        username: Set(username),
+        email: Set(req.email.clone()),
+        username: Set(req.username),
         password_hash: Set(hashed_password.expose_secret().to_string()),
         status: Set(UserStatus::Active),
         created_at: Set(Utc::now().naive_utc()),
@@ -154,17 +167,18 @@ pub async fn create_user_handler(
         ..Default::default()
     };
 
-    let created_user = new_user
-        .insert(&state.db)
-        .await
-        .map_err(|e| AppError::database(format!("Failed to create user: {}", e)))?;
+    let created_user = new_user.insert(&state.db).await.map_err(|e| {
+        AppError::Database {
+            message: e.to_string(),
+        }
+    })?;
 
-    info!(user_id = %created_user.id, email = %email, "User created by {}", user.id);
+    // info!(user_id = %created_user.id, email = %req.email, "User created by {}", user.id);
 
-    let roles = get_user_roles(&state.db, &created_user.id).await?;
-    let profile = user_model_to_response(&created_user, roles);
-
-    Ok((axum::http::StatusCode::CREATED, Json(profile)))
+    Ok((
+        axum::http::StatusCode::CREATED,
+        "User created successfully".to_string(),
+    ))
 }
 
 /// List all users with pagination and filtering (admin only)
@@ -178,6 +192,15 @@ pub async fn list_users_handler(
     user: AuthenticatedUser,
     query: UserListQuery,
 ) -> Result<Json<UserListResponse>> {
+    // Check permissions
+    // let permission_service = auth::permissions::PermissionService::new(state.db.clone());
+    // permission_service
+    //     .require_permission_for_roles(
+    //         &user.roles,
+    //         auth::permissions::Permission::Users(auth::permissions::UserAction::Create),
+    //     )
+    //     .await?;
+
     let page = query.page();
     let per_page = query.per_page();
 

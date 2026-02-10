@@ -812,12 +812,8 @@ async fn test_e2e_user_creation_requires_permission() {
         },
     };
 
-    // Try to flush Redis, but skip if it fails
-    if let Err(e) = redis.flush_all().await {
-        eprintln!("Warning: Failed to flush Redis: {}", e);
-        eprintln!("Skipping test due to Redis unavailability");
-        return;
-    }
+    // Try to flush Redis, but skip if it fails - Redis is not needed for permission checks
+    let _ = redis.flush_all().await;
 
     let jwt_config = JwtConfig {
         secret:             BASE64.encode("test-secret-key-that-is-at-least-32-bytes-long".as_bytes()),
@@ -836,10 +832,7 @@ async fn test_e2e_user_creation_requires_permission() {
     let app: axum::Router = router::create_router(state);
 
     // Create admin user in database
-    let admin_fixture = UserFixture::default()
-        .with_email("admin@example.com")
-        .with_username("admin")
-        .with_password("AdminPass123!");
+    let admin_fixture = UserFixture::new();
 
     let hashed_password = hash_password(
         &auth::secrecy::SecretString::from(admin_fixture.password.clone()),
@@ -932,12 +925,8 @@ async fn test_e2e_user_read_without_permission_returns_403() {
         },
     };
 
-    // Try to flush Redis, but skip if it fails
-    if let Err(e) = redis.flush_all().await {
-        eprintln!("Warning: Failed to flush Redis: {}", e);
-        eprintln!("Skipping test due to Redis unavailability");
-        return;
-    }
+    // Try to flush Redis, but skip if it fails - Redis is not needed for permission checks
+    let _ = redis.flush_all().await;
 
     let jwt_config = JwtConfig {
         secret:             BASE64.encode("test-secret-key-that-is-at-least-32-bytes-long".as_bytes()),
@@ -957,8 +946,8 @@ async fn test_e2e_user_read_without_permission_returns_403() {
 
     // Create regular user without users:read permission
     let regular_fixture = UserFixture::default()
-        .with_email("regular@example.com")
-        .with_username("regular")
+        .with_email("regular_user_read@example.com")
+        .with_username("regular_user_read")
         .with_password("Pass123!");
 
     let hashed_password = hash_password(
@@ -1040,12 +1029,8 @@ async fn test_e2e_team_member_operations_requires_permissions() {
         },
     };
 
-    // Try to flush Redis, but skip if it fails
-    if let Err(e) = redis.flush_all().await {
-        eprintln!("Warning: Failed to flush Redis: {}", e);
-        eprintln!("Skipping test due to Redis unavailability");
-        return;
-    }
+    // Try to flush Redis, but skip if it fails - Redis is not needed for permission checks
+    let _ = redis.flush_all().await;
 
     let jwt_config = JwtConfig {
         secret:             BASE64.encode("test-secret-key-that-is-at-least-32-bytes-long".as_bytes()),
@@ -1064,10 +1049,7 @@ async fn test_e2e_team_member_operations_requires_permissions() {
     let app: axum::Router = router::create_router(state);
 
     // Create team member user with only teams:members_read permission
-    let member_fixture = UserFixture::default()
-        .with_email("member@example.com")
-        .with_username("member")
-        .with_password("Pass123!");
+    let member_fixture = UserFixture::default().with_password("Pass123!");
 
     let hashed_password = hash_password(
         &auth::secrecy::SecretString::from(member_fixture.password.clone()),
@@ -1111,6 +1093,7 @@ async fn test_e2e_team_member_operations_requires_permissions() {
                 .method(axum::http::Method::POST)
                 .header("Authorization", format!("Bearer {}", token))
                 .header("Content-Type", "application/json")
+                .extension(axum::Extension(jwt_config.clone()))
                 .uri("/api/v1/teams/team-123/members")
                 .body(axum::body::Body::from(request_body.to_string()))
                 .unwrap(),
@@ -1118,8 +1101,14 @@ async fn test_e2e_team_member_operations_requires_permissions() {
         .await
         .unwrap();
 
+    let status = response.status();
+    let b = response.into_body();
+    let body_bytes = axum::body::to_bytes(b, usize::MAX).await.unwrap();
+    println!("Response status: {}", status);
+    println!("Response body: {:?}", body_bytes);
+
     // Should return 403 Forbidden (no teams:members_add permission)
-    assert_eq!(response.status(), axum::http::StatusCode::FORBIDDEN);
+    assert_eq!(status, axum::http::StatusCode::FORBIDDEN);
 
     // Cleanup
     entity::users::Entity::delete_many()
@@ -1178,8 +1167,8 @@ async fn test_e2e_api_key_rotation_requires_permission() {
 
     // Create user with api_keys:rotate permission
     let user_fixture = UserFixture::default()
-        .with_email("admin@example.com")
-        .with_username("admin")
+        .with_email("admin_api_key@example.com")
+        .with_username("admin_api_key")
         .with_password("AdminPass123!");
 
     let hashed_password = hash_password(
@@ -1291,8 +1280,8 @@ async fn test_e2e_admin_user_has_all_permissions() {
 
     // Create admin user with all permissions
     let admin_fixture = UserFixture::default()
-        .with_email("admin@example.com")
-        .with_username("admin")
+        .with_email("admin_all_perms@example.com")
+        .with_username("admin_all_perms")
         .with_password("AdminPass123!");
 
     let hashed_password = hash_password(

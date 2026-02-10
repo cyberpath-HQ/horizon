@@ -312,6 +312,12 @@ pub async fn add_team_member_handler(
     team_id: &str,
     req: AddTeamMemberRequest,
 ) -> Result<Json<TeamMemberResponse>> {
+    // Check permissions
+    let permission_service = auth::permissions::PermissionService::new(state.db.clone());
+    permission_service
+        .require_permission_for_roles(&user.roles, auth::permissions::Permission::Teams(auth::permissions::TeamAction::MembersAdd))
+        .await?;
+
     let team = TeamsEntity::find_by_id(team_id)
         .one(&state.db)
         .await?

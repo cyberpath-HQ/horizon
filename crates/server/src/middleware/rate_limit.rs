@@ -13,6 +13,7 @@ use axum::{
     http::{header, StatusCode},
     middleware::Next,
     response::{IntoResponse, Response},
+    Extension,
 };
 use redis::AsyncCommands;
 use serde_json::json;
@@ -141,15 +142,15 @@ fn extract_client_ip(request: &Request, peer_addr: &SocketAddr) -> String {
 /// 4. Returns 429 Too Many Requests when the limit is exceeded
 /// 5. Adds rate limit headers (X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After)
 pub async fn rate_limit_middleware(mut request: Request, next: Next) -> Response {
-    // Try to get peer address from ConnectInfo if available
+    // Get peer address from ConnectInfo extension (set by tower service)
     let peer_addr = request
         .extensions()
         .get::<axum::extract::ConnectInfo<SocketAddr>>()
         .map(|info| info.0);
 
     // If no ConnectInfo or app state, skip rate limiting (e.g., in tests)
-    let app_state = match request.extensions().get::<AppState>() {
-        Some(state) => state.clone(),
+    let app_state = match request.extensions().get::<Extension<AppState>>() {
+        Some(ext) => ext.clone(),
         None => {
             // If no state, skip rate limiting (fall through)
             return next.run(request).await;

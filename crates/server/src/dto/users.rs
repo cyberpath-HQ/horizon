@@ -36,6 +36,20 @@ pub struct UserProfileResponse {
     pub updated_at:        String,
 }
 
+/// Request to create a new user
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Validate)]
+pub struct CreateUserRequest {
+    /// User's email address
+    #[validate(email(message = "Invalid email format"))]
+    pub email:    String,
+    /// User's username
+    #[validate(length(min = 3, max = 50, message = "Username must be between 3 and 50 characters"))]
+    pub username: String,
+    /// User's password
+    #[validate(length(min = 8, message = "Password must be at least 8 characters"))]
+    pub password: String,
+}
+
 /// Request to update user profile
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Validate)]
 pub struct UpdateUserProfileRequest {

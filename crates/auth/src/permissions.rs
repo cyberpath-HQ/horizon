@@ -252,7 +252,7 @@ impl PermissionService {
     ///
     /// # Example
     /// ```ignore
-    /// let service = PermissionService::new(&db);
+    /// let service = PermissionService::new(db.clone());
     /// let result = service.check_permission("user-123", Permission::Users(UserAction::Create)).await?;
     /// if matches!(result, PermissionCheckResult::Allowed) {
     ///     // User can create users
@@ -265,13 +265,38 @@ impl PermissionService {
             Err(_) => vec![], // If database error, treat as no roles
         };
 
-        debug!(user_id = %user_id, permission = %permission, "Checking user permission");
+        self.check_permission_for_roles(&roles, permission).await
+    }
 
-        // Check each role's permissions
-        for role_name in &roles {
+    /// Check if a set of roles has a specific permission
+    ///
+    /// # Arguments
+    ///
+    /// * `roles` - The roles to check
+    /// * `permission` - The permission to check
+    ///
+    /// # Returns
+    ///
+    /// `PermissionCheckResult::Allowed` if the roles have the permission,
+    /// `PermissionCheckResult::Denied` otherwise
+    pub async fn check_permission_for_roles(&self, roles: &[String], permission: Permission) -> Result<PermissionCheckResult> {
+        let permission_str = permission.to_string();
+
+        // debug!(roles = ?roles, permission = %permission, permission_str = %permission_str, "Checking permission for roles");
+
+        // First, check for direct permission matches (for JWT roles that are permission strings)
+        for role in roles {
+            if role == &permission_str {
+                // debug!(role = %role, "Permission granted by direct match");
+                return Ok(PermissionCheckResult::Allowed);
+            }
+        }
+
+        // Then check role-based permissions
+        for role_name in roles {
             match self.check_role_permission(role_name, &permission).await? {
                 PermissionCheckResult::Allowed => {
-                    debug!(user_id = %user_id, role = %role_name, "Permission granted by role");
+                    // debug!(role = %role_name, "Permission granted by role");
                     return Ok(PermissionCheckResult::Allowed);
                 },
                 PermissionCheckResult::Denied => {
@@ -292,18 +317,24 @@ impl PermissionService {
             }
         }
 
-        debug!(user_id = %user_id, permission = %permission, "Permission denied");
+        // debug!(permission = %permission, "Permission denied");
         Ok(PermissionCheckResult::Denied)
     }
 
     /// Check if a role has a specific permission
     async fn check_role_permission(&self, role_name: &str, permission: &Permission) -> Result<PermissionCheckResult> {
         // Get the role from the database
-        let role = entity::roles::Entity::find()
+        let role = match entity::roles::Entity::find()
             .filter(entity::roles::Column::Slug.eq(role_name))
             .one(&self.db)
             .await?
-            .ok_or_else(|| error::AppError::not_found(format!("Role '{}' not found", role_name)))?;
+        {
+            Some(role) => role,
+            None => {
+                // Role doesn't exist, so permission is not granted
+                return Ok(PermissionCheckResult::Denied);
+            }
+        };
 
         // Parse role permissions from JSON
         let role_permissions: Vec<String> = serde_json::from_value(role.permissions.clone()).unwrap_or_default();
@@ -490,6 +521,30 @@ impl PermissionService {
     /// ```
     pub async fn require_permission(&self, user_id: &str, permission: Permission) -> Result<()> {
         match self.check_permission(user_id, permission).await? {
+            PermissionCheckResult::Allowed => Ok(()),
+            PermissionCheckResult::Unauthenticated => Err(error::AppError::unauthorized("Authentication required")),
+            _ => Err(error::AppError::forbidden("Insufficient permissions")),
+        }
+    }
+
+    /// Require that a set of roles has a specific permission, returning an error if not
+    ///
+    /// # Arguments
+    ///
+    /// * `roles` - The roles to check
+    /// * `permission` - The permission required
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` if the roles have the permission, `Err(AppError)` otherwise
+    ///
+    /// # Example
+    /// ```ignore
+    /// permission_service.require_permission_for_roles(&user.roles, Permission::Users(UserAction::Read)).await?;
+    /// // Continue with handler logic
+    /// ```
+    pub async fn require_permission_for_roles(&self, roles: &[String], permission: Permission) -> Result<()> {
+        match self.check_permission_for_roles(roles, permission).await? {
             PermissionCheckResult::Allowed => Ok(()),
             PermissionCheckResult::Unauthenticated => Err(error::AppError::unauthorized("Authentication required")),
             _ => Err(error::AppError::forbidden("Insufficient permissions")),
