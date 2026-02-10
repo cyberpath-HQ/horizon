@@ -9,7 +9,6 @@ use axum::{
     http::{header, StatusCode},
     middleware::Next,
     response::{IntoResponse, Response},
-    Extension,
 };
 use serde_json::json;
 use tracing::{debug, warn};
@@ -47,8 +46,8 @@ pub async fn api_key_auth_middleware(mut request: Request, next: Next) -> Respon
     };
 
     // Get app state
-    let app_state = match request.extensions().get::<Extension<AppState>>() {
-        Some(ext) => ext.clone(),
+    let app_state = match request.extensions().get::<AppState>() {
+        Some(state) => state.clone(),
         None => {
             // If no state available (e.g., in tests with oneshot), skip API key auth and pass through
             return next.run(request).await;

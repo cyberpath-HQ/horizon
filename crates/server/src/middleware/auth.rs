@@ -7,7 +7,6 @@ use axum::{
     http::{header, StatusCode},
     middleware::Next,
     response::{IntoResponse, Response},
-    Extension,
 };
 use serde_json::json;
 use auth::jwt::{extract_bearer_token, validate_token};
@@ -49,24 +48,10 @@ where
 /// 3. Adds authenticated user info to request extensions
 /// 4. Rejects requests with invalid/missing tokens
 pub async fn auth_middleware(mut request: Request, next: Next) -> Response {
-    // Get app state for Redis access
-    let app_state = request.extensions().get::<Extension<AppState>>();
-
-    // Get JWT config - either from AppState or try to extract from extensions directly
-    let jwt_config = match app_state {
-        Some(state) => &state.0.jwt_config,
-        None => {
-            // Try to get JWT config from a separate extension for testing
-            match request.extensions().get::<Extension<auth::JwtConfig>>() {
-                Some(config) => &config.0,
-                None => {
-                    // No JWT config available, skip auth and pass through
-                    // This allows tests to proceed without needing full middleware state propagation
-                    return next.run(request).await;
-                },
-            }
-        },
-    };
+    // Get app state
+    let state = request.extensions().get::<AppState>().unwrap();
+    // Get JWT config from state
+    let jwt_config = &state.jwt_config;
 
     // Extract Authorization header
     let auth_header = match request.headers().get(header::AUTHORIZATION) {
@@ -109,21 +94,21 @@ pub async fn auth_middleware(mut request: Request, next: Next) -> Response {
     };
 
     // Check if token is blacklisted
-    // let token_hash = hash_token_for_blacklist(&token);
-    // let blacklist = crate::token_blacklist::TokenBlacklist::new(app_state.redis.clone());
-    // match blacklist.is_blacklisted(&token_hash).await {
-    //     Ok(true) => {
-    //         return create_auth_error_response("Token has been revoked");
-    //     },
-    //     Ok(false) => {
-    //         // Token is not blacklisted, continue
-    //     },
-    //     Err(e) => {
-    //         // Fail-closed for security: deny request if we can't verify token status
-    //         tracing::error!("Failed to check token blacklist, denying request: {}", e);
-    //         return create_auth_error_response("Authentication service temporarily unavailable");
-    //     },
-    // }
+    let token_hash = crate::token_blacklist::hash_token_for_blacklist(&token);
+    let blacklist = crate::token_blacklist::TokenBlacklist::new(state.redis.clone());
+    match blacklist.is_blacklisted(&token_hash).await {
+        Ok(true) => {
+            return create_auth_error_response("Token has been revoked");
+        },
+        Ok(false) => {
+            // Token is not blacklisted, continue
+        },
+        Err(e) => {
+            // Fail-closed for security: deny request if we can't verify token status
+            tracing::error!("Failed to check token blacklist, denying request: {}", e);
+            return create_auth_error_response("Authentication service temporarily unavailable");
+        },
+    }
 
     // Create authenticated user from claims
     let user = AuthenticatedUser {
