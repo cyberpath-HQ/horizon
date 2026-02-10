@@ -385,21 +385,20 @@ pub async fn logout_handler_inner(state: &AppState, request: Request) -> Result<
     }
 
     // Extract the access token from the Authorization header to blacklist it
-    if let Some(auth_header) = request.headers().get("authorization") {
-        if let Ok(auth_str) = auth_header.to_str() {
-            if let Some(token) = extract_bearer_token(auth_str) {
-                // Blacklist the token
-                let token_hash = crate::token_blacklist::hash_token_for_blacklist(&token);
-                let blacklist = crate::token_blacklist::TokenBlacklist::new(state.redis.clone());
+    if let Some(auth_header) = request.headers().get("authorization")
+        && let Ok(auth_str) = auth_header.to_str()
+        && let Some(token) = extract_bearer_token(auth_str)
+    {
+        // Blacklist the token
+        let token_hash = crate::token_blacklist::hash_token_for_blacklist(&token);
+        let blacklist = crate::token_blacklist::TokenBlacklist::new(state.redis.clone());
 
-                // Calculate expiration time (we'll use the JWT expiration time)
-                let expires_at = Utc::now() + chrono::Duration::seconds(state.jwt_config.expiration_seconds as i64);
+        // Calculate expiration time (we'll use the JWT expiration time)
+        let expires_at = Utc::now() + chrono::Duration::seconds(state.jwt_config.expiration_seconds as i64);
 
-                if let Err(e) = blacklist.blacklist_token(&token_hash, expires_at).await {
-                    // Log the error but don't fail the logout
-                    tracing::warn!("Failed to blacklist token on logout: {}", e);
-                }
-            }
+        if let Err(e) = blacklist.blacklist_token(&token_hash, expires_at).await {
+            // Log the error but don't fail the logout
+            tracing::warn!("Failed to blacklist token on logout: {}", e);
         }
     }
 
