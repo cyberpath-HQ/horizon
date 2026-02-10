@@ -854,8 +854,17 @@ mod tests {
 
         // Note: This test only checks the role-based logic, not the DB-dependent parts
         // For full testing, integration tests are needed
-        assert!(user_admin.roles.iter().any(|r| r == "super_admin" || r == "admin"));
-        assert!(user_super.roles.iter().any(|r| r == "super_admin" || r == "admin"));
-        assert!(!user_regular.roles.iter().any(|r| r == "super_admin" || r == "admin"));
+        assert!(user_admin
+            .roles
+            .iter()
+            .any(|r| r == "super_admin" || r == "admin"));
+        assert!(user_super
+            .roles
+            .iter()
+            .any(|r| r == "super_admin" || r == "admin"));
+        assert!(!user_regular
+            .roles
+            .iter()
+            .any(|r| r == "super_admin" || r == "admin"));
     }
 }
