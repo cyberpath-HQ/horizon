@@ -48,13 +48,6 @@ jobs:
           sudo apt update && sudo apt install -y libglib2.0-dev libwebkit2gtk-4.1-dev build-essential curl wget file
           libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
 
-      - name: Run database migrations
-        run: |
-          cargo build --release -p migration
-          cargo run --release -p migration -- run
-        env:
-          DATABASE_URL: postgres://horizon:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/horizon_test
-
       - name: Run tests
         run: ./scripts/run-test.sh
         env:
