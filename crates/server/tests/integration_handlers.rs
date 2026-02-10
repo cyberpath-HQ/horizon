@@ -187,11 +187,10 @@ async fn test_login_returns_tokens_on_success() {
 
     let state = create_test_app_state().await;
 
-    let unique_email = format!("tokentest.{}", get_unique_id());
-    let user = create_test_user(&state, &unique_email).await;
+    let user = create_test_user(&state, "tokentest").await;
 
     let req = LoginRequest {
-        email:    unique_email,
+        email:    user.email.clone(),
         password: TEST_PASSWORD.to_string(),
     };
 

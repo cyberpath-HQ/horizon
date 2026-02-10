@@ -14,7 +14,7 @@ use error::Result;
 use redis::AsyncCommands;
 use tracing::error;
 
-use crate::AppState;
+use crate::{middleware::auth::AuthenticatedUser, AppState};
 
 /// Creates the API router with all routes
 ///
@@ -241,10 +241,10 @@ async fn update_my_profile_handler(
 /// Create a new user
 async fn create_user_handler(
     State(state): State<AppState>,
+    user: AuthenticatedUser,
     Json(req): Json<crate::dto::users::CreateUserRequest>,
 ) -> Response {
-    eprintln!("Router handler called");
-    match crate::auth::users::create_user_handler(&state, req).await {
+    match crate::auth::users::create_user_handler(&state, user, req).await {
         Ok((status, body)) => (status, body).into_response(),
         Err(e) => e.into_response(),
     }
