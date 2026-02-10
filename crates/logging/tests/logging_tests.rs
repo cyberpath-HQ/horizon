@@ -8,18 +8,11 @@ mod logging_config_tests {
 
     #[test]
     fn test_logging_config_defaults() {
-        let _config = LoggingConfig::default();
+        let config = LoggingConfig::default();
         // Verify defaults are sensible
-        assert!(true);
-    }
-
-    #[test]
-    fn test_logging_level_parsing() {
-        // Test that logging levels are properly understood
-        let levels = vec!["DEBUG", "INFO", "WARN", "ERROR"];
-        for _level in levels {
-            assert!(true); // Log levels should be valid
-        }
+        assert_eq!(config.level, "info");
+        assert_eq!(config.format, "json");
+        assert_eq!(config.environment, "development");
     }
 
     #[test]

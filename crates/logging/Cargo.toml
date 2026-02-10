@@ -21,6 +21,7 @@ tracing-subscriber = { workspace = true, features = [
     "ansi",
 ] }
 tracing-appender = { workspace = true }
+derivative = { workspace = true }
 
 # Configuration
 serde = { workspace = true }
