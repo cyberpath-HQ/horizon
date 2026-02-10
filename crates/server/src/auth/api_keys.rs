@@ -145,7 +145,7 @@ pub async fn list_api_keys_handler(
         0
     }
     else {
-        (total + per_page - 1) / per_page
+        total.div_ceil(per_page)
     };
 
     let keys = base_query
@@ -500,10 +500,10 @@ pub async fn authenticate_api_key(
         .ok_or_else(|| AppError::unauthorized("Invalid API key"))?;
 
     // Check expiration
-    if let Some(expires_at) = api_key.expires_at {
-        if expires_at < Utc::now().naive_utc() {
-            return Err(AppError::unauthorized("API key has expired"));
-        }
+    if let Some(expires_at) = api_key.expires_at
+        && expires_at < Utc::now().naive_utc()
+    {
+        return Err(AppError::unauthorized("API key has expired"));
     }
 
     // Load the associated user
@@ -554,8 +554,7 @@ pub fn check_api_key_permissions(permissions: &serde_json::Value, endpoint: &str
                     return true;
                 }
                 // Support glob-like matching with trailing *
-                if pattern.ends_with('*') {
-                    let prefix = &pattern[.. pattern.len() - 1];
+                if let Some(prefix) = pattern.strip_suffix('*') {
                     return endpoint.starts_with(prefix);
                 }
                 pattern == endpoint
