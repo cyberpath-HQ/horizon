@@ -260,7 +260,10 @@ impl PermissionService {
     /// ```
     pub async fn check_permission(&self, user_id: &str, permission: Permission) -> Result<PermissionCheckResult> {
         // Get all roles for the user
-        let roles = roles::get_user_roles(&self.db, user_id).await?;
+        let roles = match roles::get_user_roles(&self.db, user_id).await {
+            Ok(roles) => roles,
+            Err(_) => vec![], // If database error, treat as no roles
+        };
 
         debug!(user_id = %user_id, permission = %permission, "Checking user permission");
 

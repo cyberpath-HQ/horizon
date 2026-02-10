@@ -9,8 +9,6 @@
 //! - [`middleware`]: HTTP middleware (CORS, auth, logging)
 //! - [`router`]: API route configuration
 
-use error::Result;
-
 pub mod auth;
 pub mod dto;
 pub mod middleware;

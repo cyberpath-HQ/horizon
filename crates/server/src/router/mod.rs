@@ -38,6 +38,7 @@ pub fn create_router(state: AppState) -> Router {
         // User endpoints
         .route("/api/v1/users/me", get(get_my_profile_handler))
         .route("/api/v1/users/me", put(update_my_profile_handler))
+        .route("/api/v1/users", post(create_user_handler))
         .route("/api/v1/users", get(list_users_handler))
         // Team endpoints
         .route("/api/v1/teams", post(create_team_handler))
@@ -78,7 +79,7 @@ pub fn create_router(state: AppState) -> Router {
         .merge(health_route)
         .with_state(state);
 
-    // Apply rate limiting to all routes
+    // Apply rate limiting to all routes (ConnectInfo will be provided by the tower service)
     all_routes.layer(middleware::from_fn(
         crate::middleware::rate_limit::rate_limit_middleware,
     ))
@@ -235,6 +236,18 @@ async fn update_my_profile_handler(
     Json(req): Json<crate::dto::users::UpdateUserProfileRequest>,
 ) -> Result<Json<crate::dto::users::UserProfileResponse>> {
     crate::auth::users::update_my_profile_handler(&state, user, req).await
+}
+
+/// Create a new user
+async fn create_user_handler(
+    State(state): State<AppState>,
+    Extension(user): Extension<crate::middleware::auth::AuthenticatedUser>,
+    Json(req): Json<serde_json::Value>,
+) -> Result<(
+    axum::http::StatusCode,
+    Json<crate::dto::users::UserProfileResponse>,
+)> {
+    crate::auth::users::create_user_handler(&state, user, req).await
 }
 
 /// List users (admin only)

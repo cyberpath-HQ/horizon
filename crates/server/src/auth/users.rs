@@ -14,6 +14,7 @@ use tracing::info;
 use auth::{
     permissions::{Permission, UserAction},
     roles::get_user_roles,
+    secrecy::ExposeSecret,
 };
 use permissions_macro::with_permission;
 
@@ -90,6 +91,80 @@ pub async fn update_my_profile_handler(
     info!(user_id = %user.id, "User profile updated");
 
     Ok(Json(profile))
+}
+
+/// Create a new user (requires users:create permission)
+///
+/// # Arguments
+///
+/// * `state` - Application state
+/// * `user` - Authenticated user from middleware
+/// * `req` - Request body with user details
+///
+/// # Returns
+///
+/// Created user profile response
+#[with_permission(Permission::Users(UserAction::Create))]
+pub async fn create_user_handler(
+    state: &AppState,
+    user: AuthenticatedUser,
+    req: serde_json::Value,
+) -> Result<(axum::http::StatusCode, Json<UserProfileResponse>)> {
+    // Extract email, username, and password from request
+    let email = req
+        .get("email")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| AppError::bad_request("Missing or invalid 'email' field"))?
+        .to_string();
+
+    let username = req
+        .get("username")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| AppError::bad_request("Missing or invalid 'username' field"))?
+        .to_string();
+
+    let password = req
+        .get("password")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| AppError::bad_request("Missing or invalid 'password' field"))?
+        .to_string();
+
+    // Validate password strength
+    if let Err(errors) = auth::password::validate_password_strength(&password) {
+        let messages: Vec<String> = errors.iter().map(|e| e.to_string()).collect();
+        return Err(AppError::validation(format!(
+            "Password validation failed: {}",
+            messages.join(", ")
+        )));
+    }
+
+    // Hash the password
+    let password_secret = auth::secrecy::SecretString::from(password);
+    let hashed_password = auth::password::hash_password(&password_secret, None)
+        .map_err(|e| AppError::internal(format!("Failed to hash password: {}", e)))?;
+
+    // Create the user
+    let new_user = entity::users::ActiveModel {
+        email: Set(email.clone()),
+        username: Set(username),
+        password_hash: Set(hashed_password.expose_secret().to_string()),
+        status: Set(UserStatus::Active),
+        created_at: Set(Utc::now().naive_utc()),
+        updated_at: Set(Utc::now().naive_utc()),
+        ..Default::default()
+    };
+
+    let created_user = new_user
+        .insert(&state.db)
+        .await
+        .map_err(|e| AppError::database(format!("Failed to create user: {}", e)))?;
+
+    info!(user_id = %created_user.id, email = %email, "User created by {}", user.id);
+
+    let roles = get_user_roles(&state.db, &created_user.id).await?;
+    let profile = user_model_to_response(&created_user, roles);
+
+    Ok((axum::http::StatusCode::CREATED, Json(profile)))
 }
 
 /// List all users with pagination and filtering (admin only)

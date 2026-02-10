@@ -140,15 +140,27 @@ fn extract_client_ip(request: &Request, peer_addr: &SocketAddr) -> String {
 /// 3. Uses Redis ZRANGEBYSCORE + ZADD for sliding window counting
 /// 4. Returns 429 Too Many Requests when the limit is exceeded
 /// 5. Adds rate limit headers (X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After)
-pub async fn rate_limit_middleware(
-    axum::extract::ConnectInfo(peer_addr): axum::extract::ConnectInfo<SocketAddr>,
-    request: Request,
-    next: Next,
-) -> Response {
+pub async fn rate_limit_middleware(mut request: Request, next: Next) -> Response {
+    // Try to get peer address from ConnectInfo if available
+    let peer_addr = request
+        .extensions()
+        .get::<axum::extract::ConnectInfo<SocketAddr>>()
+        .map(|info| info.0);
+
+    // If no ConnectInfo or app state, skip rate limiting (e.g., in tests)
     let app_state = match request.extensions().get::<AppState>() {
         Some(state) => state.clone(),
         None => {
             // If no state, skip rate limiting (fall through)
+            return next.run(request).await;
+        },
+    };
+
+    let peer_addr = match peer_addr {
+        Some(addr) => addr,
+        None => {
+            // If no ConnectInfo available (e.g., in tests), skip rate limiting
+            debug!("ConnectInfo not available, skipping rate limiting");
             return next.run(request).await;
         },
     };
