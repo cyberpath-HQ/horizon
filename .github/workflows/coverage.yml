@@ -15,10 +15,11 @@ jobs:
         image: postgres:18-alpine
         env:
           POSTGRES_USER: horizon
-          POSTGRES_PASSWORD: horizon_secret_password_change_in_production
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           POSTGRES_DB: horizon_test
         options: >-
-          --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+          --health-cmd pg_isready -U horizon -d horizon_test --health-interval 10s --health-timeout 5s --health-retries
+          5
         ports:
           - 5432:5432
 
@@ -30,7 +31,7 @@ jobs:
           - 6379:6379
 
     env:
-      DATABASE_URL: postgres://horizon:horizon_secret_password_change_in_production@localhost:5432/horizon_test
+      DATABASE_URL: postgres://horizon:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/horizon_test
       REDIS_URL: redis://localhost:6379
       RUST_BACKTRACE: 1
 
