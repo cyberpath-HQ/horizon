@@ -122,7 +122,10 @@ fn extract_client_ip(request: &Request, peer_addr: &SocketAddr) -> String {
         .headers()
         .get("x-forwarded-for")
         .and_then(|v| v.to_str().ok())
-        .map(|s| s.split(',').next().unwrap_or("unknown").trim().to_string())
+        .and_then(|s| {
+            let ip = s.split(',').next().unwrap_or("").trim();
+            if ip.is_empty() { None } else { Some(ip.to_string()) }
+        })
         .or_else(|| {
             request
                 .headers()
@@ -812,9 +815,8 @@ mod tests {
             .body(axum::body::Body::empty())
             .unwrap();
         let peer_addr = "127.0.0.1:8080".parse().unwrap();
-        // When x-forwarded-for header exists but is empty, it returns empty string
-        // (the map() finds Some("") and doesn't trigger or_else)
+        // When x-forwarded-for header is empty, it should fall back to x-real-ip
         let ip = extract_client_ip(&request, &peer_addr);
-        assert_eq!(ip, "");
+        assert_eq!(ip, "10.0.0.1");
     }
 }
