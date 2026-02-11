@@ -10,20 +10,20 @@
 
 ## Table of Contents
 
-1. [Executive Summary](#executive-summary)
-2. [Introduction and Vision](#introduction-and-vision)
-3. [Architecture Overview](#architecture-overview)
-4. [Core Components](#core-components)
-5. [Database Schema Design](#database-schema-design)
-6. [API Design Specification](#api-design-specification)
-7. [Agent Architecture and Design](#agent-architecture-and-design)
-8. [Feature Specifications](#feature-specifications)
-9. [Security Framework](#security-framework)
-10. [Configuration Management](#configuration-management)
-11. [Docker Deployment](#docker-deployment)
-12. [Implementation Phases](#implementation-phases)
-13. [Technical Decisions and Justifications](#technical-decisions-and-justifications)
-14. [Action Items and Roadmap](#action-items-and-roadmap)
+1. [Executive Summary](#1-executive-summary)
+2. [Introduction and Vision](#2-introduction-and-vision)
+3. [Architecture Overview](#3-architecture-overview)
+4. [Core Components](#4-core-components)
+5. [Database Schema Design](#5-database-schema-design)
+6. [API Design Specification](#6-api-design-specification)
+7. [Agent Architecture and Design](#7-agent-architecture-and-design)
+8. [Feature Specifications](#8-feature-specifications)
+9. [Security Framework](#9-security-framework)
+10. [Configuration Management](#10-configuration-management)
+11. [Docker Deployment](#11-docker-deployment)
+12. [Implementation Phases](#12-implementation-phases)
+13. [Technical Decisions and Justifications](#13-technical-decisions-and-justifications)
+14. [Action Items and Roadmap](#14-action-items-and-roadmap)
 
 ---
 
