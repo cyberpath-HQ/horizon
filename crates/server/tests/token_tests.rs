@@ -149,15 +149,15 @@ async fn test_token_blacklist_ttl_expiration() {
     let is_blacklisted = blacklist.is_blacklisted(token_hash).await.unwrap();
     assert!(is_blacklisted, "Token should be blacklisted");
 
-    // Wait for expiration
-    sleep(Duration::from_secs(3)).await;
+    // Wait for expiration (with some margin to ensure Redis TTL has expired)
+    sleep(Duration::from_secs(4)).await;
 
-    // Check if expired (may or may not be expired from TTL, depending on Redis timing)
+    // Verify the token has expired and is no longer in the blacklist
     let is_blacklisted = blacklist.is_blacklisted(token_hash).await.unwrap();
-    // The token should not be blacklisted after expiration
-    // Note: Due to Redis timing, it might still be blacklisted for a short time
-    // But the operation should complete without error
-    let _ = is_blacklisted; // Just ensure no panic
+    assert!(
+        !is_blacklisted,
+        "Token should have expired and no longer be blacklisted after TTL"
+    );
 }
 
 /// Test blacklist with multiple tokens
