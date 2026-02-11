@@ -87,7 +87,8 @@ pub async fn create_api_key_handler(
                 "Expiration time exceeds maximum, using maximum allowed"
             );
             MAX_EXPIRATION_SECONDS
-        } else {
+        }
+        else {
             secs
         };
 
@@ -1197,15 +1198,14 @@ mod tests {
         )); // Different case
     }
 
-
     // ==================== Expiration Validation Security Tests ====================
 
     #[test]
     fn test_create_api_key_request_normal_expiration() {
         // Normal expiration time (1 hour)
         let req = CreateApiKeyRequest {
-            name: "Test Key".to_string(),
-            permissions: None,
+            name:               "Test Key".to_string(),
+            permissions:        None,
             expires_in_seconds: Some(3600),
         };
         assert!(req.validate().is_ok());
@@ -1216,8 +1216,8 @@ mod tests {
         // Maximum allowed expiration (100 years in seconds)
         let max_secs = 100 * 365 * 24 * 60 * 60;
         let req = CreateApiKeyRequest {
-            name: "Test Key".to_string(),
-            permissions: None,
+            name:               "Test Key".to_string(),
+            permissions:        None,
             expires_in_seconds: Some(max_secs),
         };
         assert!(req.validate().is_ok());
@@ -1228,8 +1228,8 @@ mod tests {
         // Expiration exceeds maximum (100 years + 1 second)
         let max_secs_plus_one = 100 * 365 * 24 * 60 * 60 + 1;
         let req = CreateApiKeyRequest {
-            name: "Test Key".to_string(),
-            permissions: None,
+            name:               "Test Key".to_string(),
+            permissions:        None,
             expires_in_seconds: Some(max_secs_plus_one),
         };
         assert!(req.validate().is_err());
@@ -1239,8 +1239,8 @@ mod tests {
     fn test_create_api_key_request_no_expiration() {
         // No expiration (key never expires)
         let req = CreateApiKeyRequest {
-            name: "Test Key".to_string(),
-            permissions: None,
+            name:               "Test Key".to_string(),
+            permissions:        None,
             expires_in_seconds: None,
         };
         assert!(req.validate().is_ok());
@@ -1250,8 +1250,8 @@ mod tests {
     fn test_create_api_key_request_min_expiration() {
         // Minimum expiration (1 second)
         let req = CreateApiKeyRequest {
-            name: "Test Key".to_string(),
-            permissions: None,
+            name:               "Test Key".to_string(),
+            permissions:        None,
             expires_in_seconds: Some(1),
         };
         assert!(req.validate().is_ok());
@@ -1261,8 +1261,8 @@ mod tests {
     fn test_create_api_key_request_expiration_zero() {
         // Zero expiration should be invalid
         let req = CreateApiKeyRequest {
-            name: "Test Key".to_string(),
-            permissions: None,
+            name:               "Test Key".to_string(),
+            permissions:        None,
             expires_in_seconds: Some(0),
         };
         assert!(req.validate().is_err());
@@ -1279,8 +1279,8 @@ mod tests {
     fn test_create_api_key_request_expiration_very_large_value() {
         // Test with u64::MAX to ensure no overflow
         let req = CreateApiKeyRequest {
-            name: "Test Key".to_string(),
-            permissions: None,
+            name:               "Test Key".to_string(),
+            permissions:        None,
             expires_in_seconds: Some(u64::MAX),
         };
         // This should fail validation because it exceeds MAX_EXPIRATION_SECONDS
@@ -1291,15 +1291,15 @@ mod tests {
     fn test_create_api_key_request_name_validation() {
         // Test name validation still works
         let req_empty_name = CreateApiKeyRequest {
-            name: "".to_string(),
-            permissions: None,
+            name:               "".to_string(),
+            permissions:        None,
             expires_in_seconds: Some(3600),
         };
         assert!(req_empty_name.validate().is_err());
 
         let req_valid_name = CreateApiKeyRequest {
-            name: "Valid Name".to_string(),
-            permissions: None,
+            name:               "Valid Name".to_string(),
+            permissions:        None,
             expires_in_seconds: Some(3600),
         };
         assert!(req_valid_name.validate().is_ok());
@@ -1309,18 +1309,17 @@ mod tests {
     fn test_create_api_key_request_combined_validation() {
         // Test that all validations work together
         let req_valid = CreateApiKeyRequest {
-            name: "Test Key".to_string(),
-            permissions: Some(serde_json::json!({"scopes": ["read"]})),
+            name:               "Test Key".to_string(),
+            permissions:        Some(serde_json::json!({"scopes": ["read"]})),
             expires_in_seconds: Some(86400), // 24 hours
         };
         assert!(req_valid.validate().is_ok());
 
         let req_invalid = CreateApiKeyRequest {
-            name: "".to_string(), // Invalid name
-            permissions: None,
+            name:               "".to_string(), // Invalid name
+            permissions:        None,
             expires_in_seconds: Some(u64::MAX), // Invalid expiration
         };
         assert!(req_invalid.validate().is_err());
     }
-
 }

@@ -76,8 +76,8 @@ impl ErrorHandler {
         if let AppError::RateLimit {
             retry_after,
             ..
-        } = err
-            && let Ok(retry_val) = retry_after.to_string().parse::<axum::http::HeaderValue>()
+        } = err &&
+            let Ok(retry_val) = retry_after.to_string().parse::<axum::http::HeaderValue>()
         {
             let _ = res.headers_mut().insert("Retry-After", retry_val);
         }

@@ -179,9 +179,9 @@ pub async fn cors_middleware(request: Request, next: Next, config: CorsConfig) -
     let origin = get_request_origin(&request);
 
     // Handle preflight (OPTIONS) requests
-    if request.method() == http::Method::OPTIONS
-        && let Some(ref req_origin) = origin
-        && is_origin_allowed(req_origin, &config.allowed_origins)
+    if request.method() == http::Method::OPTIONS &&
+        let Some(ref req_origin) = origin &&
+        is_origin_allowed(req_origin, &config.allowed_origins)
     {
         let mut response = (StatusCode::NO_CONTENT, Body::empty()).into_response();
         let headers = response.headers_mut();
@@ -191,18 +191,35 @@ pub async fn cors_middleware(request: Request, next: Next, config: CorsConfig) -
 
         // Allow specific methods
         // Join all methods into a single comma-separated value
-        let allowed_methods_value = config.allowed_methods.iter().map(|m| m.as_str()).collect::<Vec<_>>().join(", ");
-        insert_header(headers, "Access-Control-Allow-Methods", &allowed_methods_value);
+        let allowed_methods_value = config
+            .allowed_methods
+            .iter()
+            .map(|m| m.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        insert_header(
+            headers,
+            "Access-Control-Allow-Methods",
+            &allowed_methods_value,
+        );
 
         // Allow specific request headers
         // Join all headers into a single comma-separated value
         let allowed_headers_value = config.allowed_headers.join(", ");
-        insert_header(headers, "Access-Control-Allow-Headers", &allowed_headers_value);
+        insert_header(
+            headers,
+            "Access-Control-Allow-Headers",
+            &allowed_headers_value,
+        );
 
         // Expose headers that client-side JavaScript might need to read
         // Join all exposed headers into a single comma-separated value
         let exposed_headers_value = config.exposed_headers.join(", ");
-        insert_header(headers, "Access-Control-Expose-Headers", &exposed_headers_value);
+        insert_header(
+            headers,
+            "Access-Control-Expose-Headers",
+            &exposed_headers_value,
+        );
 
         // Credentials
         if config.allow_credentials {
@@ -227,8 +244,8 @@ pub async fn cors_middleware(request: Request, next: Next, config: CorsConfig) -
     // Handle regular requests
     let mut response = next.run(request).await;
 
-    if let Some(ref req_origin) = origin
-        && is_origin_allowed(req_origin, &config.allowed_origins)
+    if let Some(ref req_origin) = origin &&
+        is_origin_allowed(req_origin, &config.allowed_origins)
     {
         let headers = response.headers_mut();
         insert_header(headers, "Access-Control-Allow-Origin", req_origin);
@@ -236,7 +253,11 @@ pub async fn cors_middleware(request: Request, next: Next, config: CorsConfig) -
         // Expose headers for client-side access
         // Join all exposed headers into a single comma-separated value
         let exposed_headers_value = config.exposed_headers.join(", ");
-        insert_header(headers, "Access-Control-Expose-Headers", &exposed_headers_value);
+        insert_header(
+            headers,
+            "Access-Control-Expose-Headers",
+            &exposed_headers_value,
+        );
 
         if config.allow_credentials {
             insert_header(headers, "Access-Control-Allow-Credentials", "true");

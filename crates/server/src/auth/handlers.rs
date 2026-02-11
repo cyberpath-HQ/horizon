@@ -13,7 +13,7 @@ use entity::{
     users::{Column, Entity as UsersEntity},
 };
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
-use chrono::{DateTime, Utc, FixedOffset};
+use chrono::{DateTime, FixedOffset, Utc};
 use tracing::{info, warn};
 use axum::{extract::Request, Json};
 use error::{AppError, Result};

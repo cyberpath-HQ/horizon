@@ -533,23 +533,32 @@ impl From<redis::RedisError> for AppError {
 impl From<validator::ValidationErrors> for AppError {
     fn from(err: validator::ValidationErrors) -> Self {
         // Convert all errors to strings
-        let messages: Vec<String> = err.field_errors().iter()
+        let messages: Vec<String> = err
+            .field_errors()
+            .iter()
             .flat_map(|(_, errors)| {
-                errors.iter().map(|e| {
-                    e.message.as_ref()
-                        .map(|s| s.to_string())
-                        .unwrap_or_else(|| "Invalid value".to_string())
-                }).collect::<Vec<_>>()
+                errors
+                    .iter()
+                    .map(|e| {
+                        e.message
+                            .as_ref()
+                            .map(|s| s.to_string())
+                            .unwrap_or_else(|| "Invalid value".to_string())
+                    })
+                    .collect::<Vec<_>>()
             })
             .collect();
 
         let message = if messages.is_empty() {
             "Validation failed".to_string()
-        } else {
+        }
+        else {
             messages.join(", ")
         };
 
-        Self::Validation { message }
+        Self::Validation {
+            message,
+        }
     }
 }
 
@@ -767,28 +776,30 @@ mod tests {
         );
     }
 
-
     #[test]
     fn test_from_validation_errors() {
         // Test the From<validator::ValidationErrors> implementation
         use validator::Validate;
-        
+
         #[derive(Validate)]
         struct TestStruct {
             #[validate(range(min = 1, max = 10))]
             value: i32,
         }
-        
-        let s = TestStruct { value: 100 };
+
+        let s = TestStruct {
+            value: 100,
+        };
         let errors = s.validate().unwrap_err();
         let app_error: AppError = errors.into();
-        
+
         match app_error {
-            AppError::Validation { message } => {
+            AppError::Validation {
+                message,
+            } => {
                 assert!(!message.is_empty());
-            }
+            },
             _ => panic!("Expected Validation error"),
         }
     }
-
 }
