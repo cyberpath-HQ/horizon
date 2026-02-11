@@ -13,7 +13,7 @@ use entity::{
     users::{Column, Entity as UsersEntity},
 };
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
-use chrono::Utc;
+use chrono::{DateTime, Utc, FixedOffset};
 use tracing::{info, warn};
 use axum::{extract::Request, Json};
 use error::{AppError, Result};
@@ -31,6 +31,14 @@ use crate::{
     refresh_tokens::{generate_refresh_token, revoke_refresh_token, validate_refresh_token},
     AppState,
 };
+
+/// Helper function to convert DateTime<Utc> to DateTime<FixedOffset> for UTC timezone
+/// FixedOffset::east_opt(0) always returns Some for offset 0, so unwrap is safe here
+#[inline]
+fn to_utc_tz(utc_time: DateTime<Utc>) -> DateTime<FixedOffset> {
+    // Safe: FixedOffset::east_opt(0) always returns Some(0) for UTC timezone
+    utc_time.with_timezone(&FixedOffset::east_opt(0).expect("Failed to create UTC timezone offset"))
+}
 
 /// Inner handler for setup endpoint
 ///
@@ -160,7 +168,7 @@ pub async fn login_handler_inner(
 
     // Check account lockout
     if let Some(locked_until) = user.locked_until {
-        let now_tz = Utc::now().with_timezone(&chrono::FixedOffset::east_opt(0).unwrap());
+        let now_tz = to_utc_tz(Utc::now());
         if locked_until > now_tz {
             let remaining = (locked_until - now_tz).num_minutes() + 1;
             return Err(AppError::unauthorized(format!(
@@ -183,7 +191,7 @@ pub async fn login_handler_inner(
 
         if new_attempts >= MAX_FAILED_LOGIN_ATTEMPTS {
             let locked_until = Utc::now() + chrono::Duration::minutes(LOCKOUT_DURATION_MINUTES);
-            let locked_tz = locked_until.with_timezone(&chrono::FixedOffset::east_opt(0).unwrap());
+            let locked_tz = to_utc_tz(locked_until);
             active_model.locked_until = Set(Some(locked_tz));
             tracing::warn!(
                 user_id = %user.id,
