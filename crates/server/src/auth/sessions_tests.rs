@@ -5,13 +5,13 @@
 #[cfg(test)]
 mod session_tests {
     #[test]
-    fn test_session_creation_structure() {
-        // Test basic session structure is valid
-        // TODO: Implement session creation and test actual structure
-        // For now, verify that session IDs can be generated
+    fn test_session_id_generation() {
+        // Test that session IDs can be generated with expected format
         let session_id = cuid2::cuid();
         assert!(!session_id.is_empty());
         assert!(session_id.len() > 10);
+        // Verify format matches expected CUID2 pattern (alphanumeric)
+        assert!(session_id.chars().all(|c| c.is_alphanumeric()));
     }
 
     #[test]
