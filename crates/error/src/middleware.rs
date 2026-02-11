@@ -57,20 +57,29 @@ impl ErrorHandler {
 
         let response = ApiResponse::<()>::error(code, message);
 
+        let body_str = serde_json::to_string(&response).unwrap_or_else(|_| {
+            r#"{"success":false,"code":"INTERNAL_ERROR","message":"Internal server error"}"#.to_string()
+        });
+
         let mut res = Response::builder()
             .status(status)
             .header("Content-Type", "application/json")
-            .body(Body::from(serde_json::to_string(&response).unwrap()))
-            .unwrap();
+            .body(Body::from(body_str))
+            .unwrap_or_else(|_| {
+                Response::builder()
+                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    .body(Body::from("Internal server error"))
+                    .unwrap()
+            });
 
         // Add retry-after header for rate limit errors
         if let AppError::RateLimit {
             retry_after,
             ..
-        } = err
+        } = err &&
+            let Ok(retry_val) = retry_after.to_string().parse::<axum::http::HeaderValue>()
         {
-            res.headers_mut()
-                .insert("Retry-After", retry_after.to_string().parse().unwrap());
+            let _ = res.headers_mut().insert("Retry-After", retry_val);
         }
 
         res
@@ -171,6 +180,14 @@ impl IntoResponse for String {
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
+        let handler = ErrorHandler::new(false);
+        handler.to_response(&self)
+    }
+}
+
+// Implement axum's IntoResponse trait for AppError
+impl axum::response::IntoResponse for AppError {
+    fn into_response(self) -> axum::response::Response {
         let handler = ErrorHandler::new(false);
         handler.to_response(&self)
     }

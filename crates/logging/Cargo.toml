@@ -14,18 +14,21 @@ categories.workspace = true
 [dependencies]
 # Tracing and logging
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true, features = ["env-filter", "json", "fmt", "ansi"] }
+tracing-subscriber = { workspace = true, features = [
+    "env-filter",
+    "json",
+    "fmt",
+    "ansi",
+] }
 tracing-appender = { workspace = true }
-
-# Async support
-tokio = { workspace = true, features = ["sync"] }
+derivative = { workspace = true }
 
 # Configuration
 serde = { workspace = true }
 
 # Utilities
 cuid2 = { workspace = true }
-blake3 = { workspace = true }
 
 [dev-dependencies]
 rstest = { workspace = true }
+serial_test = "3.0"

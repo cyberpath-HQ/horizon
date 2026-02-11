@@ -1,0 +1,88 @@
+[package]
+name = "server"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+description = "Horizon API server with Axum framework"
+license.workspace = true
+repository.workspace = true
+readme = "../../README.md"
+keywords = ["cmdb", "api", "server", "axum", "horizon"]
+categories = ["network-programming", "web-programming"]
+
+[dependencies]
+# ==================== WEB FRAMEWORK ====================
+axum = { workspace = true, features = ["multipart", "tokio"] }
+axum-extra = { version = "0.12.5", features = ["typed-header"] }
+tower = { workspace = true, features = ["util", "filter"] }
+tower-http = { workspace = true, features = ["cors", "trace", "timeout"] }
+http = { workspace = true }
+
+# ==================== DATABASE ====================
+sea-orm = { workspace = true, features = [
+    "runtime-tokio-rustls",
+    "sqlx-postgres",
+] }
+
+# ==================== AUTHENTICATION ====================
+jsonwebtoken = { workspace = true }
+argon2 = { workspace = true }
+totp-rs = { workspace = true }
+
+# ==================== SERIALIZATION ====================
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# ==================== ERROR HANDLING ====================
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# ==================== LOGGING ====================
+tracing = { workspace = true }
+
+# ==================== VALIDATION ====================
+validator = { workspace = true, features = ["derive"] }
+
+# ==================== INTERNAL ====================
+error = { path = "../error" }
+auth = { path = "../auth" }
+entity = { path = "../entity" }
+migration = { path = "../migration" }
+permissions-macro = { path = "../permissions-macro" }
+
+# ==================== UTILITIES ====================
+chrono = { workspace = true }
+cuid2 = { workspace = true }
+secrecy = { workspace = true }
+base64 = { workspace = true }
+blake3 = { workspace = true }
+rand = { workspace = true }
+uuid = { workspace = true }
+redis = { workspace = true }
+sha3 = { workspace = true }
+hmac = { workspace = true }
+subtle = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
+sea-orm = { workspace = true, features = [
+    "runtime-tokio-rustls",
+    "sqlx-postgres",
+    "sqlx-sqlite",
+] }
+tracing-subscriber = { workspace = true, features = [
+    "fmt",
+    "env-filter",
+    "ansi",
+] }
+dotenv = { workspace = true }
+# Serial test execution for test isolation
+serial_test = { version = "2.0.0", default-features = false }
+# Async test utilities
+async-std = { version = "1.12" }
+# Mocking support
+mockall = "0.13"
+# Property-based testing
+proptest = { workspace = true }

@@ -10,6 +10,30 @@ jobs:
   coverage:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: horizon
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: horizon_test
+        options: >-
+          --health-cmd "pg_isready -U horizon -d horizon_test" --health-interval 10s --health-timeout 5s --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:8-alpine
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
+        ports:
+          - 6379:6379
+
+    env:
+      DATABASE_URL: postgres://horizon:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/horizon_test
+      REDIS_URL: redis://localhost:6379
+      RUST_BACKTRACE: 1
+
     steps:
       - uses: actions/checkout@v4
 
@@ -21,17 +45,25 @@ jobs:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
 
+      - name: Install dependencies
+        run:
+          sudo apt update && sudo apt install -y libglib2.0-dev libwebkit2gtk-4.1-dev build-essential curl wget file
+          libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
       - name: Install grcov
-        run: cargo install grcov
+        run: cargo install grcov sqlx-cli
 
       - name: Generate coverage reports
-        run: bash ./scripts/run_coverage.sh
+        run: bash ./scripts/run-coverage.sh
+        env:
+          DATABASE_URL: postgres://horizon:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/horizon_test
+          REDIS_URL: redis://localhost:6379
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          slug: cyberpath-HQ/sentinel
+          slug: cyberpath-HQ/horizon
           flags: rust
           name: codecov-umbrella
           fail_ci_if_error: true

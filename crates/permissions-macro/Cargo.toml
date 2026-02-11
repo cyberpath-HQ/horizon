@@ -1,0 +1,28 @@
+[package]
+name = "permissions-macro"
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+version.workspace = true
+readme.workspace = true
+description.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+# Procedural macro dependencies
+syn = { version = "2.0.114", features = ["full", "extra-traits"] }
+quote = "1.0.44"
+proc-macro2 = "1.0.106"
+
+# Internal dependencies
+auth = { path = "../auth" }
+error = { path = "../error" }
+
+[lints]
+workspace = true

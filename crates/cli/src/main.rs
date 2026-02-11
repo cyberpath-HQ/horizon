@@ -10,63 +10,21 @@
 //! horizon --help   # Show help
 //! ```
 
-use clap::{Args, CommandFactory as _, Parser, Subcommand};
-use error::{AppError, Result};
-use migration::{Migrator, MigratorTrait as _};
+mod commands;
+mod config;
+mod server;
+mod tls;
 
-/// Database configuration for CLI
-#[derive(Debug, Clone)]
-pub struct DatabaseConfig {
-    /// Database host address
-    pub host:      String,
-    /// Database port number
-    pub port:      u16,
-    /// Database name
-    pub database:  String,
-    /// Database username
-    pub username:  String,
-    /// Database password
-    pub password:  String,
-    /// SSL mode
-    pub ssl_mode:  String,
-    /// Connection pool size
-    pub pool_size: u32,
-}
-
-impl Default for DatabaseConfig {
-    fn default() -> Self {
-        Self {
-            host:      std::env::var("HORIZON_DATABASE_HOST").unwrap_or_else(|_| "localhost".to_owned()),
-            port:      std::env::var("HORIZON_DATABASE_PORT")
-                .unwrap_or_else(|_| "5432".to_owned())
-                .parse()
-                .unwrap_or(5432),
-            database:  std::env::var("HORIZON_DATABASE_NAME").unwrap_or_else(|_| "horizon".to_owned()),
-            username:  std::env::var("HORIZON_DATABASE_USER").unwrap_or_else(|_| "horizon".to_owned()),
-            password:  std::env::var("HORIZON_DATABASE_PASSWORD").unwrap_or_else(|_| String::new()),
-            ssl_mode:  std::env::var("HORIZON_DATABASE_SSL_MODE").unwrap_or_else(|_| "require".to_owned()),
-            pool_size: std::env::var("HORIZON_DATABASE_POOL_SIZE")
-                .unwrap_or_else(|_| "10".to_owned())
-                .parse()
-                .unwrap_or(10),
-        }
-    }
-}
-
-/// Builds the DATABASE_URL from DatabaseConfig
-pub fn build_database_url(config: &DatabaseConfig) -> String {
-    format!(
-        "postgres://{}:{}@{}:{}/{}?sslmode={}",
-        config.username, config.password, config.host, config.port, config.database,
-        config.ssl_mode
-    )
-}
+use clap::{CommandFactory as _, Parser, Subcommand};
+use commands::{CompletionsArgs, ServeArgs};
+use config::DatabaseConfig;
 
 /// Horizon CMDB - Configuration Management Database
 #[derive(Parser, Debug)]
 #[command(name = "horizon")]
 #[command(author, version, about, long_about = None)]
 struct Cli {
+    /// The command to run
     #[command(subcommand)]
     command: Commands,
 
@@ -79,13 +37,11 @@ struct Cli {
     log_format: String,
 }
 
+/// Available commands for the Horizon CLI
 #[derive(Subcommand, Debug)]
 enum Commands {
     /// Start the API server
     Serve(ServeArgs),
-
-    /// Run database migrations
-    Migrate(MigrateArgs),
 
     /// Generate shell completions
     Completions(CompletionsArgs),
@@ -94,61 +50,8 @@ enum Commands {
     Validate,
 }
 
-#[derive(Args, Debug)]
-struct ServeArgs {
-    /// Server host to bind to
-    #[arg(long, env = "HORIZON_HOST", default_value = "0.0.0.0")]
-    host: String,
-
-    /// Server port to bind to
-    #[arg(short, long, env = "HORIZON_PORT", default_value = "3000")]
-    port: u16,
-
-    /// Enable TLS/HTTPS
-    #[arg(long, env = "HORIZON_TLS")]
-    tls: bool,
-
-    /// TLS certificate file path
-    #[arg(long, env = "HORIZON_TLS_CERT", requires = "tls")]
-    tls_cert: Option<String>,
-
-    /// TLS key file path
-    #[arg(long, env = "HORIZON_TLS_KEY", requires = "tls")]
-    tls_key: Option<String>,
-}
-
-#[derive(Args, Debug)]
-struct MigrateArgs {
-    /// Run migrations in dry-run mode (no changes)
-    #[arg(long)]
-    dry_run: bool,
-
-    /// Rollback the last migration
-    #[arg(long)]
-    rollback: bool,
-
-    /// Create a new migration with the given name
-    #[arg(long, requires = "migration_dir")]
-    create: Option<String>,
-
-    /// Directory for migration files
-    #[arg(long, env = "HORIZON_MIGRATION_DIR")]
-    migration_dir: Option<String>,
-
-    /// Number of parallel migration threads
-    #[arg(long, default_value = "4")]
-    threads: u8,
-}
-
-#[derive(Args, Debug)]
-struct CompletionsArgs {
-    /// Shell to generate completions for
-    #[arg(value_enum)]
-    shell: clap_complete::Shell,
-}
-
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() -> error::Result<()> {
     let cli = Cli::parse();
 
     // Initialize logging
@@ -158,140 +61,15 @@ async fn main() -> Result<()> {
     logging::info!(target: "app", command = ?cli.command, "Horizon CLI starting...");
 
     match cli.command {
-        Commands::Serve(args) => serve(&args).await?,
-        Commands::Migrate(args) => migrate(&args).await?,
-        Commands::Completions(args) => completions(&args)?,
-        Commands::Validate => validate()?,
+        Commands::Serve(args) => {
+            let config = DatabaseConfig::from_env().map_err(|_e| anyhow::anyhow!("Invalid database configuration"))?;
+            server::serve(&config, args).await?
+        },
+        Commands::Completions(args) => commands::completions::completions(args.shell, &mut Cli::command())?,
+        Commands::Validate => commands::validate::validate()?,
     }
 
     logging::info!(target: "app", "Horizon CLI completed successfully");
-    Ok(())
-}
-
-async fn serve(_args: &ServeArgs) -> Result<()> {
-    logging::info!(target: "serve", "Starting API server...");
-
-    // Build database URL from configuration
-    let config = DatabaseConfig::default();
-    let database_url = build_database_url(&config);
-
-    // Connect to database
-    logging::info!(target: "serve", "Connecting to database...");
-    let db = migration::connect_to_database(&database_url)
-        .await
-        .map_err(AppError::database)?;
-
-    // Run migrations automatically on startup
-    logging::info!(target: "serve", "Running database migrations...");
-    Migrator::up(&db, None).await.map_err(AppError::database)?;
-
-    logging::info!(target: "serve", "Database migrations completed successfully");
-
-    // TODO: Implement server startup
-    // - Set up Axum router
-    // - Apply middleware
-    // - Start listening
-
-    logging::info!(target: "serve", "Server functionality to be implemented");
-    Ok(())
-}
-
-async fn migrate(args: &MigrateArgs) -> Result<()> {
-    logging::info!(target: "migrate",
-        dry_run = %args.dry_run,
-        rollback = %args.rollback,
-        create = ?args.create,
-        threads = %args.threads,
-        "Running database migrations..."
-    );
-
-    // Build database URL from configuration
-    let config = DatabaseConfig::default();
-    let database_url = build_database_url(&config);
-
-    // Connect to database
-    let db = migration::connect_to_database(&database_url)
-        .await
-        .map_err(AppError::database)?;
-
-    if args.dry_run {
-        // Dry run mode - just show what would happen
-        logging::info!(target: "migrate", "Dry run mode - migrations would be applied");
-
-        // Get pending migrations
-        let pending = migration::Migrator::get_pending_migrations(&db)
-            .await
-            .map_err(AppError::database)?;
-
-        logging::info!(target: "migrate",
-            pending_count = %pending.len(),
-            "Pending migrations found"
-        );
-
-        for m in &pending {
-            logging::info!(target: "migrate", migration = %m.name(), "Would apply");
-        }
-
-        return Ok(());
-    }
-
-    if args.rollback {
-        // Rollback the last migration
-        logging::info!(target: "migrate", "Rolling back the last migration...");
-
-        migration::Migrator::down(&db, None)
-            .await
-            .map_err(AppError::database)?;
-
-        logging::info!(target: "migrate", "Rollback completed successfully");
-        return Ok(());
-    }
-
-    // Run migrations
-    Migrator::up(&db, None).await.map_err(AppError::database)?;
-
-    logging::info!(target: "migrate", "Migrations completed successfully");
-    Ok(())
-}
-
-fn completions(args: &CompletionsArgs) -> Result<()> {
-    clap_complete::generate(
-        args.shell,
-        &mut Cli::command(),
-        "horizon",
-        &mut std::io::stdout(),
-    );
-    Ok(())
-}
-
-fn validate() -> Result<()> {
-    logging::info!(target: "validate", "Validating configuration...");
-
-    // Check required environment variables
-    let required_vars = [
-        "HORIZON_DATABASE_HOST",
-        "HORIZON_DATABASE_PORT",
-        "HORIZON_DATABASE_NAME",
-        "HORIZON_DATABASE_USER",
-        "HORIZON_DATABASE_PASSWORD",
-    ];
-
-    let mut missing = Vec::new();
-    for var in &required_vars {
-        if std::env::var(var).is_err() {
-            missing.push(var);
-        }
-    }
-
-    if !missing.is_empty() {
-        logging::error!(target: "validate", missing_vars = ?missing, "Missing required environment variables");
-        return Err(AppError::validation(format!(
-            "Missing required environment variables: {:?}",
-            missing
-        )));
-    }
-
-    logging::info!(target: "validate", "Configuration validation passed");
     Ok(())
 }
 
@@ -345,35 +123,6 @@ mod tests {
     }
 
     #[test]
-    fn test_migrate_rollback() {
-        let cli = Cli::parse_from(&["horizon", "migrate", "--rollback"]);
-        match cli.command {
-            Commands::Migrate(args) => {
-                assert!(args.rollback);
-            },
-            _ => panic!("Expected Migrate command"),
-        }
-    }
-
-    #[test]
-    fn test_migrate_create() {
-        let cli = Cli::parse_from(&[
-            "horizon",
-            "migrate",
-            "--create",
-            "add_users_table",
-            "--migration-dir",
-            "/migrations",
-        ]);
-        match cli.command {
-            Commands::Migrate(args) => {
-                assert_eq!(args.create, Some("add_users_table".to_string()));
-            },
-            _ => panic!("Expected Migrate command"),
-        }
-    }
-
-    #[test]
     fn test_cli_command_factory() {
         let cmd = Cli::command();
         assert!(cmd.get_name() == "horizon");
@@ -381,21 +130,75 @@ mod tests {
 
     #[test]
     fn test_validate_returns_ok() {
-        // Set required env vars
+        // Save original env vars and ensure all required vars are set
+        let orig_host = std::env::var("HORIZON_DATABASE_HOST").ok();
+        let orig_port = std::env::var("HORIZON_DATABASE_PORT").ok();
+        let orig_name = std::env::var("HORIZON_DATABASE_NAME").ok();
+        let orig_user = std::env::var("HORIZON_DATABASE_USER").ok();
+        let orig_pass = std::env::var("HORIZON_DATABASE_PASSWORD").ok();
+
+        // Set required env vars - overwrite any existing values
         unsafe {
             std::env::set_var("HORIZON_DATABASE_HOST", "localhost");
             std::env::set_var("HORIZON_DATABASE_PORT", "5432");
             std::env::set_var("HORIZON_DATABASE_NAME", "horizon");
             std::env::set_var("HORIZON_DATABASE_USER", "horizon");
-            std::env::set_var("HORIZON_DATABASE_PASSWORD", "password");
+            std::env::set_var(
+                "HORIZON_DATABASE_PASSWORD",
+                "horizon_secret_password_change_in_production",
+            );
         }
 
-        let result = validate();
-        assert!(result.is_ok());
+        let result = commands::validate::validate();
+        assert!(
+            result.is_ok(),
+            "Validation should succeed with all required env vars set"
+        );
+
+        // Restore original env vars
+        unsafe {
+            if let Some(v) = orig_host {
+                std::env::set_var("HORIZON_DATABASE_HOST", v);
+            }
+            else {
+                std::env::remove_var("HORIZON_DATABASE_HOST");
+            }
+            if let Some(v) = orig_port {
+                std::env::set_var("HORIZON_DATABASE_PORT", v);
+            }
+            else {
+                std::env::remove_var("HORIZON_DATABASE_PORT");
+            }
+            if let Some(v) = orig_name {
+                std::env::set_var("HORIZON_DATABASE_NAME", v);
+            }
+            else {
+                std::env::remove_var("HORIZON_DATABASE_NAME");
+            }
+            if let Some(v) = orig_user {
+                std::env::set_var("HORIZON_DATABASE_USER", v);
+            }
+            else {
+                std::env::remove_var("HORIZON_DATABASE_USER");
+            }
+            if let Some(v) = orig_pass {
+                std::env::set_var("HORIZON_DATABASE_PASSWORD", v);
+            }
+            else {
+                std::env::remove_var("HORIZON_DATABASE_PASSWORD");
+            }
+        }
     }
 
     #[test]
     fn test_validate_missing_vars() {
+        // Save original env vars
+        let orig_host = std::env::var("HORIZON_DATABASE_HOST").ok();
+        let orig_port = std::env::var("HORIZON_DATABASE_PORT").ok();
+        let orig_name = std::env::var("HORIZON_DATABASE_NAME").ok();
+        let orig_user = std::env::var("HORIZON_DATABASE_USER").ok();
+        let orig_pass = std::env::var("HORIZON_DATABASE_PASSWORD").ok();
+
         // Clear env vars
         unsafe {
             std::env::remove_var("HORIZON_DATABASE_HOST");
@@ -405,8 +208,35 @@ mod tests {
             std::env::remove_var("HORIZON_DATABASE_PASSWORD");
         }
 
-        let result = validate();
+        let result = commands::validate::validate();
         assert!(result.is_err());
+
+        // Restore original env vars
+        if let Some(v) = orig_host {
+            unsafe {
+                std::env::set_var("HORIZON_DATABASE_HOST", v);
+            }
+        }
+        if let Some(v) = orig_port {
+            unsafe {
+                std::env::set_var("HORIZON_DATABASE_PORT", v);
+            }
+        }
+        if let Some(v) = orig_name {
+            unsafe {
+                std::env::set_var("HORIZON_DATABASE_NAME", v);
+            }
+        }
+        if let Some(v) = orig_user {
+            unsafe {
+                std::env::set_var("HORIZON_DATABASE_USER", v);
+            }
+        }
+        if let Some(v) = orig_pass {
+            unsafe {
+                std::env::set_var("HORIZON_DATABASE_PASSWORD", v);
+            }
+        }
     }
 
     #[test]
@@ -424,33 +254,209 @@ mod tests {
     }
 
     #[test]
-    fn test_migrate_args_default() {
-        let args = MigrateArgs {
-            dry_run:       false,
-            rollback:      false,
-            create:        None,
-            migration_dir: None,
-            threads:       4,
-        };
-        assert!(!args.dry_run);
-        assert!(!args.rollback);
-        assert!(args.create.is_none());
-        assert_eq!(args.threads, 4);
+    fn test_cli_parse_with_log_options() {
+        let cli = Cli::parse_from(&[
+            "horizon",
+            "--log-level",
+            "debug",
+            "--log-format",
+            "json",
+            "validate",
+        ]);
+
+        assert_eq!(cli.log_level, "debug");
+        assert_eq!(cli.log_format, "json");
+        match cli.command {
+            Commands::Validate => {},
+            _ => panic!("Expected Validate command"),
+        }
     }
 
     #[test]
-    fn test_build_database_url() {
-        // Set test environment variables
+    fn test_serve_args_tls_validation() {
+        // TLS enabled but missing cert
+        let args = ServeArgs {
+            host:     "0.0.0.0".to_string(),
+            port:     3000,
+            tls:      true,
+            tls_cert: None,
+            tls_key:  Some("/path/to/key".to_string()),
+        };
+        assert!(args.tls);
+        assert!(args.tls_cert.is_none());
+        assert!(args.tls_key.is_some());
+
+        // TLS enabled but missing key
+        let args = ServeArgs {
+            host:     "0.0.0.0".to_string(),
+            port:     3000,
+            tls:      true,
+            tls_cert: Some("/path/to/cert".to_string()),
+            tls_key:  None,
+        };
+        assert!(args.tls);
+        assert!(args.tls_cert.is_some());
+        assert!(args.tls_key.is_none());
+    }
+
+    #[test]
+    fn test_cli_parse_unknown_command() {
+        use std::process::Command;
+
+        let output = Command::new("cargo")
+            .args(&["run", "--bin", "cli", "--", "unknown"])
+            .current_dir(env!("CARGO_MANIFEST_DIR"))
+            .output()
+            .expect("Failed to run command");
+
+        // Should exit with non-zero status for unknown command
+        assert!(!output.status.success());
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(stderr.contains("unrecognized subcommand"));
+    }
+
+    #[test]
+    fn test_cli_name_and_version() {
+        let cmd = Cli::command();
+        assert_eq!(cmd.get_name(), "horizon");
+        // Version should be set
+        let version = cmd.get_version();
+        assert!(version.is_some());
+    }
+
+    #[test]
+    fn test_cli_about_text() {
+        let cmd = Cli::command();
+        let about = cmd.get_about();
+        assert!(about.is_some());
+    }
+
+    #[test]
+    fn test_cli_serve_subcommand() {
+        let cmd = Cli::command();
+        let mut has_serve = false;
+        for subcommand in cmd.get_subcommands() {
+            if subcommand.get_name() == "serve" {
+                has_serve = true;
+                break;
+            }
+        }
+        assert!(has_serve);
+    }
+
+    #[test]
+    fn test_cli_validate_subcommand() {
+        let cmd = Cli::command();
+        let mut has_validate = false;
+        for subcommand in cmd.get_subcommands() {
+            if subcommand.get_name() == "validate" {
+                has_validate = true;
+                break;
+            }
+        }
+        assert!(has_validate);
+    }
+
+    #[test]
+    fn test_cli_completions_subcommand() {
+        let cmd = Cli::command();
+        let mut has_completions = false;
+        for subcommand in cmd.get_subcommands() {
+            if subcommand.get_name() == "completions" {
+                has_completions = true;
+                break;
+            }
+        }
+        assert!(has_completions);
+    }
+
+    #[test]
+    fn test_validate_partial_missing_vars() {
+        // Save original env vars
+        let orig_host = std::env::var("HORIZON_DATABASE_HOST").ok();
+        let orig_port = std::env::var("HORIZON_DATABASE_PORT").ok();
+        let orig_name = std::env::var("HORIZON_DATABASE_NAME").ok();
+        let orig_user = std::env::var("HORIZON_DATABASE_USER").ok();
+        let orig_pass = std::env::var("HORIZON_DATABASE_PASSWORD").ok();
+
+        // Clear all env vars
         unsafe {
-            std::env::set_var("HORIZON_DATABASE_HOST", "testhost");
-            std::env::set_var("HORIZON_DATABASE_PORT", "5433");
-            std::env::set_var("HORIZON_DATABASE_NAME", "testdb");
-            std::env::set_var("HORIZON_DATABASE_USER", "testuser");
-            std::env::set_var("HORIZON_DATABASE_PASSWORD", "testpass");
+            std::env::remove_var("HORIZON_DATABASE_HOST");
+            std::env::remove_var("HORIZON_DATABASE_PORT");
+            std::env::remove_var("HORIZON_DATABASE_NAME");
+            std::env::remove_var("HORIZON_DATABASE_USER");
+            std::env::remove_var("HORIZON_DATABASE_PASSWORD");
         }
 
-        let config = DatabaseConfig::default();
-        let url = build_database_url(&config);
-        assert!(url.contains("postgres://testuser:testpass@testhost:5433/testdb"));
+        // Set only some vars
+        unsafe {
+            std::env::set_var("HORIZON_DATABASE_HOST", "localhost");
+            std::env::set_var("HORIZON_DATABASE_PORT", "5432");
+            // Leave others unset
+        }
+
+        let result = commands::validate::validate();
+        assert!(result.is_err());
+        let err_msg = format!("{}", result.unwrap_err());
+        assert!(err_msg.contains("Missing required environment variables"));
+
+        // Restore original env vars
+        restore_env_var("HORIZON_DATABASE_HOST", orig_host);
+        restore_env_var("HORIZON_DATABASE_PORT", orig_port);
+        restore_env_var("HORIZON_DATABASE_NAME", orig_name);
+        restore_env_var("HORIZON_DATABASE_USER", orig_user);
+        restore_env_var("HORIZON_DATABASE_PASSWORD", orig_pass);
+    }
+
+    #[test]
+    fn test_completions_direct() {
+        use std::io::Write;
+
+        let args = CompletionsArgs {
+            shell: clap_complete::Shell::Bash,
+        };
+
+        let mut temp_file = tempfile::NamedTempFile::new().unwrap();
+        let result = completions_with_output(&args, &mut temp_file);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_completions_all_shells() {
+        let shells = vec![
+            clap_complete::Shell::Bash,
+            clap_complete::Shell::Zsh,
+            clap_complete::Shell::Fish,
+            clap_complete::Shell::PowerShell,
+            clap_complete::Shell::Elvish,
+        ];
+
+        for shell in shells {
+            let args = CompletionsArgs {
+                shell,
+            };
+            let result = commands::completions::completions(args.shell, &mut Cli::command());
+            assert!(result.is_ok(), "Completions failed for {:?}", shell);
+        }
+    }
+
+    // Helper functions for comprehensive testing
+
+    // Helper function for completions that writes to a provided writer
+    fn completions_with_output<T: std::io::Write>(args: &CompletionsArgs, writer: &mut T) -> error::Result<()> {
+        clap_complete::generate(args.shell, &mut Cli::command(), "horizon", writer);
+        Ok(())
+    }
+
+    // Helper to restore environment variable
+    fn restore_env_var(name: &str, value: Option<String>) {
+        unsafe {
+            if let Some(v) = value {
+                std::env::set_var(name, v);
+            }
+            else {
+                std::env::remove_var(name);
+            }
+        }
     }
 }

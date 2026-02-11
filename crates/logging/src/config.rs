@@ -5,45 +5,35 @@
 
 use std::path::PathBuf;
 
+use derivative::Derivative;
 use serde::{Deserialize, Serialize};
 use tracing_subscriber::{filter::LevelFilter, fmt, prelude::*, Registry};
 
 /// Logging configuration structure.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Derivative)]
+#[derivative(Default)]
 #[serde(rename_all = "kebab-case")]
 pub struct LoggingConfig {
     /// Log level (debug, info, warn, error)
-    #[serde(default = "default_level")]
+    #[derivative(Default(value = "\"info\".to_string()"))]
     pub level: String,
 
     /// Output format (json, pretty, compact)
-    #[serde(default = "default_format")]
+    #[derivative(Default(value = "\"json\".to_string()"))]
     pub format: String,
 
     /// Optional log file path
-    #[serde(default = "default_log_file")]
+    #[derivative(Default(value = "None"))]
     pub log_file: Option<String>,
 
     /// Whether to include timestamps
-    #[serde(default = "default::bool_true")]
+    #[derivative(Default(value = "true"))]
     pub include_timestamp: bool,
 
     /// Environment (development, testing, production)
-    #[serde(default = "default_environment")]
+    #[derivative(Default(value = "\"development\".to_string()"))]
     pub environment: String,
 }
-
-mod default {
-    pub fn bool_true() -> bool { true }
-}
-
-fn default_level() -> String { "info".to_string() }
-
-fn default_format() -> String { "json".to_string() }
-
-fn default_log_file() -> Option<String> { None }
-
-fn default_environment() -> String { "development".to_string() }
 
 impl LoggingConfig {
     /// Create configuration from environment variables.
@@ -128,11 +118,28 @@ mod tests {
     use super::*;
 
     #[test]
+    #[serial_test::serial]
     fn test_config_default() {
+        // Ensure HORIZON_ENV is not set for this test
+        let orig = std::env::var("HORIZON_ENV").ok();
+        unsafe {
+            std::env::remove_var("HORIZON_ENV");
+            std::env::remove_var("RUST_LOG");
+            std::env::remove_var("HORIZON_LOG_FORMAT");
+            std::env::remove_var("HORIZON_LOG_FILE");
+        }
+
         let config = LoggingConfig::from_env("info", "json", None);
         assert_eq!(config.level, "info");
         assert_eq!(config.format, "json");
         assert_eq!(config.environment, "development");
+
+        // Restore
+        unsafe {
+            if let Some(v) = orig {
+                std::env::set_var("HORIZON_ENV", v);
+            }
+        }
     }
 
     #[test]

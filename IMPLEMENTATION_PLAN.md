@@ -10,20 +10,20 @@
 
 ## Table of Contents
 
-1. [Executive Summary](#executive-summary)
-2. [Introduction and Vision](#introduction-and-vision)
-3. [Architecture Overview](#architecture-overview)
-4. [Core Components](#core-components)
-5. [Database Schema Design](#database-schema-design)
-6. [API Design Specification](#api-design-specification)
-7. [Agent Architecture and Design](#agent-architecture-and-design)
-8. [Feature Specifications](#feature-specifications)
-9. [Security Framework](#security-framework)
-10. [Configuration Management](#configuration-management)
-11. [Docker Deployment](#docker-deployment)
-12. [Implementation Phases](#implementation-phases)
-13. [Technical Decisions and Justifications](#technical-decisions-and-justifications)
-14. [Action Items and Roadmap](#action-items-and-roadmap)
+1. [Executive Summary](#1-executive-summary)
+2. [Introduction and Vision](#2-introduction-and-vision)
+3. [Architecture Overview](#3-architecture-overview)
+4. [Core Components](#4-core-components)
+5. [Database Schema Design](#5-database-schema-design)
+6. [API Design Specification](#6-api-design-specification)
+7. [Agent Architecture and Design](#7-agent-architecture-and-design)
+8. [Feature Specifications](#8-feature-specifications)
+9. [Security Framework](#9-security-framework)
+10. [Configuration Management](#10-configuration-management)
+11. [Docker Deployment](#11-docker-deployment)
+12. [Implementation Phases](#12-implementation-phases)
+13. [Technical Decisions and Justifications](#13-technical-decisions-and-justifications)
+14. [Action Items and Roadmap](#14-action-items-and-roadmap)
 
 ---
 
@@ -242,7 +242,8 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 
 - Implement Argon2id password hashing using argon2 crate
 - Create password hashing and verification functions
-- Implement user registration endpoint (POST /api/v1/auth/register)
+- Implement initial setup endpoint for first-user creation (POST /api/v1/auth/setup), this must be disabled after first
+  user creation
 - Implement login endpoint (POST /api/v1/auth/login)
 - Implement logout endpoint (POST /api/v1/auth/logout)
 
@@ -276,6 +277,35 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Configure per-endpoint rate limits based on sensitivity
 - Implement IP-based rate limiting rules
 - Add security headers (CSP, X-Frame-Options, etc.) to all responses
+- Add MFA enforcement middleware for sensitive endpoints
+- Implement account lockout after multiple failed login attempts
+- Implement password complexity validation
+- Add MFA verification requirement on login if enabled
+
+#### B-08: API Access
+
+- Implement API key authentication middleware
+- Create API key generation endpoint (POST /api/v1/auth/api-keys)
+- Implement API key revocation endpoint (DELETE /api/v1/auth/api-keys/{id})
+- Implement API key usage tracking and last used timestamp update
+- Create API key permission scope enforcement
+- Implement API key expiration handling
+- Create API key listing endpoint (GET /api/v1/auth/api-keys)
+- Implement API key rotation functionality
+- Create API key usage audit logging
+- Implement API key prefix matching for authentication
+- Create API key search and filtering functionality
+- Implement API key rate limiting based on key permissions (configurable)
+- Create API key detailed view endpoint (GET /api/v1/auth/api-keys/{id})
+- Implement API key usage statistics endpoint (GET /api/v1/auth/api-keys/{id}/usage)
+- Implement API key permission modification endpoint (PUT /api/v1/auth/api-keys/{id}/permissions)
+- ensure that api keys cannot be used to access user management endpoints unless explicitly granted the necessary
+  permissions. This includes restricting access to user creation, deletion, and role assignment endpoints.
+- ensure all permissions of the user associated with the api key are checked before allowing any action. if the user has
+  been deactivated or had their roles changed, the api key should reflect those changes immediately.
+- ensure all api keys are logged with their usage, including timestamp, endpoint accessed, and action performed for
+  auditing purposes.
+- ensure all api keys are linked to their creator user for accountability.
 
 ---
 
@@ -292,7 +322,7 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 #### C-02: Authentication Pages
 
 - Implement login page with email/password form
-- Implement registration page with validation
+- Implement setup page with validation
 - Implement MFA verification page
 - Create password reset request and reset pages
 - Implement session timeout and refresh handling

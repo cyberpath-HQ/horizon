@@ -20,11 +20,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          persist-credentials: false  # Prevent GITHUB_TOKEN interference
+          persist-credentials: false # Prevent GITHUB_TOKEN interference
       - uses: actions/setup-node@v6
         with:
-          node-version: '24'
+          node-version: "24"
       - run: npm ci
+
+      - name: Install dependencies
+        run:
+          sudo apt update && sudo apt install -y libglib2.0-dev libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
       - id: generate-token
         uses: actions/create-github-app-token@v2
         with:
@@ -32,6 +37,7 @@ jobs:
           private-key: ${{ secrets.SEMANTIC_RELEASE_APP_PRIVATE_KEY }}
           owner: cyberpath-HQ
           repositories: horizon
-      - run: npx semantic-release
-        env:
-          GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
+      # Not ready to release yet, waiting for more features and stability improvements
+      #- run: npx semantic-release
+      #  env:
+      #    GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}

@@ -32,6 +32,15 @@ pub enum AppError {
         message: String,
     },
 
+    #[error("JwtExpired: Token has expired")]
+    JwtExpired,
+
+    #[error("JwtInvalidSignature: Invalid token signature")]
+    JwtInvalidSignature,
+
+    #[error("JwtInvalidToken: Invalid token")]
+    JwtInvalidToken,
+
     #[error("Forbidden: {message}")]
     Forbidden {
         message: String,
@@ -226,6 +235,9 @@ impl AppError {
             AppError::Unauthorized {
                 ..
             } => http::StatusCode::UNAUTHORIZED,
+            AppError::JwtExpired => http::StatusCode::UNAUTHORIZED,
+            AppError::JwtInvalidSignature => http::StatusCode::UNAUTHORIZED,
+            AppError::JwtInvalidToken => http::StatusCode::UNAUTHORIZED,
             AppError::Forbidden {
                 ..
             } => http::StatusCode::FORBIDDEN,
@@ -268,6 +280,9 @@ impl AppError {
             AppError::Unauthorized {
                 ..
             } => "UNAUTHORIZED",
+            AppError::JwtExpired => "JWT_EXPIRED",
+            AppError::JwtInvalidSignature => "JWT_INVALID_SIGNATURE",
+            AppError::JwtInvalidToken => "JWT_INVALID_TOKEN",
             AppError::Forbidden {
                 ..
             } => "FORBIDDEN",
@@ -313,6 +328,9 @@ impl AppError {
                 message,
                 ..
             } => message.clone(),
+            AppError::JwtExpired => "Token has expired".to_string(),
+            AppError::JwtInvalidSignature => "Invalid token signature".to_string(),
+            AppError::JwtInvalidToken => "Invalid token".to_string(),
             AppError::Forbidden {
                 message,
                 ..
@@ -389,6 +407,9 @@ impl AppError {
                     message: format!("{}: {}", context_msg, message),
                 }
             },
+            AppError::JwtExpired => self,
+            AppError::JwtInvalidSignature => self,
+            AppError::JwtInvalidToken => self,
             AppError::Forbidden {
                 message,
             } => {
@@ -495,6 +516,48 @@ impl From<sea_orm::DbErr> for AppError {
     fn from(err: sea_orm::DbErr) -> Self {
         Self::Database {
             message: err.to_string(),
+        }
+    }
+}
+
+/// Convert Redis errors to AppError.
+impl From<redis::RedisError> for AppError {
+    fn from(err: redis::RedisError) -> Self {
+        Self::Internal {
+            message: format!("Redis error: {}", err),
+        }
+    }
+}
+
+/// Convert validator validation errors to AppError.
+impl From<validator::ValidationErrors> for AppError {
+    fn from(err: validator::ValidationErrors) -> Self {
+        // Convert all errors to strings
+        let messages: Vec<String> = err
+            .field_errors()
+            .iter()
+            .flat_map(|(_, errors)| {
+                errors
+                    .iter()
+                    .map(|e| {
+                        e.message
+                            .as_ref()
+                            .map(|s| s.to_string())
+                            .unwrap_or_else(|| "Invalid value".to_string())
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+
+        let message = if messages.is_empty() {
+            "Validation failed".to_string()
+        }
+        else {
+            messages.join(", ")
+        };
+
+        Self::Validation {
+            message,
         }
     }
 }
@@ -711,5 +774,32 @@ mod tests {
             .status(),
             http::StatusCode::INTERNAL_SERVER_ERROR
         );
+    }
+
+    #[test]
+    fn test_from_validation_errors() {
+        // Test the From<validator::ValidationErrors> implementation
+        use validator::Validate;
+
+        #[derive(Validate)]
+        struct TestStruct {
+            #[validate(range(min = 1, max = 10))]
+            value: i32,
+        }
+
+        let s = TestStruct {
+            value: 100,
+        };
+        let errors = s.validate().unwrap_err();
+        let app_error: AppError = errors.into();
+
+        match app_error {
+            AppError::Validation {
+                message,
+            } => {
+                assert!(!message.is_empty());
+            },
+            _ => panic!("Expected Validation error"),
+        }
     }
 }
