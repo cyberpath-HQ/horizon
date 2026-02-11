@@ -13,12 +13,9 @@ use auth::{
 };
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use common::{init_test_env, TestDb, TestRedis, UserFixture};
-use entity::sea_orm_active_enums::UserStatus;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter};
 use server::{middleware::auth::AuthenticatedUser, router, AppState};
 use tower::util::ServiceExt;
-// Re-export for E2E tests
-use axum::http::Response;
 
 /// Test the JWT token creation and validation flow
 #[tokio::test]

@@ -71,9 +71,6 @@ impl TestDb {
             conn,
         })
     }
-
-    /// Get a reference to the database connection
-    pub fn get_connection(&self) -> &DbConn { &self.conn }
 }
 
 /// Redis connection for tests (uses real Redis)
@@ -89,35 +86,6 @@ impl TestRedis {
             client,
         })
     }
-
-    /// Get a reference to the Redis client
-    pub fn get_client(&self) -> &Client { &self.client }
-
-    /// Get a connection to Redis
-    pub async fn get_connection(&self) -> Result<redis::aio::MultiplexedConnection, String> {
-        self.client
-            .get_multiplexed_async_connection()
-            .await
-            .map_err(|e| format!("Failed to get Redis connection: {}", e))
-    }
-
-    /// Clear all Redis data (for test isolation)
-    pub async fn flush_all(&self) -> Result<(), String> {
-        let mut conn = self.get_connection().await?;
-        let _: () = redis::cmd("FLUSHDB")
-            .query_async(&mut conn)
-            .await
-            .map_err(|e| format!("Failed to flush Redis: {}", e))?;
-        Ok(())
-    }
-}
-
-/// Clean up all test data from the database
-pub async fn cleanup_test_data(_db: &DbConn) -> Result<(), String> {
-    // Tests use UUID-based IDs for isolation, cleanup happens per-test or via test infrastructure
-    Ok(())
-}
-
 /// Test fixtures for user data
 pub struct UserFixture {
     pub id:       String,
@@ -169,11 +137,6 @@ impl UserFixture {
         self
     }
 
-    /// Set the password
-    #[must_use]
-    pub fn with_password(mut self, password: impl Into<String>) -> Self {
-        self.password = password.into();
-        self
     }
 }
 
