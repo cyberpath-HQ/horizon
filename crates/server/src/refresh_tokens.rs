@@ -213,16 +213,7 @@ pub fn generate_refresh_token() -> String {
 
 #[cfg(test)]
 mod tests {
-    use sea_orm::{Database, DatabaseConnection};
-
     use super::*;
-
-    async fn setup_test_db() -> DatabaseConnection {
-        // Use SQLite for tests
-        Database::connect("sqlite::memory:")
-            .await
-            .expect("Failed to connect to test database")
-    }
 
     #[tokio::test]
     async fn test_generate_refresh_token() {
