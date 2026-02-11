@@ -5,7 +5,7 @@ FIX_FLAG=""
 while [[ $# -gt 0 ]]; do
     case $1 in
         --fix)
-            FIX_FLAG="--fix"
+            FIX_FLAG="--fix --allow-dirty"
             shift
             ;;
         *)
@@ -34,7 +34,7 @@ fi
 # Run clippy for each element
 for element in $workspace_elements; do
     echo "Running clippy for: $element"
-    if ! cargo clippy -p "$element" --all-features $FIX_FLAG --allow-dirty -- -D warnings --no-deps; then
+    if ! cargo clippy -p "$element" --all-features $FIX_FLAG -- -D warnings --no-deps; then
         echo "Clippy failed for: $element"
         exit 1
     fi
