@@ -104,7 +104,15 @@ fn percent_encode_username_password(s: &str) -> String {
 ///
 /// A `Result` containing the parsed `SocketAddr` or an error if parsing fails.
 pub fn parse_socket_addr(host: &str, port: u16) -> Result<SocketAddr, std::net::AddrParseError> {
-    format!("{}:{}", host, port).parse()
+    // IPv6 addresses must be wrapped in brackets when appending a port
+    // e.g., "::1" becomes "[::1]:3000"
+    let addr_str = if host.contains(':') {
+        format!("[{}]:{}", host, port)
+    }
+    else {
+        format!("{}:{}", host, port)
+    };
+    addr_str.parse()
 }
 
 #[cfg(test)]
@@ -174,5 +182,19 @@ mod tests {
         let addr = parse_socket_addr("127.0.0.1", 8080);
         assert!(addr.is_ok());
         assert_eq!(addr.unwrap().to_string(), "127.0.0.1:8080");
+    }
+
+    #[test]
+    fn test_parse_socket_addr_ipv6() {
+        let addr = parse_socket_addr("::1", 3000);
+        assert!(addr.is_ok());
+        assert_eq!(addr.unwrap().to_string(), "[::1]:3000");
+    }
+
+    #[test]
+    fn test_parse_socket_addr_ipv6_full() {
+        let addr = parse_socket_addr("2001:db8::1", 8080);
+        assert!(addr.is_ok());
+        assert_eq!(addr.unwrap().to_string(), "[2001:db8::1]:8080");
     }
 }

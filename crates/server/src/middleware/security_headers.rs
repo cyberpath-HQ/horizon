@@ -190,14 +190,14 @@ pub async fn cors_middleware(request: Request, next: Next, config: CorsConfig) -
         insert_header(headers, "Access-Control-Allow-Origin", req_origin);
 
         // Allow specific methods
-        for method in &config.allowed_methods {
-            insert_header(headers, "Access-Control-Allow-Methods", method.as_str());
-        }
+        // Join all methods into a single comma-separated value
+        let allowed_methods_value = config.allowed_methods.iter().map(|m| m.as_str()).collect::<Vec<_>>().join(", ");
+        insert_header(headers, "Access-Control-Allow-Methods", &allowed_methods_value);
 
         // Allow specific request headers
-        for header in &config.allowed_headers {
-            insert_header(headers, "Access-Control-Allow-Headers", header);
-        }
+        // Join all headers into a single comma-separated value
+        let allowed_headers_value = config.allowed_headers.join(", ");
+        insert_header(headers, "Access-Control-Allow-Headers", &allowed_headers_value);
 
         // Expose headers that client-side JavaScript might need to read
         // Join all exposed headers into a single comma-separated value

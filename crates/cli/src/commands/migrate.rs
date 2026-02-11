@@ -27,8 +27,6 @@ pub async fn migrate(config: &DatabaseConfig, args: MigrateArgs) -> Result<()> {
         target: "migrate",
         dry_run = %args.dry_run,
         rollback = %args.rollback,
-        create = ?args.create,
-        threads = %args.threads,
         "Running database migrations..."
     );
 

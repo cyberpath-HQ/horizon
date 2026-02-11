@@ -36,7 +36,7 @@ pub struct ServeArgs {
     pub port: u16,
 
     /// Enable TLS/HTTPS
-    #[arg(long, env = "HORIZON_TLS")]
+    #[arg(long, env = "HORIZON_TLS", requires_all = ["tls_cert", "tls_key"])]
     pub tls: bool,
 
     /// TLS certificate file path
@@ -58,18 +58,6 @@ pub struct MigrateArgs {
     /// Rollback the last migration
     #[arg(long)]
     pub rollback: bool,
-
-    /// Create a new migration with the given name
-    #[arg(long, requires = "migration_dir")]
-    pub create: Option<String>,
-
-    /// Directory for migration files
-    #[arg(long, env = "HORIZON_MIGRATION_DIR")]
-    pub migration_dir: Option<String>,
-
-    /// Number of parallel migration threads
-    #[arg(long, default_value = "4")]
-    pub threads: u8,
 }
 
 /// Arguments for the completions command

@@ -62,7 +62,7 @@ pub async fn serve(config: &DatabaseConfig, args: ServeArgs) -> Result<()> {
     // Initialize Redis client for token blacklisting
     let redis_url = std::env::var("HORIZON_REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_owned());
     let redis_client =
-        RedisClient::open(redis_url).map_err(|e| anyhow::anyhow!("Failed to connect to Redis: {}", e))?;
+        RedisClient::open(redis_url).map_err(|e| anyhow::anyhow!("Failed to create Redis client: {}", e))?;
 
     // Create application state
     let jwt_config = JwtConfig::default();
@@ -89,7 +89,7 @@ pub async fn serve(config: &DatabaseConfig, args: ServeArgs) -> Result<()> {
     }
 }
 
-/// Serves the application over HTTPS
+/// Serves the application over HTTP
 async fn serve_http(app: &axum::Router, address: &SocketAddr) -> Result<()> {
     let listener = TcpListener::bind(address)
         .await
@@ -157,8 +157,15 @@ async fn serve_https(app: &axum::Router, address: &SocketAddr, args: ServeArgs) 
                 break;
             }
             result = listener.accept() => {
-                let (tcp_stream, peer_addr) = result
-                    .map_err(|e| anyhow!("Failed to accept connection: {}", e))?;
+                let (tcp_stream, peer_addr) = match result {
+                    Ok(result) => result,
+                    Err(e) => {
+                        // Log transient errors and continue serving
+                        // Common transient errors: EMFILE (too many open files), ECONNABORTED (connection aborted)
+                        tracing::warn!("Failed to accept connection (transient error, continuing): {}", e);
+                        continue;
+                    },
+                };
                 let tls_acceptor = tls_acceptor.clone();
                 let app = app.clone();
 

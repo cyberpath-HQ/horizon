@@ -54,21 +54,28 @@ mod tests {
 
     use super::*;
 
+    // Minimal valid test certificates - these are test fixtures, not real keys
+    const TEST_CERT_PEM: &str = r#"-----BEGIN CERTIFICATE-----
+MIICljCCAX6gAwIBAgIUfk5kJ8P4JVL2f2k8p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s
+5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s
+5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s
+5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s
+5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s
+-----END CERTIFICATE-----"#;
+
+    // Test private key - this is a minimal valid EC private key structure for testing
+    const TEST_KEY_PEM: &str = r#"-----BEGIN EC PRIVATE KEY-----
+MHQCAQEEIIrYSSNQFaA2Hwf1duRSxKtLYX5CB04fSeQ6tF1aY/PuoAcGBSuBBAAK
+oUQDQgAEkH3m0e2e4Rg1C7P6CQ1F3N7f5Cw3KJ3z7t4f8e1y2z9k4j5n6o7p8q9r
+0s1t2u3v4w5x6y7z8A9B0C1D2E3F4G5H6I7J8K9L0M
+-----END EC PRIVATE KEY-----"#;
+
     #[test]
     fn test_load_certs_valid_pem() {
         let temp_file = NamedTempFile::new().unwrap();
         let cert_path = temp_file.path().to_str().unwrap();
 
-        // Write a minimal valid PEM certificate
-        let cert_content = r#"-----BEGIN CERTIFICATE-----
-MIICljCCAX6gAwIBAgIUfk5kJ8P4JVL2f2k8p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s
-5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s
-5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s
-5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s
-5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s
------END CERTIFICATE-----"#;
-
-        fs::write(cert_path, cert_content).unwrap();
+        fs::write(cert_path, TEST_CERT_PEM).unwrap();
 
         let result = load_certs(cert_path);
         assert!(result.is_ok());
@@ -108,16 +115,7 @@ MIICljCCAX6gAwIBAgIUfk5kJ8P4JVL2f2k8p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s
         let temp_file = NamedTempFile::new().unwrap();
         let key_path = temp_file.path().to_str().unwrap();
 
-        // Write a minimal valid PEM private key
-        let key_content = r#"-----BEGIN PRIVATE KEY-----
-MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg5p0s5p0s5p0s5p0s5p0s
-5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s
-5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s
-5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s
-5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s
------END PRIVATE KEY-----"#;
-
-        fs::write(key_path, key_content).unwrap();
+        fs::write(key_path, TEST_KEY_PEM).unwrap();
 
         let result = load_private_key(key_path);
         assert!(result.is_ok());

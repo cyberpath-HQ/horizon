@@ -52,7 +52,8 @@ pub async fn auth_middleware(mut request: Request, next: Next) -> Response {
     let state = match request.extensions().get::<AppState>() {
         Some(s) => s,
         None => {
-            return create_auth_error_response("Server configuration error: missing app state");
+            tracing::error!("Server misconfiguration: missing app state in request extensions");
+            return create_server_error_response("Server configuration error: missing app state");
         },
     };
     // Get JWT config from state
@@ -137,6 +138,19 @@ fn create_auth_error_response(message: &str) -> Response {
         axum::Json(json!({
             "success": false,
             "code": "AUTHENTICATION_ERROR",
+            "message": message
+        })),
+    )
+        .into_response()
+}
+
+/// Create server error response for misconfiguration (missing app state)
+fn create_server_error_response(message: &str) -> Response {
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        axum::Json(json!({
+            "success": false,
+            "code": "SERVER_ERROR",
             "message": message
         })),
     )

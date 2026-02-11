@@ -142,24 +142,6 @@ mod tests {
     }
 
     #[test]
-    fn test_migrate_create() {
-        let cli = Cli::parse_from(&[
-            "horizon",
-            "migrate",
-            "--create",
-            "add_users_table",
-            "--migration-dir",
-            "/migrations",
-        ]);
-        match cli.command {
-            Commands::Migrate(args) => {
-                assert_eq!(args.create, Some("add_users_table".to_string()));
-            },
-            _ => panic!("Expected Migrate command"),
-        }
-    }
-
-    #[test]
     fn test_cli_command_factory() {
         let cmd = Cli::command();
         assert!(cmd.get_name() == "horizon");
@@ -293,16 +275,11 @@ mod tests {
     #[test]
     fn test_migrate_args_default() {
         let args = MigrateArgs {
-            dry_run:       false,
-            rollback:      false,
-            create:        None,
-            migration_dir: None,
-            threads:       4,
+            dry_run:  false,
+            rollback: false,
         };
         assert!(!args.dry_run);
         assert!(!args.rollback);
-        assert!(args.create.is_none());
-        assert_eq!(args.threads, 4);
     }
 
     #[test]
@@ -354,18 +331,12 @@ mod tests {
     #[test]
     fn test_migrate_args_full() {
         let args = MigrateArgs {
-            dry_run:       true,
-            rollback:      false,
-            create:        Some("test_migration".to_string()),
-            migration_dir: Some("/custom/migrations".to_string()),
-            threads:       8,
+            dry_run:  true,
+            rollback: false,
         };
 
         assert!(args.dry_run);
         assert!(!args.rollback);
-        assert_eq!(args.create, Some("test_migration".to_string()));
-        assert_eq!(args.migration_dir, Some("/custom/migrations".to_string()));
-        assert_eq!(args.threads, 8);
     }
 
     #[test]

@@ -71,12 +71,18 @@ impl PaginationMeta {
     /// Clamps `page` to `MAX_PAGE` if it exceeds the maximum allowed value.
     pub fn new(page: u64, per_page: u64, total_items: u64) -> Self {
         let page = if page > Self::MAX_PAGE {
-            tracing::error!("Page number {} exceeds maximum allowed value {}, clamping to max", page, Self::MAX_PAGE);
+            tracing::warn!(
+                "Page number {} exceeds maximum allowed value {}, clamping to max",
+                page,
+                Self::MAX_PAGE
+            );
             Self::MAX_PAGE
-        } else if page < 1 {
-            tracing::error!("Page number must be at least 1, defaulting to 1");
+        }
+        else if page < 1 {
+            tracing::warn!("Page number must be at least 1, defaulting to 1");
             1
-        } else {
+        }
+        else {
             page
         };
 
@@ -772,7 +778,7 @@ mod tests {
         // Note: per_page 0 is allowed in the current implementation
         // but would cause division by zero in total_pages calculation
         // This tests the actual behavior
-        let meta = PaginationMeta::new(1, 1, 100);  // Use 1 instead of 0
+        let meta = PaginationMeta::new(1, 1, 100); // Use 1 instead of 0
         assert_eq!(meta.per_page, 1);
         assert_eq!(meta.offset(), Some(0));
     }
@@ -781,12 +787,12 @@ mod tests {
     fn test_pagination_offset_overflow_protection() {
         // Test with values that would definitely cause overflow
         // Use a page value that's large enough that multiplying by per_page would overflow
-        let page = u64::MAX - 1;  // Very large page
-        let per_page = 10;  // Small per_page, but page is so large it still overflows
-        
+        let page = u64::MAX - 1; // Very large page
+        let per_page = 10; // Small per_page, but page is so large it still overflows
+
         // Before clamping: (page - 1) * per_page = (u64::MAX - 2) * 10
         // This definitely overflows u64
-        
+
         let meta = PaginationMeta::new(page, per_page, u64::MAX);
         // After clamping, page will be MAX_PAGE, so the multiplication becomes:
         // (MAX_PAGE - 1) * 10 = 9,999,990, which doesn't overflow
