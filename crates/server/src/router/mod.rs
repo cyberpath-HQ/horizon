@@ -434,7 +434,9 @@ async fn health_check_handler(State(state): State<AppState>) -> Result<Json<serd
         "uptime_seconds": state.start_time.elapsed().as_secs()
     });
 
-    let checks_obj = checks["checks"].as_object_mut().unwrap();
+    let checks_obj = checks["checks"]
+        .as_object_mut()
+        .expect("Health check response should have checks object");
 
     // Database connectivity check (PostgreSQL)
     let db_status = match state.db.ping().await {
