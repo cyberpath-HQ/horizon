@@ -51,7 +51,7 @@ jobs:
           libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
 
       - name: Install grcov
-        run: cargo install grcov
+        run: cargo install grcov sqlx-cli
 
       - name: Generate coverage reports
         run: bash ./scripts/run-coverage.sh
