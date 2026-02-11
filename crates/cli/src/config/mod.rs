@@ -106,7 +106,7 @@ fn percent_encode_username_password(s: &str) -> String {
 pub fn parse_socket_addr(host: &str, port: u16) -> Result<SocketAddr, std::net::AddrParseError> {
     // IPv6 addresses must be wrapped in brackets when appending a port
     // e.g., "::1" becomes "[::1]:3000"
-    let addr_str = if host.contains(':') {
+    let addr_str = if host.contains(':') && !host.starts_with('[') {
         format!("[{}]:{}", host, port)
     }
     else {
