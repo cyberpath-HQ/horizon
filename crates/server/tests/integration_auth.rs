@@ -13,7 +13,7 @@ use auth::{
 };
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use common::{init_test_env, TestDb, TestRedis, UserFixture};
-use entity::{refresh_tokens, user_sessions, users};
+use entity::sea_orm_active_enums::UserStatus;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use server::{middleware::auth::AuthenticatedUser, router, AppState};
 use tower::util::ServiceExt;

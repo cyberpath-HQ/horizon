@@ -200,9 +200,9 @@ pub async fn cors_middleware(request: Request, next: Next, config: CorsConfig) -
         }
 
         // Expose headers that client-side JavaScript might need to read
-        for header in &config.exposed_headers {
-            insert_header(headers, "Access-Control-Expose-Headers", header);
-        }
+        // Join all exposed headers into a single comma-separated value
+        let exposed_headers_value = config.exposed_headers.join(", ");
+        insert_header(headers, "Access-Control-Expose-Headers", &exposed_headers_value);
 
         // Credentials
         if config.allow_credentials {
@@ -234,9 +234,9 @@ pub async fn cors_middleware(request: Request, next: Next, config: CorsConfig) -
         insert_header(headers, "Access-Control-Allow-Origin", req_origin);
 
         // Expose headers for client-side access
-        for header in &config.exposed_headers {
-            insert_header(headers, "Access-Control-Expose-Headers", header);
-        }
+        // Join all exposed headers into a single comma-separated value
+        let exposed_headers_value = config.exposed_headers.join(", ");
+        insert_header(headers, "Access-Control-Expose-Headers", &exposed_headers_value);
 
         if config.allow_credentials {
             insert_header(headers, "Access-Control-Allow-Credentials", "true");

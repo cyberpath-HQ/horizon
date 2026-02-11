@@ -167,27 +167,19 @@ mod tests {
 
     #[test]
     fn test_validate_returns_ok() {
-        // Save original env vars
+        // Save original env vars and ensure all required vars are set
         let orig_host = std::env::var("HORIZON_DATABASE_HOST").ok();
         let orig_port = std::env::var("HORIZON_DATABASE_PORT").ok();
         let orig_name = std::env::var("HORIZON_DATABASE_NAME").ok();
         let orig_user = std::env::var("HORIZON_DATABASE_USER").ok();
         let orig_pass = std::env::var("HORIZON_DATABASE_PASSWORD").ok();
 
-        // Set required env vars
+        // Set required env vars - overwrite any existing values
         unsafe {
             std::env::set_var("HORIZON_DATABASE_HOST", "localhost");
-        }
-        unsafe {
             std::env::set_var("HORIZON_DATABASE_PORT", "5432");
-        }
-        unsafe {
             std::env::set_var("HORIZON_DATABASE_NAME", "horizon");
-        }
-        unsafe {
             std::env::set_var("HORIZON_DATABASE_USER", "horizon");
-        }
-        unsafe {
             std::env::set_var(
                 "HORIZON_DATABASE_PASSWORD",
                 "horizon_secret_password_change_in_production",
@@ -195,56 +187,41 @@ mod tests {
         }
 
         let result = commands::validate::validate();
-        assert!(result.is_ok());
+        assert!(
+            result.is_ok(),
+            "Validation should succeed with all required env vars set"
+        );
 
         // Restore original env vars
-        if let Some(v) = orig_host {
-            unsafe {
+        unsafe {
+            if let Some(v) = orig_host {
                 std::env::set_var("HORIZON_DATABASE_HOST", v);
             }
-        }
-        else {
-            unsafe {
+            else {
                 std::env::remove_var("HORIZON_DATABASE_HOST");
             }
-        }
-        if let Some(v) = orig_port {
-            unsafe {
+            if let Some(v) = orig_port {
                 std::env::set_var("HORIZON_DATABASE_PORT", v);
             }
-        }
-        else {
-            unsafe {
+            else {
                 std::env::remove_var("HORIZON_DATABASE_PORT");
             }
-        }
-        if let Some(v) = orig_name {
-            unsafe {
+            if let Some(v) = orig_name {
                 std::env::set_var("HORIZON_DATABASE_NAME", v);
             }
-        }
-        else {
-            unsafe {
+            else {
                 std::env::remove_var("HORIZON_DATABASE_NAME");
             }
-        }
-        if let Some(v) = orig_user {
-            unsafe {
+            if let Some(v) = orig_user {
                 std::env::set_var("HORIZON_DATABASE_USER", v);
             }
-        }
-        else {
-            unsafe {
+            else {
                 std::env::remove_var("HORIZON_DATABASE_USER");
             }
-        }
-        if let Some(v) = orig_pass {
-            unsafe {
+            if let Some(v) = orig_pass {
                 std::env::set_var("HORIZON_DATABASE_PASSWORD", v);
             }
-        }
-        else {
-            unsafe {
+            else {
                 std::env::remove_var("HORIZON_DATABASE_PASSWORD");
             }
         }

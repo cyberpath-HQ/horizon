@@ -7,26 +7,18 @@ mod common;
 use auth::secrecy::ExposeSecret;
 use chrono::Utc;
 use common::{init_test_env, TestDb, TestRedis};
-use entity::{refresh_tokens, sea_orm_active_enums::UserStatus, users, Users};
-use uuid::Uuid;
-use sea_orm::{ActiveModelTrait, ColumnTrait, QueryFilter, Set};
+use entity::{sea_orm_active_enums::UserStatus, users};
+use sea_orm::{ActiveModelTrait, Set};
 use server::{
     auth::{
         handlers::{login_handler_inner, logout_handler_inner, refresh_handler_inner, setup_handler_inner},
-        sessions::{delete_all_sessions_handler, delete_session_handler, get_sessions_handler},
-        teams::{create_team_handler, delete_team_handler, get_team_handler, list_teams_handler, update_team_handler},
-        users::{get_my_profile_handler, list_users_handler, update_my_profile_handler},
+        sessions::delete_all_sessions_handler,
     },
-    dto::{
-        auth::{LoginRequest, RefreshRequest, SetupRequest},
-        teams::{CreateTeamRequest, TeamListQuery, UpdateTeamRequest},
-        users::{UpdateUserProfileRequest, UserListQuery},
-    },
+    dto::auth::{LoginRequest, RefreshRequest, SetupRequest},
     middleware::auth::AuthenticatedUser,
-    refresh_tokens::{create_refresh_token, generate_refresh_token, revoke_refresh_token, validate_refresh_token},
+    refresh_tokens::{create_refresh_token, generate_refresh_token},
     AppState,
 };
-use tower::ServiceExt;
 
 const TEST_PASSWORD: &str = "SecureTestPassword123!";
 
@@ -242,7 +234,7 @@ async fn test_logout_handler_returns_success_response() {
 
     let unique_email = format!("logout.{}", get_unique_id());
     let user = create_test_user(&state, &unique_email).await;
-    let auth_user = authenticated_user_from_model(&user);
+    let _auth_user = authenticated_user_from_model(&user);
 
     let request = axum::http::Request::builder()
         .body(axum::body::Body::empty())

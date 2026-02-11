@@ -81,7 +81,7 @@ mod api_key_tests {
 
     #[test]
     fn test_api_key_rate_limit_enforcement() {
-        let api_key_id = "key-12345";
+        let _api_key_id = "key-12345";
         let requests_per_minute = 100;
         let current_minute_requests = 50;
 

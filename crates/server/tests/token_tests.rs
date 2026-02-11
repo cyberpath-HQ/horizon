@@ -8,7 +8,6 @@ use std::time::Duration;
 
 use chrono::Utc;
 use common::{init_test_env, TestRedis};
-use redis::AsyncCommands;
 use serial_test::serial;
 use server::token_blacklist::TokenBlacklist;
 use tokio::time::sleep;

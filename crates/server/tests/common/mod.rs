@@ -113,7 +113,7 @@ impl TestRedis {
 }
 
 /// Clean up all test data from the database
-pub async fn cleanup_test_data(db: &DbConn) -> Result<(), String> {
+pub async fn cleanup_test_data(_db: &DbConn) -> Result<(), String> {
     // Tests use UUID-based IDs for isolation, cleanup happens per-test or via test infrastructure
     Ok(())
 }
@@ -130,7 +130,7 @@ impl Default for UserFixture {
     fn default() -> Self {
         // Use UUID for guaranteed uniqueness across test runs
         let uuid = uuid::Uuid::new_v4();
-        let timestamp = std::time::SystemTime::now()
+        let _timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos();

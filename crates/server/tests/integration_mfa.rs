@@ -18,7 +18,6 @@ use server::{
     middleware::auth::AuthenticatedUser,
     AppState,
 };
-use tower::ServiceExt;
 
 const TEST_PASSWORD: &str = "SecureTestPassword123!";
 
@@ -332,7 +331,7 @@ async fn test_mfa_backup_codes_response_count() {
 
     let unique_email = format!("mfa_backup_count.{}", get_unique_id());
     let user = create_test_user(&state, &unique_email).await;
-    let auth_user = authenticated_user_from_model(&user);
+    let _auth_user = authenticated_user_from_model(&user);
 
     // Verify user has no backup codes initially
     let db_user = entity::users::Entity::find_by_id(&user.id)
