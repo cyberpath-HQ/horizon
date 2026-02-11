@@ -77,10 +77,9 @@ impl ErrorHandler {
             retry_after,
             ..
         } = err
+            && let Ok(retry_val) = retry_after.to_string().parse::<axum::http::HeaderValue>()
         {
-            if let Ok(retry_val) = retry_after.to_string().parse::<axum::http::HeaderValue>() {
-                let _ = res.headers_mut().insert("Retry-After", retry_val);
-            }
+            let _ = res.headers_mut().insert("Retry-After", retry_val);
         }
 
         res
