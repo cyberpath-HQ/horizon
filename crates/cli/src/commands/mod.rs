@@ -3,7 +3,6 @@
 //! Implementation of CLI commands for the Horizon application.
 
 pub mod completions;
-pub mod migrate;
 pub mod validate;
 
 use clap::{Args, Subcommand};
@@ -13,9 +12,6 @@ use clap::{Args, Subcommand};
 pub enum Commands {
     /// Start the API server
     Serve(ServeArgs),
-
-    /// Run database migrations
-    Migrate(MigrateArgs),
 
     /// Generate shell completions
     Completions(CompletionsArgs),
@@ -46,18 +42,6 @@ pub struct ServeArgs {
     /// TLS key file path
     #[arg(long, env = "HORIZON_TLS_KEY", requires = "tls")]
     pub tls_key: Option<String>,
-}
-
-/// Arguments for the migrate command
-#[derive(Args, Debug)]
-pub struct MigrateArgs {
-    /// Run migrations in dry-run mode (no changes)
-    #[arg(long)]
-    pub dry_run: bool,
-
-    /// Rollback the last migration
-    #[arg(long)]
-    pub rollback: bool,
 }
 
 /// Arguments for the completions command

@@ -74,23 +74,40 @@ pub fn build_database_url(config: &DatabaseConfig) -> String {
     )
 }
 
-/// Simple percent-encoding for username/password in PostgreSQL URIs
-/// Encodes @, :, /, ?, #, [, ], and % as required
+/// Percent-encoding for username/password in PostgreSQL URIs.
+///
+/// Encodes all characters that need to be percent-encoded in userinfo:
+/// - Reserved characters: @ : / ? # [ ]
+/// - Percent sign itself: %
+/// - Any character outside ASCII (encoded as UTF-8 bytes)
+/// - Any other character that might cause issues in URIs
 fn percent_encode_username_password(s: &str) -> String {
-    s.chars().fold(String::new(), |mut acc, c| {
-        match c {
-            '@' => acc.push_str("%40"),
-            ':' => acc.push_str("%3A"),
-            '/' => acc.push_str("%2F"),
-            '?' => acc.push_str("%3F"),
-            '#' => acc.push_str("%23"),
-            '[' => acc.push_str("%5B"),
-            ']' => acc.push_str("%5D"),
-            '%' => acc.push_str("%25"),
-            c => acc.push(c),
+    let mut result = String::with_capacity(s.len() * 3);
+    for c in s.chars() {
+        if c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '~') {
+            // Unreserved characters - safe to include as-is
+            result.push(c);
         }
-        acc
-    })
+        else {
+            // Encode the character as UTF-8 bytes, then percent-encode each byte
+            let mut buf = [0u8; 4];
+            let encoded = c.encode_utf8(&mut buf);
+            for byte in encoded.as_bytes() {
+                result.push('%');
+                result.push(
+                    char::from_digit(((*byte / 16) as u32), 16)
+                        .unwrap()
+                        .to_ascii_uppercase(),
+                );
+                result.push(
+                    char::from_digit(((*byte % 16) as u32), 16)
+                        .unwrap()
+                        .to_ascii_uppercase(),
+                );
+            }
+        }
+    }
+    result
 }
 
 /// Parses a host and port into a SocketAddr.

@@ -16,7 +16,7 @@ mod server;
 mod tls;
 
 use clap::{CommandFactory as _, Parser, Subcommand};
-use commands::{CompletionsArgs, MigrateArgs, ServeArgs};
+use commands::{CompletionsArgs, ServeArgs};
 use config::DatabaseConfig;
 
 /// Horizon CMDB - Configuration Management Database
@@ -43,9 +43,6 @@ enum Commands {
     /// Start the API server
     Serve(ServeArgs),
 
-    /// Run database migrations
-    Migrate(MigrateArgs),
-
     /// Generate shell completions
     Completions(CompletionsArgs),
 
@@ -67,10 +64,6 @@ async fn main() -> error::Result<()> {
         Commands::Serve(args) => {
             let config = DatabaseConfig::from_env().map_err(|_e| anyhow::anyhow!("Invalid database configuration"))?;
             server::serve(&config, args).await?
-        },
-        Commands::Migrate(args) => {
-            let config = DatabaseConfig::from_env().map_err(|_e| anyhow::anyhow!("Invalid database configuration"))?;
-            commands::migrate::migrate(&config, args).await?
         },
         Commands::Completions(args) => commands::completions::completions(args.shell, &mut Cli::command())?,
         Commands::Validate => commands::validate::validate()?,
@@ -127,18 +120,6 @@ mod tests {
         assert!(args.tls);
         assert_eq!(args.tls_cert, Some("/path/to/cert".to_string()));
         assert_eq!(args.tls_key, Some("/path/to/key".to_string()));
-    }
-
-    #[tokio::test]
-    async fn test_migrate_rollback() {
-        let cli = Cli::parse_from(&["horizon", "migrate", "--rollback"]);
-        match cli.command {
-            Commands::Migrate(args) => {
-                assert_eq!(args.rollback, true);
-                assert_eq!(args.dry_run, false);
-            },
-            _ => panic!("Expected Migrate command"),
-        }
     }
 
     #[test]
@@ -273,16 +254,6 @@ mod tests {
     }
 
     #[test]
-    fn test_migrate_args_default() {
-        let args = MigrateArgs {
-            dry_run:  false,
-            rollback: false,
-        };
-        assert!(!args.dry_run);
-        assert!(!args.rollback);
-    }
-
-    #[test]
     fn test_cli_parse_with_log_options() {
         let cli = Cli::parse_from(&[
             "horizon",
@@ -329,17 +300,6 @@ mod tests {
     }
 
     #[test]
-    fn test_migrate_args_full() {
-        let args = MigrateArgs {
-            dry_run:  true,
-            rollback: false,
-        };
-
-        assert!(args.dry_run);
-        assert!(!args.rollback);
-    }
-
-    #[test]
     fn test_cli_parse_unknown_command() {
         use std::process::Command;
 
@@ -382,19 +342,6 @@ mod tests {
             }
         }
         assert!(has_serve);
-    }
-
-    #[test]
-    fn test_cli_migrate_subcommand() {
-        let cmd = Cli::command();
-        let mut has_migrate = false;
-        for subcommand in cmd.get_subcommands() {
-            if subcommand.get_name() == "migrate" {
-                has_migrate = true;
-                break;
-            }
-        }
-        assert!(has_migrate);
     }
 
     #[test]
