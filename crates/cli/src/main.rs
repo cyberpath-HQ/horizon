@@ -129,19 +129,13 @@ mod tests {
         assert_eq!(args.tls_key, Some("/path/to/key".to_string()));
     }
 
-    #[test]
-    fn test_migrate_rollback() {
+    #[tokio::test]
+    async fn test_migrate_rollback() {
         let cli = Cli::parse_from(&["horizon", "migrate", "--rollback"]);
         match cli.command {
-            Commands::Serve(args) => {
-                let config =
-                    DatabaseConfig::from_env().map_err(|_e| anyhow::anyhow!("Invalid database configuration"))?;
-                server::serve(&config, args)?
-            },
             Commands::Migrate(args) => {
-                let config =
-                    DatabaseConfig::from_env().map_err(|_e| anyhow::anyhow!("Invalid database configuration"))?;
-                commands::migrate::migrate(&config, args)?
+                assert_eq!(args.rollback, true);
+                assert_eq!(args.dry_run, false);
             },
             _ => panic!("Expected Migrate command"),
         }
@@ -194,7 +188,10 @@ mod tests {
             std::env::set_var("HORIZON_DATABASE_USER", "horizon");
         }
         unsafe {
-            std::env::set_var("HORIZON_DATABASE_PASSWORD", "password");
+            std::env::set_var(
+                "HORIZON_DATABASE_PASSWORD",
+                "horizon_secret_password_change_in_production",
+            );
         }
 
         let result = commands::validate::validate();
