@@ -37,6 +37,7 @@ jobs:
           private-key: ${{ secrets.SEMANTIC_RELEASE_APP_PRIVATE_KEY }}
           owner: cyberpath-HQ
           repositories: horizon
-      - run: npx semantic-release
-        env:
-          GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
+      # Not ready to release yet, waiting for more features and stability improvements
+      #- run: npx semantic-release
+      #  env:
+      #    GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
