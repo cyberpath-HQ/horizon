@@ -135,4 +135,6 @@ echo "Running database migrations..."
 cargo run --package migration --features cli -- -u "$DATABASE_URL" fresh
 
 echo "Running tests (excluding src-tauri)..."
+export DATABASE_URL="$DATABASE_URL"
+export REDIS_URL="$REDIS_URL"
 cargo test --workspace --exclude ui
