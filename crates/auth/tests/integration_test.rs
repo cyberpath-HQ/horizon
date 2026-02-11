@@ -1001,7 +1001,7 @@ async fn test_permission_service_team_member_permissions() {
         .expect("No roles found in database");
 
     // Assign team member permissions
-    let mut role_permissions = serde_json::Value::Array(vec![
+    let role_permissions = serde_json::Value::Array(vec![
         serde_json::Value::String("teams:members_read".to_string()),
         serde_json::Value::String("teams:members_add".to_string()),
     ]);
@@ -1103,7 +1103,7 @@ async fn test_permission_service_team_management_permissions() {
         .expect("No roles found in database");
 
     // Assign team management permissions
-    let mut role_permissions = serde_json::Value::Array(vec![
+    let role_permissions = serde_json::Value::Array(vec![
         serde_json::Value::String("teams:read".to_string()),
         serde_json::Value::String("teams:update".to_string()),
         serde_json::Value::String("teams:delete".to_string()),
@@ -1215,7 +1215,7 @@ async fn test_permission_service_team_scope_isolation() {
         .expect("Failed to query roles")
         .expect("No roles found in database");
 
-    let mut role_permissions = serde_json::Value::Array(vec![serde_json::Value::String("teams:read".to_string())]);
+    let role_permissions = serde_json::Value::Array(vec![serde_json::Value::String("teams:read".to_string())]);
     let role_update = entity::roles::ActiveModel {
         id: Set(role.id.clone()),
         permissions: Set(role_permissions),
@@ -1312,7 +1312,7 @@ async fn test_permission_service_api_key_permissions() {
         .expect("No roles found in database");
 
     // Assign API key permissions
-    let mut role_permissions = serde_json::Value::Array(vec![
+    let role_permissions = serde_json::Value::Array(vec![
         serde_json::Value::String("api_keys:read".to_string()),
         serde_json::Value::String("api_keys:rotate".to_string()),
     ]);
@@ -1414,7 +1414,7 @@ async fn test_permission_service_role_inheritance() {
         .expect("No roles found in database");
 
     // Assign base role with read permission
-    let mut base_perms = serde_json::Value::Array(vec![serde_json::Value::String("users:read".to_string())]);
+    let base_perms = serde_json::Value::Array(vec![serde_json::Value::String("users:read".to_string())]);
     let base_role_update = entity::roles::ActiveModel {
         id: Set(base_role.id.clone()),
         permissions: Set(base_perms),
