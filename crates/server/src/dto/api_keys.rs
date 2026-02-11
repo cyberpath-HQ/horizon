@@ -5,6 +5,10 @@
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
+/// Maximum allowed expiration time in seconds (100 years)
+/// This prevents integer overflow and excessive memory allocation
+const MAX_EXPIRATION_SECONDS: u64 = 100 * 365 * 24 * 60 * 60; // 100 years
+
 /// Request to create a new API key
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Validate)]
 pub struct CreateApiKeyRequest {
@@ -18,6 +22,8 @@ pub struct CreateApiKeyRequest {
     /// JSON permissions object defining what this key can access
     pub permissions:        Option<serde_json::Value>,
     /// Optional expiration time in seconds from now (if not set, key does not expire)
+    /// Maximum: 100 years in seconds
+    #[validate(range(min = 1, max = MAX_EXPIRATION_SECONDS, message = "Expiration time must be between 1 second and 100 years"))]
     pub expires_in_seconds: Option<u64>,
 }
 

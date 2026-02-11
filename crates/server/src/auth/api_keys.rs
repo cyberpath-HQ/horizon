@@ -13,6 +13,7 @@ use entity::{
 use error::{AppError, Result};
 use sea_orm::{ActiveModelTrait, ColumnTrait, Condition, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set};
 use tracing::info;
+use validator::Validate;
 
 use crate::{
     dto::{
@@ -35,6 +36,10 @@ use crate::{
     utils::escape_like_wildcards,
     AppState,
 };
+
+/// Maximum allowed expiration time in seconds (100 years)
+/// This prevents integer overflow and excessive memory allocation
+const MAX_EXPIRATION_SECONDS: u64 = 100 * 365 * 24 * 60 * 60;
 
 /// Length of the raw API key in bytes (before hex encoding)
 const API_KEY_BYTES: usize = 32;
@@ -61,6 +66,9 @@ pub async fn create_api_key_handler(
     user: AuthenticatedUser,
     req: CreateApiKeyRequest,
 ) -> Result<Json<CreateApiKeyResponse>> {
+    // Validate the request first
+    req.validate()?;
+
     // Generate a cryptographically random API key
     let raw_key = generate_api_key();
     let key_hash = hash_api_key(&raw_key);
@@ -68,9 +76,26 @@ pub async fn create_api_key_handler(
 
     let permissions = req.permissions.unwrap_or(serde_json::json!({}));
 
-    let expires_at = req
-        .expires_in_seconds
-        .map(|secs| (Utc::now() + chrono::Duration::seconds(secs as i64)).naive_utc());
+    // Safely calculate expiration time with overflow protection
+    let expires_at = req.expires_in_seconds.map(|secs| {
+        // Validate that secs is within safe bounds
+        let safe_secs = if secs > MAX_EXPIRATION_SECONDS {
+            tracing::warn!(
+                user_id = %user.id,
+                requested_secs = secs,
+                max_secs = MAX_EXPIRATION_SECONDS,
+                "Expiration time exceeds maximum, using maximum allowed"
+            );
+            MAX_EXPIRATION_SECONDS
+        } else {
+            secs
+        };
+
+        // Convert to i64 safely (we've validated it's within bounds)
+        let i64_secs = safe_secs as i64;
+        let duration = chrono::Duration::seconds(i64_secs);
+        (Utc::now() + duration).naive_utc()
+    });
 
     let now = Utc::now().naive_utc();
     let api_key = entity::api_keys::ActiveModel {
@@ -1171,4 +1196,131 @@ mod tests {
             "GET"
         )); // Different case
     }
+
+
+    // ==================== Expiration Validation Security Tests ====================
+
+    #[test]
+    fn test_create_api_key_request_normal_expiration() {
+        // Normal expiration time (1 hour)
+        let req = CreateApiKeyRequest {
+            name: "Test Key".to_string(),
+            permissions: None,
+            expires_in_seconds: Some(3600),
+        };
+        assert!(req.validate().is_ok());
+    }
+
+    #[test]
+    fn test_create_api_key_request_max_expiration() {
+        // Maximum allowed expiration (100 years in seconds)
+        let max_secs = 100 * 365 * 24 * 60 * 60;
+        let req = CreateApiKeyRequest {
+            name: "Test Key".to_string(),
+            permissions: None,
+            expires_in_seconds: Some(max_secs),
+        };
+        assert!(req.validate().is_ok());
+    }
+
+    #[test]
+    fn test_create_api_key_request_expiration_too_large() {
+        // Expiration exceeds maximum (100 years + 1 second)
+        let max_secs_plus_one = 100 * 365 * 24 * 60 * 60 + 1;
+        let req = CreateApiKeyRequest {
+            name: "Test Key".to_string(),
+            permissions: None,
+            expires_in_seconds: Some(max_secs_plus_one),
+        };
+        assert!(req.validate().is_err());
+    }
+
+    #[test]
+    fn test_create_api_key_request_no_expiration() {
+        // No expiration (key never expires)
+        let req = CreateApiKeyRequest {
+            name: "Test Key".to_string(),
+            permissions: None,
+            expires_in_seconds: None,
+        };
+        assert!(req.validate().is_ok());
+    }
+
+    #[test]
+    fn test_create_api_key_request_min_expiration() {
+        // Minimum expiration (1 second)
+        let req = CreateApiKeyRequest {
+            name: "Test Key".to_string(),
+            permissions: None,
+            expires_in_seconds: Some(1),
+        };
+        assert!(req.validate().is_ok());
+    }
+
+    #[test]
+    fn test_create_api_key_request_expiration_zero() {
+        // Zero expiration should be invalid
+        let req = CreateApiKeyRequest {
+            name: "Test Key".to_string(),
+            permissions: None,
+            expires_in_seconds: Some(0),
+        };
+        assert!(req.validate().is_err());
+    }
+
+    #[test]
+    fn test_max_expiration_constant() {
+        // Verify the MAX_EXPIRATION_SECONDS constant is correct
+        let expected = 100 * 365 * 24 * 60 * 60; // 100 years in seconds
+        assert_eq!(MAX_EXPIRATION_SECONDS, expected);
+    }
+
+    #[test]
+    fn test_create_api_key_request_expiration_very_large_value() {
+        // Test with u64::MAX to ensure no overflow
+        let req = CreateApiKeyRequest {
+            name: "Test Key".to_string(),
+            permissions: None,
+            expires_in_seconds: Some(u64::MAX),
+        };
+        // This should fail validation because it exceeds MAX_EXPIRATION_SECONDS
+        assert!(req.validate().is_err());
+    }
+
+    #[test]
+    fn test_create_api_key_request_name_validation() {
+        // Test name validation still works
+        let req_empty_name = CreateApiKeyRequest {
+            name: "".to_string(),
+            permissions: None,
+            expires_in_seconds: Some(3600),
+        };
+        assert!(req_empty_name.validate().is_err());
+
+        let req_valid_name = CreateApiKeyRequest {
+            name: "Valid Name".to_string(),
+            permissions: None,
+            expires_in_seconds: Some(3600),
+        };
+        assert!(req_valid_name.validate().is_ok());
+    }
+
+    #[test]
+    fn test_create_api_key_request_combined_validation() {
+        // Test that all validations work together
+        let req_valid = CreateApiKeyRequest {
+            name: "Test Key".to_string(),
+            permissions: Some(serde_json::json!({"scopes": ["read"]})),
+            expires_in_seconds: Some(86400), // 24 hours
+        };
+        assert!(req_valid.validate().is_ok());
+
+        let req_invalid = CreateApiKeyRequest {
+            name: "".to_string(), // Invalid name
+            permissions: None,
+            expires_in_seconds: Some(u64::MAX), // Invalid expiration
+        };
+        assert!(req_invalid.validate().is_err());
+    }
+
 }
