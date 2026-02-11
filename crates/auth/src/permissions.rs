@@ -688,14 +688,10 @@ mod tests {
     use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
     // Import entity modules for test database operations
     use entity::{
-        api_key_usage_log,
-        api_keys,
-        refresh_tokens,
         roles,
         sea_orm_active_enums::{RoleScopeType, UserStatus},
         user_roles,
         users,
-        users::ActiveModel,
     };
     use serial_test::serial;
 
@@ -1413,7 +1409,7 @@ mod tests {
             .expect("Failed to query roles");
         let role = role.expect("No roles found in database");
 
-        let mut role_permissions = serde_json::Value::Array(vec![serde_json::Value::String("users:read".to_string())]);
+        let role_permissions = serde_json::Value::Array(vec![serde_json::Value::String("users:read".to_string())]);
         let role_update = entity::roles::ActiveModel {
             id: Set(role.id.clone()),
             permissions: Set(role_permissions),
@@ -1495,7 +1491,7 @@ mod tests {
             .expect("Failed to query roles");
         let role = role.expect("No roles found in database");
 
-        let mut role_permissions = serde_json::Value::Array(vec![serde_json::Value::String("users:read".to_string())]);
+        let role_permissions = serde_json::Value::Array(vec![serde_json::Value::String("users:read".to_string())]);
         let role_update = entity::roles::ActiveModel {
             id: Set(role.id.clone()),
             permissions: Set(role_permissions),
@@ -1619,7 +1615,7 @@ mod tests {
         let role = role.expect("No roles found in database");
 
         // Assign permissions to role
-        let mut role_permissions = serde_json::Value::Array(vec![serde_json::Value::String("users:read".to_string())]);
+        let role_permissions = serde_json::Value::Array(vec![serde_json::Value::String("users:read".to_string())]);
         let role_update = entity::roles::ActiveModel {
             id: Set(role.id.clone()),
             permissions: Set(role_permissions),
@@ -1698,7 +1694,7 @@ mod tests {
         let role = role.expect("No roles found in database");
 
         // Assign permissions to role
-        let mut role_permissions = serde_json::Value::Array(vec![serde_json::Value::String("teams:read".to_string())]);
+        let role_permissions = serde_json::Value::Array(vec![serde_json::Value::String("teams:read".to_string())]);
         let role_update = entity::roles::ActiveModel {
             id: Set(role.id.clone()),
             permissions: Set(role_permissions),
@@ -1794,7 +1790,7 @@ mod tests {
             .expect("No roles found in database");
 
         // Assign permission to role
-        let mut role_permissions = serde_json::Value::Array(vec![serde_json::Value::String("users:read".to_string())]);
+        let role_permissions = serde_json::Value::Array(vec![serde_json::Value::String("users:read".to_string())]);
         let role_update = entity::roles::ActiveModel {
             id: Set(role.id.clone()),
             permissions: Set(role_permissions),

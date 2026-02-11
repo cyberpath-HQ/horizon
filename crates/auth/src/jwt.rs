@@ -30,7 +30,7 @@ impl Default for JwtConfig {
         let secret = std::env::var("HORIZON_JWT_SECRET").unwrap_or_else(|_| {
             #[cfg(test)]
             {
-                base64::encode(b"test-secret-key-at-least-32-bytes-long")
+                base64::engine::general_purpose::STANDARD.encode(b"test-secret-key-at-least-32-bytes-long")
             }
             #[cfg(not(test))]
             {
@@ -48,6 +48,7 @@ impl Default for JwtConfig {
 }
 
 use error::Result;
+use base64::Engine;
 
 /// JWT claims structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
