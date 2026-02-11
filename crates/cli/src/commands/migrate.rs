@@ -6,7 +6,7 @@ use error::Result;
 use migration::MigratorTrait as _;
 use tracing::info;
 
-use crate::config::DatabaseConfig;
+use crate::{commands::MigrateArgs, config::DatabaseConfig};
 
 /// Runs database migrations
 ///
@@ -22,7 +22,7 @@ use crate::config::DatabaseConfig;
     clippy::cognitive_complexity,
     reason = "Migration logic requires comprehensive error handling"
 )]
-pub async fn migrate(config: &DatabaseConfig, args: &crate::commands::MigrateArgs) -> Result<()> {
+pub async fn migrate(config: &DatabaseConfig, args: MigrateArgs) -> Result<()> {
     info!(
         target: "migrate",
         dry_run = %args.dry_run,

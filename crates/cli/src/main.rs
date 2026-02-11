@@ -63,15 +63,13 @@ async fn main() -> error::Result<()> {
 
     logging::info!(target: "app", command = ?cli.command, "Horizon CLI starting...");
 
-    match &cli.command {
+    match cli.command {
         Commands::Serve(args) => {
-            let config =
-                DatabaseConfig::from_env().map_err(|e| anyhow::anyhow!("Invalid database configuration: {}", e))?;
+            let config = DatabaseConfig::from_env().map_err(|_e| anyhow::anyhow!("Invalid database configuration"))?;
             server::serve(&config, args).await?
         },
         Commands::Migrate(args) => {
-            let config =
-                DatabaseConfig::from_env().map_err(|e| anyhow::anyhow!("Invalid database configuration: {}", e))?;
+            let config = DatabaseConfig::from_env().map_err(|_e| anyhow::anyhow!("Invalid database configuration"))?;
             commands::migrate::migrate(&config, args).await?
         },
         Commands::Completions(args) => commands::completions::completions(args.shell, &mut Cli::command())?,
@@ -135,8 +133,15 @@ mod tests {
     fn test_migrate_rollback() {
         let cli = Cli::parse_from(&["horizon", "migrate", "--rollback"]);
         match cli.command {
+            Commands::Serve(args) => {
+                let config =
+                    DatabaseConfig::from_env().map_err(|_e| anyhow::anyhow!("Invalid database configuration"))?;
+                server::serve(&config, args)?
+            },
             Commands::Migrate(args) => {
-                assert!(args.rollback);
+                let config =
+                    DatabaseConfig::from_env().map_err(|_e| anyhow::anyhow!("Invalid database configuration"))?;
+                commands::migrate::migrate(&config, args)?
             },
             _ => panic!("Expected Migrate command"),
         }

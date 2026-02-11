@@ -8,31 +8,26 @@ use std::net::SocketAddr;
 #[derive(Debug, Clone)]
 pub struct DatabaseConfig {
     /// Database host address
-    pub host:      String,
+    pub host:     String,
     /// Database port number
-    pub port:      u16,
+    pub port:     u16,
     /// Database name
-    pub database:  String,
+    pub database: String,
     /// Database username
-    pub username:  String,
+    pub username: String,
     /// Database password
-    pub password:  String,
+    pub password: String,
     /// SSL mode
-    pub ssl_mode:  String,
-    /// Connection pool size
-    pub pool_size: u32,
+    pub ssl_mode: String,
 }
 
 /// Errors that can occur when parsing database configuration.
 #[derive(Debug, thiserror::Error)]
 pub enum DatabaseConfigError {
+    /// The port number could not be parsed as a valid number.
     #[error("Invalid port number: {value}")]
     InvalidPort {
-        value: String,
-    },
-
-    #[error("Invalid pool size: {value}")]
-    InvalidPoolSize {
+        /// The invalid port value that was provided.
         value: String,
     },
 }
@@ -43,16 +38,9 @@ impl DatabaseConfig {
     /// Returns `Err` if any required environment variable has an invalid format.
     pub fn from_env() -> Result<Self, DatabaseConfigError> {
         let port_str = std::env::var("HORIZON_DATABASE_PORT").unwrap_or_else(|_| "5432".to_owned());
-        let port = port_str.parse().map_err(|_| {
+        let port = port_str.parse::<u16>().map_err(|_e| {
             DatabaseConfigError::InvalidPort {
                 value: port_str.clone(),
-            }
-        })?;
-
-        let pool_size_str = std::env::var("HORIZON_DATABASE_POOL_SIZE").unwrap_or_else(|_| "10".to_owned());
-        let pool_size = pool_size_str.parse().map_err(|_| {
-            DatabaseConfigError::InvalidPoolSize {
-                value: pool_size_str.clone(),
             }
         })?;
 
@@ -63,7 +51,6 @@ impl DatabaseConfig {
             username: std::env::var("HORIZON_DATABASE_USER").unwrap_or_else(|_| "horizon".to_owned()),
             password: std::env::var("HORIZON_DATABASE_PASSWORD").unwrap_or_else(|_| String::new()),
             ssl_mode: std::env::var("HORIZON_DATABASE_SSL_MODE").unwrap_or_else(|_| "require".to_owned()),
-            pool_size,
         })
     }
 }
@@ -127,13 +114,12 @@ mod tests {
     #[test]
     fn test_build_database_url() {
         let config = DatabaseConfig {
-            host:      "localhost".to_string(),
-            port:      5432,
-            database:  "horizon".to_string(),
-            username:  "horizon".to_string(),
-            password:  "secret".to_string(),
-            ssl_mode:  "require".to_string(),
-            pool_size: 10,
+            host:     "localhost".to_string(),
+            port:     5432,
+            database: "horizon".to_string(),
+            username: "horizon".to_string(),
+            password: "secret".to_string(),
+            ssl_mode: "require".to_string(),
         };
 
         let url = build_database_url(&config);
@@ -146,13 +132,12 @@ mod tests {
     #[test]
     fn test_build_database_url_special_chars() {
         let config = DatabaseConfig {
-            host:      "localhost".to_string(),
-            port:      5432,
-            database:  "test_db".to_string(),
-            username:  "user@domain".to_string(),
-            password:  "pass:word@123".to_string(),
-            ssl_mode:  "require".to_string(),
-            pool_size: 10,
+            host:     "localhost".to_string(),
+            port:     5432,
+            database: "test_db".to_string(),
+            username: "user@domain".to_string(),
+            password: "pass:word@123".to_string(),
+            ssl_mode: "require".to_string(),
         };
 
         let url = build_database_url(&config);
@@ -165,13 +150,12 @@ mod tests {
     #[test]
     fn test_build_database_url_empty_password() {
         let config = DatabaseConfig {
-            host:      "localhost".to_string(),
-            port:      5432,
-            database:  "test".to_string(),
-            username:  "user".to_string(),
-            password:  String::new(),
-            ssl_mode:  "require".to_string(),
-            pool_size: 10,
+            host:     "localhost".to_string(),
+            port:     5432,
+            database: "test".to_string(),
+            username: "user".to_string(),
+            password: String::new(),
+            ssl_mode: "require".to_string(),
         };
 
         let url = build_database_url(&config);

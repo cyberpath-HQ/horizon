@@ -13,10 +13,11 @@ use rustls::ServerConfig;
 use server::{router::create_app_router, AppState};
 use tokio::net::TcpListener;
 use tokio_rustls::TlsAcceptor;
-use tower_service::Service;
+use tower_service::Service as _;
 use tracing::info;
 
 use crate::{
+    commands::ServeArgs,
     config::{parse_socket_addr, DatabaseConfig},
     tls::{load_certs, load_private_key},
 };
@@ -36,7 +37,7 @@ use crate::{
     clippy::integer_division_remainder_used,
     reason = "Complex server setup is intentional"
 )]
-pub async fn serve(config: &DatabaseConfig, args: &crate::commands::ServeArgs) -> Result<()> {
+pub async fn serve(config: &DatabaseConfig, args: ServeArgs) -> Result<()> {
     info!(target: "serve", "Starting API server...");
 
     // Build database URL from configuration
@@ -73,7 +74,7 @@ pub async fn serve(config: &DatabaseConfig, args: &crate::commands::ServeArgs) -
     };
 
     // Create the Axum router
-    let app = create_app_router(state.clone());
+    let app = create_app_router(state.clone(), args.tls);
 
     // Parse the bind address
     let address = parse_socket_addr(&args.host, args.port)
@@ -107,7 +108,12 @@ async fn serve_http(app: &axum::Router, address: &SocketAddr) -> Result<()> {
 }
 
 /// Serves the application over HTTPS with TLS
-async fn serve_https(app: &axum::Router, address: &SocketAddr, args: &crate::commands::ServeArgs) -> Result<()> {
+#[allow(
+    clippy::integer_division_remainder_used,
+    clippy::cognitive_complexity,
+    reason = "TLS server implementation requires complex async handling"
+)]
+async fn serve_https(app: &axum::Router, address: &SocketAddr, args: ServeArgs) -> Result<()> {
     // TLS is enabled - require certificate and key paths
     let tls_cert_path = args
         .tls_cert
@@ -191,7 +197,9 @@ async fn serve_https(app: &axum::Router, address: &SocketAddr, args: &crate::com
 /// Waits for shutdown signals (Ctrl+C or SIGTERM)
 #[allow(
     clippy::integer_division_remainder_used,
-    reason = "tokio::select! macro triggers false positive"
+    clippy::expect_used,
+    reason = "tokio::select! macro triggers false positive; expect() is appropriate for signal handler setup which \
+              cannot recover"
 )]
 pub async fn shutdown_signal() {
     let ctrl_c = async {

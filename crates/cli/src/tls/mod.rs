@@ -4,7 +4,7 @@
 
 use std::io;
 
-use rustls::pki_types::pem::PemObject;
+use rustls::pki_types::pem::PemObject as _;
 
 /// Load certificates from a PEM file
 ///
