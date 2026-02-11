@@ -95,12 +95,12 @@ fn percent_encode_username_password(s: &str) -> String {
             for byte in encoded.as_bytes() {
                 result.push('%');
                 result.push(
-                    char::from_digit(((*byte / 16) as u32), 16)
+                    char::from_digit((*byte / 16) as u32, 16)
                         .unwrap()
                         .to_ascii_uppercase(),
                 );
                 result.push(
-                    char::from_digit(((*byte % 16) as u32), 16)
+                    char::from_digit((*byte % 16) as u32, 16)
                         .unwrap()
                         .to_ascii_uppercase(),
                 );
