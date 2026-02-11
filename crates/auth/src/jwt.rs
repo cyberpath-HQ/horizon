@@ -48,6 +48,7 @@ impl Default for JwtConfig {
 }
 
 use error::Result;
+#[cfg(test)]
 use base64::Engine;
 
 /// JWT claims structure
