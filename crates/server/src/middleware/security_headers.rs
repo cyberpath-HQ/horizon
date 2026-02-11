@@ -3,7 +3,7 @@
 //! Adds standard security headers to all HTTP responses following
 //! OWASP recommended practices.
 
-use axum::{extract::Request, middleware::Next, response::Response};
+use axum::{extract::Request, http, middleware::Next, response::Response};
 
 /// Security headers middleware
 ///
@@ -20,53 +20,53 @@ pub async fn security_headers_middleware(request: Request, next: Next) -> Respon
     let mut response = next.run(request).await;
     let headers = response.headers_mut();
 
+    // Helper to safely insert a header, logging if it fails
+    macro_rules! insert_header {
+        ($name:expr, $value:expr) => {
+            if let Ok(val) = $value.parse::<http::HeaderValue>() {
+                let _ = headers.insert($name, val);
+            }
+        };
+    }
+
     // Content-Security-Policy: Restrictive default for API server
-    headers.insert(
+    insert_header!(
         "Content-Security-Policy",
         "default-src 'none'; frame-ancestors 'none'"
-            .parse()
-            .unwrap(),
     );
 
     // X-Frame-Options: Prevent embedding in frames (clickjacking protection)
-    headers.insert("X-Frame-Options", "DENY".parse().unwrap());
+    insert_header!("X-Frame-Options", "DENY");
 
     // X-Content-Type-Options: Prevent MIME type sniffing
-    headers.insert("X-Content-Type-Options", "nosniff".parse().unwrap());
+    insert_header!("X-Content-Type-Options", "nosniff");
 
     // X-XSS-Protection: Legacy but still useful for older browsers
-    headers.insert("X-XSS-Protection", "1; mode=block".parse().unwrap());
+    insert_header!("X-XSS-Protection", "1; mode=block");
 
     // Referrer-Policy: Don't send referrer for cross-origin requests
-    headers.insert(
-        "Referrer-Policy",
-        "strict-origin-when-cross-origin".parse().unwrap(),
-    );
+    insert_header!("Referrer-Policy", "strict-origin-when-cross-origin");
 
     // Permissions-Policy: Disable unnecessary browser features
-    headers.insert(
+    insert_header!(
         "Permissions-Policy",
         "camera=(), microphone=(), geolocation=(), payment=()"
-            .parse()
-            .unwrap(),
     );
 
     // Strict-Transport-Security: Force HTTPS (1 year, include subdomains)
-    headers.insert(
+    insert_header!(
         "Strict-Transport-Security",
-        "max-age=31536000; includeSubDomains".parse().unwrap(),
+        "max-age=31536000; includeSubDomains"
     );
 
     // Cache-Control: Prevent caching of API responses containing sensitive data
-    headers.insert(
+    insert_header!(
         "Cache-Control",
         "no-store, no-cache, must-revalidate, proxy-revalidate"
-            .parse()
-            .unwrap(),
     );
 
     // Pragma: Legacy no-cache for HTTP/1.0 compatibility
-    headers.insert("Pragma", "no-cache".parse().unwrap());
+    insert_header!("Pragma", "no-cache");
 
     response
 }

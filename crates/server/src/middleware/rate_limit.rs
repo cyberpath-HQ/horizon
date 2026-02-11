@@ -188,15 +188,16 @@ pub async fn rate_limit_middleware(request: Request, next: Next) -> Response {
         }) => {
             let mut response = next.run(request).await;
             // Add rate limit headers
-            let headers = response.headers_mut();
-            headers.insert(
-                "X-RateLimit-Limit",
-                config.max_requests.to_string().parse().unwrap(),
-            );
-            headers.insert(
-                "X-RateLimit-Remaining",
-                remaining.to_string().parse().unwrap(),
-            );
+            if let Ok(limit_str) = config.max_requests.to_string().parse::<http::HeaderValue>() {
+                let _ = response
+                    .headers_mut()
+                    .insert("X-RateLimit-Limit", limit_str);
+            }
+            if let Ok(remaining_str) = remaining.to_string().parse::<http::HeaderValue>() {
+                let _ = response
+                    .headers_mut()
+                    .insert("X-RateLimit-Remaining", remaining_str);
+            }
             response
         },
         Ok(RateLimitResult::Exceeded {
@@ -353,14 +354,15 @@ fn create_rate_limit_response(max_requests: u64, retry_after: u64) -> Response {
     let mut response = (StatusCode::TOO_MANY_REQUESTS, body).into_response();
 
     let headers = response.headers_mut();
-    headers.insert(
-        header::RETRY_AFTER,
-        retry_after.to_string().parse().unwrap(),
-    );
-    if let Ok(val) = max_requests.to_string().parse() {
-        headers.insert("x-ratelimit-limit", val);
+    if let Ok(retry_after_val) = retry_after.to_string().parse::<http::HeaderValue>() {
+        let _ = headers.insert(header::RETRY_AFTER, retry_after_val);
     }
-    headers.insert("x-ratelimit-remaining", "0".parse().unwrap());
+    if let Ok(limit_val) = max_requests.to_string().parse::<http::HeaderValue>() {
+        let _ = headers.insert("x-ratelimit-limit", limit_val);
+    }
+    if let Ok(remaining_val) = "0".parse::<http::HeaderValue>() {
+        let _ = headers.insert("x-ratelimit-remaining", remaining_val);
+    }
 
     response
 }

@@ -49,7 +49,12 @@ where
 /// 4. Rejects requests with invalid/missing tokens
 pub async fn auth_middleware(mut request: Request, next: Next) -> Response {
     // Get app state
-    let state = request.extensions().get::<AppState>().unwrap();
+    let state = match request.extensions().get::<AppState>() {
+        Some(s) => s,
+        None => {
+            return create_auth_error_response("Server configuration error: missing app state");
+        },
+    };
     // Get JWT config from state
     let jwt_config = &state.jwt_config;
 
