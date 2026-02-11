@@ -82,7 +82,8 @@ pub fn build_database_url(config: &DatabaseConfig) -> String {
 /// - Any character outside ASCII (encoded as UTF-8 bytes)
 /// - Any other character that might cause issues in URIs
 fn percent_encode_username_password(s: &str) -> String {
-    let mut result = String::with_capacity(s.len() * 3);
+    let capacity = s.len().saturating_mul(3);
+    let mut result = String::with_capacity(capacity);
     for c in s.chars() {
         if c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '~') {
             // Unreserved characters - safe to include as-is
@@ -95,12 +96,12 @@ fn percent_encode_username_password(s: &str) -> String {
             for byte in encoded.as_bytes() {
                 result.push('%');
                 result.push(
-                    char::from_digit((*byte / 16) as u32, 16)
+                    char::from_digit((byte >> 4) as u32, 16)
                         .unwrap()
                         .to_ascii_uppercase(),
                 );
                 result.push(
-                    char::from_digit((*byte % 16) as u32, 16)
+                    char::from_digit((byte & 15) as u32, 16)
                         .unwrap()
                         .to_ascii_uppercase(),
                 );
