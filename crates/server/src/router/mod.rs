@@ -533,14 +533,15 @@ async fn health_check_handler(State(state): State<AppState>) -> Result<Json<serd
 /// # Arguments
 ///
 /// * `state` - Application state containing DB pool and config
+/// * `enable_tls` - Whether TLS/HTTPS is enabled (affects HSTS header)
 ///
 /// # Returns
 ///
 /// Main router with health checks and API routes
-pub fn create_app_router(state: AppState) -> Router {
-    create_router(state).layer(middleware::from_fn(
-        crate::middleware::security_headers::security_headers_middleware,
-    ))
+pub fn create_app_router(state: AppState, enable_tls: bool) -> Router {
+    create_router(state).layer(middleware::from_fn(move |req, next| {
+        crate::middleware::security_headers::security_headers_middleware(req, next, enable_tls)
+    }))
 }
 
 #[cfg(test)]

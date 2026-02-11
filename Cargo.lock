@@ -1021,9 +1021,11 @@ dependencies = [
  "serde_json",
  "server",
  "tempfile",
+ "thiserror 2.0.18",
  "tokio",
  "tokio-rustls",
  "tower",
+ "tower-service",
  "tracing",
  "tracing-subscriber",
 ]
