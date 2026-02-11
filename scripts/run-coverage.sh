@@ -52,6 +52,8 @@ if [ "$POSTGRES_AVAILABLE" = false ] && command -v psql &> /dev/null; then
     DB_HOST=$(echo "$DATABASE_URL" | sed -E 's|postgres://([^:@]+)(:([^@]+))?@([^:]+):([0-9]+)/(.+)|\4|')
     DB_PORT=$(echo "$DATABASE_URL" | sed -E 's|postgres://([^:@]+)(:([^@]+))?@([^:]+):([0-9]+)/(.+)|\5|')
 
+    # Always unset any pre-existing PGPASSWORD first, then set if we have a password
+    unset PGPASSWORD 2>/dev/null || true
     if [ -n "$DB_PASS" ]; then
         export PGPASSWORD="$DB_PASS"
     fi
