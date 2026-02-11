@@ -10,114 +10,14 @@
 //! horizon --help   # Show help
 //! ```
 
-use std::net::SocketAddr;
+mod commands;
+mod config;
+mod server;
+mod tls;
 
-use tokio::net::TcpListener;
-use clap::{Args, CommandFactory as _, Parser, Subcommand};
-use error::{AppError, Result};
-use migration::{Migrator, MigratorTrait as _};
-use server::{router::create_app_router, AppState};
-use auth::JwtConfig;
-use tokio_rustls::TlsAcceptor;
-use rustls::pki_types::pem::PemObject as _;
-use tower::Service as _;
-use hyper_util::{
-    rt::{TokioExecutor, TokioIo},
-    server::conn::auto::Builder,
-};
-
-/// Load certificates from a PEM file
-fn load_certs(path: &str) -> std::io::Result<Vec<rustls::pki_types::CertificateDer<'static>>> {
-    let cert_pem = std::fs::read(path)?;
-    let mut certs = Vec::new();
-    for cert in rustls::pki_types::CertificateDer::pem_slice_iter(&cert_pem) {
-        certs.push(cert.map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?);
-    }
-    if certs.is_empty() {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            "No certificates found in file",
-        ));
-    }
-    Ok(certs)
-}
-
-/// Load private key from a PEM file
-fn load_private_key(path: &str) -> std::io::Result<rustls::pki_types::PrivateKeyDer<'static>> {
-    let key_pem = std::fs::read(path)?;
-    let key = rustls::pki_types::PrivateKeyDer::from_pem_slice(&key_pem)
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-    Ok(key)
-}
-
-/// Database configuration for CLI
-#[derive(Debug, Clone)]
-pub struct DatabaseConfig {
-    /// Database host address
-    pub host:      String,
-    /// Database port number
-    pub port:      u16,
-    /// Database name
-    pub database:  String,
-    /// Database username
-    pub username:  String,
-    /// Database password
-    pub password:  String,
-    /// SSL mode
-    pub ssl_mode:  String,
-    /// Connection pool size
-    pub pool_size: u32,
-}
-
-impl Default for DatabaseConfig {
-    fn default() -> Self {
-        Self {
-            host:      std::env::var("HORIZON_DATABASE_HOST").unwrap_or_else(|_| "localhost".to_owned()),
-            port:      std::env::var("HORIZON_DATABASE_PORT")
-                .unwrap_or_else(|_| "5432".to_owned())
-                .parse()
-                .unwrap_or(5432),
-            database:  std::env::var("HORIZON_DATABASE_NAME").unwrap_or_else(|_| "horizon".to_owned()),
-            username:  std::env::var("HORIZON_DATABASE_USER").unwrap_or_else(|_| "horizon".to_owned()),
-            password:  std::env::var("HORIZON_DATABASE_PASSWORD").unwrap_or_else(|_| String::new()),
-            ssl_mode:  std::env::var("HORIZON_DATABASE_SSL_MODE").unwrap_or_else(|_| "require".to_owned()),
-            pool_size: std::env::var("HORIZON_DATABASE_POOL_SIZE")
-                .unwrap_or_else(|_| "10".to_owned())
-                .parse()
-                .unwrap_or(10),
-        }
-    }
-}
-
-/// Builds the DATABASE_URL from DatabaseConfig
-pub fn build_database_url(config: &DatabaseConfig) -> String {
-    // Percent-encode username and password for PostgreSQL URI
-    let encoded_username = percent_encode_username_password(&config.username);
-    let encoded_password = percent_encode_username_password(&config.password);
-    format!(
-        "postgres://{}:{}@{}:{}/{}?sslmode={}",
-        encoded_username, encoded_password, config.host, config.port, config.database, config.ssl_mode
-    )
-}
-
-/// Simple percent-encoding for username/password in PostgreSQL URIs
-/// Encodes @, :, /, ?, #, [, ], and % as required
-fn percent_encode_username_password(s: &str) -> String {
-    s.chars().fold(String::new(), |mut acc, c| {
-        match c {
-            '@' => acc.push_str("%40"),
-            ':' => acc.push_str("%3A"),
-            '/' => acc.push_str("%2F"),
-            '?' => acc.push_str("%3F"),
-            '#' => acc.push_str("%23"),
-            '[' => acc.push_str("%5B"),
-            ']' => acc.push_str("%5D"),
-            '%' => acc.push_str("%25"),
-            c => acc.push(c),
-        }
-        acc
-    })
-}
+use clap::{CommandFactory as _, Parser, Subcommand};
+use commands::{CompletionsArgs, MigrateArgs, ServeArgs};
+use config::DatabaseConfig;
 
 /// Horizon CMDB - Configuration Management Database
 #[derive(Parser, Debug)]
@@ -153,64 +53,8 @@ enum Commands {
     Validate,
 }
 
-/// Arguments for the serve command
-#[derive(Args, Debug)]
-struct ServeArgs {
-    /// Server host to bind to
-    #[arg(long, env = "HORIZON_HOST", default_value = "0.0.0.0")]
-    host: String,
-
-    /// Server port to bind to
-    #[arg(short, long, env = "HORIZON_PORT", default_value = "3000")]
-    port: u16,
-
-    /// Enable TLS/HTTPS
-    #[arg(long, env = "HORIZON_TLS")]
-    tls: bool,
-
-    /// TLS certificate file path
-    #[arg(long, env = "HORIZON_TLS_CERT", requires = "tls")]
-    tls_cert: Option<String>,
-
-    /// TLS key file path
-    #[arg(long, env = "HORIZON_TLS_KEY", requires = "tls")]
-    tls_key: Option<String>,
-}
-
-/// Arguments for the migrate command
-#[derive(Args, Debug)]
-struct MigrateArgs {
-    /// Run migrations in dry-run mode (no changes)
-    #[arg(long)]
-    dry_run: bool,
-
-    /// Rollback the last migration
-    #[arg(long)]
-    rollback: bool,
-
-    /// Create a new migration with the given name
-    #[arg(long, requires = "migration_dir")]
-    create: Option<String>,
-
-    /// Directory for migration files
-    #[arg(long, env = "HORIZON_MIGRATION_DIR")]
-    migration_dir: Option<String>,
-
-    /// Number of parallel migration threads
-    #[arg(long, default_value = "4")]
-    threads: u8,
-}
-
-/// Arguments for the completions command
-#[derive(Args, Debug)]
-struct CompletionsArgs {
-    /// Shell to generate completions for
-    #[arg(value_enum)]
-    shell: clap_complete::Shell,
-}
-
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() -> error::Result<()> {
     let cli = Cli::parse();
 
     // Initialize logging
@@ -219,290 +63,22 @@ async fn main() -> Result<()> {
 
     logging::info!(target: "app", command = ?cli.command, "Horizon CLI starting...");
 
-    match cli.command {
-        Commands::Serve(args) => serve(&args).await?,
-        Commands::Migrate(args) => migrate(&args).await?,
-        Commands::Completions(args) => completions(&args)?,
-        Commands::Validate => validate()?,
+    match &cli.command {
+        Commands::Serve(args) => {
+            let config =
+                DatabaseConfig::from_env().map_err(|e| anyhow::anyhow!("Invalid database configuration: {}", e))?;
+            server::serve(&config, args).await?
+        },
+        Commands::Migrate(args) => {
+            let config =
+                DatabaseConfig::from_env().map_err(|e| anyhow::anyhow!("Invalid database configuration: {}", e))?;
+            commands::migrate::migrate(&config, args).await?
+        },
+        Commands::Completions(args) => commands::completions::completions(args.shell, &mut Cli::command())?,
+        Commands::Validate => commands::validate::validate()?,
     }
 
     logging::info!(target: "app", "Horizon CLI completed successfully");
-    Ok(())
-}
-
-/// Starts the API server with optional TLS support
-#[allow(
-    clippy::cognitive_complexity,
-    clippy::integer_division_remainder_used,
-    reason = "Complex server setup is intentional"
-)]
-async fn serve(args: &ServeArgs) -> Result<()> {
-    logging::info!(target: "serve", "Starting API server...");
-
-    // Build database URL from configuration
-    let config = DatabaseConfig::default();
-    let database_url = build_database_url(&config);
-
-    // Connect to database
-    logging::info!(target: "serve", "Connecting to database...");
-    let db = migration::connect_to_database(&database_url)
-        .await
-        .map_err(AppError::database)?;
-
-    // Run migrations automatically on startup
-    logging::info!(target: "serve", "Running database migrations...");
-    Migrator::up(&db, None).await.map_err(AppError::database)?;
-    logging::info!(target: "serve", "Database migrations completed successfully");
-
-    // Initialize Redis client for token blacklisting
-    let redis_url = std::env::var("HORIZON_REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_owned());
-    let redis_client =
-        redis::Client::open(redis_url).map_err(|e| anyhow::anyhow!("Failed to connect to Redis: {}", e))?;
-
-    // Create application state
-    let jwt_config = JwtConfig::default();
-    let state = AppState {
-        db,
-        jwt_config,
-        redis: redis_client,
-        start_time: std::time::Instant::now(),
-    };
-
-    // Create the Axum router
-    let app = create_app_router(state.clone());
-
-    // Parse the bind address
-    let address: SocketAddr = format!("{}:{}", args.host, args.port)
-        .parse()
-        .map_err(|e| anyhow::anyhow!("Invalid address: {}", e))?;
-
-    // Start the server (HTTP or HTTPS)
-    if args.tls {
-        // TLS is enabled - require certificate and key paths
-        let tls_cert_path = args
-            .tls_cert
-            .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("TLS certificate path is required when TLS is enabled"))?;
-        let tls_key_path = args
-            .tls_key
-            .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("TLS key path is required when TLS is enabled"))?;
-
-        logging::info!(target: "serve", "Initializing TLS with cert={}, key={}", tls_cert_path, tls_key_path);
-
-        // Load TLS certificate and key
-        let certs = load_certs(tls_cert_path)?;
-        let key = load_private_key(tls_key_path)?;
-
-        let tls_config = rustls::ServerConfig::builder()
-            .with_no_client_auth()
-            .with_single_cert(certs, key)
-            .map_err(|e| anyhow::anyhow!("Failed to configure TLS: {}", e))?;
-
-        // Create TLS acceptor
-        let tls_acceptor = TlsAcceptor::from(std::sync::Arc::new(tls_config));
-
-        logging::info!(target: "serve", %address, "Starting HTTPS server (TLS enabled)...");
-
-        let listener = tokio::net::TcpListener::bind(address)
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to bind address: {}", e))?;
-
-        // Use hyper to serve with TLS
-        loop {
-            tokio::select! {
-                _ = shutdown_signal() => {
-                    logging::info!(target: "serve", "Received shutdown signal, stopping HTTPS server...");
-                    break;
-                }
-                result = listener.accept() => {
-                    let (tcp_stream, peer_addr) = result?;
-                    let tls_acceptor = tls_acceptor.clone();
-                    let app = app.clone();
-
-                    tokio::spawn(async move {
-                        let tls_stream = match tls_acceptor.accept(tcp_stream).await {
-                            Ok(stream) => stream,
-                            Err(e) => {
-                                tracing::warn!("TLS handshake failed: {}", e);
-                                return;
-                            },
-                        };
-
-                        let hyper_service =
-                            hyper::service::service_fn(move |mut request: hyper::Request<hyper::body::Incoming>| {
-                                request.extensions_mut().insert(axum::extract::ConnectInfo(peer_addr));
-                                let mut app = app.clone();
-                                async move { app.call(request).await }
-                            });
-
-                        if let Err(err) = Builder::new(TokioExecutor::new())
-                            .serve_connection(TokioIo::new(tls_stream), hyper_service)
-                            .await
-                        {
-                            tracing::warn!("Error serving connection: {}", err);
-                        }
-                    });
-                }
-            }
-        }
-    }
-    else {
-        // HTTP mode
-        logging::info!(target: "serve", %address, "Starting HTTP server...");
-
-        let listener = TcpListener::bind(&address)
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to bind to {}: {}", address, e))?;
-
-        axum::serve(
-            listener,
-            app.into_make_service_with_connect_info::<SocketAddr>(),
-        )
-        .with_graceful_shutdown(shutdown_signal())
-        .await
-        .map_err(|e| anyhow::anyhow!("HTTP server error: {}", e))?;
-    }
-
-    Ok(())
-}
-
-/// Waits for shutdown signals (Ctrl+C or SIGTERM)
-#[allow(
-    clippy::integer_division_remainder_used,
-    reason = "tokio::select! macro triggers false positive"
-)]
-async fn shutdown_signal() {
-    let ctrl_c = async {
-        #[allow(
-            clippy::expect_used,
-            reason = "Signal handlers are essential for graceful shutdown"
-        )]
-        tokio::signal::ctrl_c()
-            .await
-            .expect("Failed to install Ctrl+C handler");
-    };
-
-    #[cfg(unix)]
-    let terminate = async {
-        #[allow(
-            clippy::expect_used,
-            reason = "Signal handlers are essential for graceful shutdown"
-        )]
-        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-            .expect("Failed to install terminate handler")
-            .recv()
-            .await;
-    };
-
-    #[cfg(not(unix))]
-    let terminate = std::future::pending::<()>();
-
-    tokio::select! {
-        _ = ctrl_c => {},
-        _ = terminate => {},
-    }
-}
-
-/// Runs database migrations
-#[allow(
-    clippy::cognitive_complexity,
-    reason = "Migration logic requires comprehensive error handling"
-)]
-async fn migrate(args: &MigrateArgs) -> Result<()> {
-    logging::info!(target: "migrate",
-        dry_run = %args.dry_run,
-        rollback = %args.rollback,
-        create = ?args.create,
-        threads = %args.threads,
-        "Running database migrations..."
-    );
-
-    // Build database URL from configuration
-    let config = DatabaseConfig::default();
-    let database_url = build_database_url(&config);
-
-    // Connect to database
-    let db = migration::connect_to_database(&database_url)
-        .await
-        .map_err(AppError::database)?;
-
-    if args.dry_run {
-        // Dry run mode - just show what would happen
-        logging::info!(target: "migrate", "Dry run mode - migrations would be applied");
-
-        // Get pending migrations
-        let pending = migration::Migrator::get_pending_migrations(&db)
-            .await
-            .map_err(AppError::database)?;
-
-        logging::info!(target: "migrate",
-            pending_count = %pending.len(),
-            "Pending migrations found"
-        );
-
-        for m in &pending {
-            logging::info!(target: "migrate", migration = %m.name(), "Would apply");
-        }
-
-        return Ok(());
-    }
-
-    if args.rollback {
-        // Rollback the last migration
-        logging::info!(target: "migrate", "Rolling back the last migration...");
-
-        migration::Migrator::down(&db, None)
-            .await
-            .map_err(AppError::database)?;
-
-        logging::info!(target: "migrate", "Rollback completed successfully");
-        return Ok(());
-    }
-
-    // Run migrations
-    Migrator::up(&db, None).await.map_err(AppError::database)?;
-
-    logging::info!(target: "migrate", "Migrations completed successfully");
-    Ok(())
-}
-
-/// Generates shell completions for the CLI
-fn completions(args: &CompletionsArgs) -> Result<()> {
-    clap_complete::generate(
-        args.shell,
-        &mut Cli::command(),
-        "horizon",
-        &mut std::io::stdout(),
-    );
-    Ok(())
-}
-
-/// Validates the CLI configuration
-fn validate() -> Result<()> {
-    // Check required environment variables
-    let required_vars = [
-        "HORIZON_DATABASE_HOST",
-        "HORIZON_DATABASE_PORT",
-        "HORIZON_DATABASE_NAME",
-        "HORIZON_DATABASE_USER",
-        "HORIZON_DATABASE_PASSWORD",
-    ];
-
-    let mut missing = Vec::new();
-    for var in &required_vars {
-        if std::env::var(var).is_err() {
-            missing.push(var);
-        }
-    }
-
-    if !missing.is_empty() {
-        return Err(AppError::validation(format!(
-            "Missing required environment variables: {:?}",
-            missing
-        )));
-    }
-
     Ok(())
 }
 
@@ -616,7 +192,7 @@ mod tests {
             std::env::set_var("HORIZON_DATABASE_PASSWORD", "password");
         }
 
-        let result = validate();
+        let result = commands::validate::validate();
         assert!(result.is_ok());
 
         // Restore original env vars
@@ -690,7 +266,7 @@ mod tests {
             std::env::remove_var("HORIZON_DATABASE_PASSWORD");
         }
 
-        let result = validate();
+        let result = commands::validate::validate();
         assert!(result.is_err());
 
         // Restore original env vars
@@ -751,312 +327,82 @@ mod tests {
     }
 
     #[test]
-    fn test_build_database_url() {
-        // Set test environment variables
-        unsafe {
-            std::env::set_var("HORIZON_DATABASE_HOST", "testhost");
-            std::env::set_var("HORIZON_DATABASE_PORT", "5433");
-            std::env::set_var("HORIZON_DATABASE_NAME", "testdb");
-            std::env::set_var("HORIZON_DATABASE_USER", "testuser");
-            std::env::set_var("HORIZON_DATABASE_PASSWORD", "testpass");
-        }
-
-        let config = DatabaseConfig::default();
-        let url = build_database_url(&config);
-        assert!(url.contains("postgres://testuser:testpass@testhost:5433/testdb"));
-    }
-
-    #[test]
-    fn test_load_certs_with_valid_pem() {
-        // Create a temporary PEM file with test certificate
-        let temp_dir = std::env::temp_dir();
-        let cert_path = temp_dir.join("test_cert.pem");
-
-        // Write a minimal valid PEM certificate
-        let cert_content = r#"-----BEGIN CERTIFICATE-----
-MIICljCCAX6gAwIBAgIUfk5kJ8P4JVL2f2k8p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s
-5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s
-5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s
-5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s
-5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s
------END CERTIFICATE-----"#;
-
-        std::fs::write(&cert_path, cert_content).unwrap();
-
-        let result = load_certs(cert_path.to_str().unwrap());
-        assert!(result.is_ok());
-        assert!(!result.unwrap().is_empty());
-
-        // Cleanup
-        std::fs::remove_file(cert_path).ok();
-    }
-
-    #[test]
-    fn test_load_certs_empty_file() {
-        let temp_dir = std::env::temp_dir();
-        let cert_path = temp_dir.join("empty_cert.pem");
-
-        // Write empty file
-        std::fs::write(&cert_path, "").unwrap();
-
-        let result = load_certs(cert_path.to_str().unwrap());
-        assert!(result.is_err());
-
-        // Cleanup
-        std::fs::remove_file(cert_path).ok();
-    }
-
-    #[test]
-    fn test_load_certs_invalid_pem() {
-        let temp_dir = std::env::temp_dir();
-        let cert_path = temp_dir.join("invalid_cert.pem");
-
-        // Write invalid PEM content
-        std::fs::write(&cert_path, "not a valid pem").unwrap();
-
-        let result = load_certs(cert_path.to_str().unwrap());
-        assert!(result.is_err());
-
-        // Cleanup
-        std::fs::remove_file(cert_path).ok();
-    }
-
-    #[test]
-    fn test_load_certs_nonexistent_file() {
-        let result = load_certs("/nonexistent/path/cert.pem");
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_load_private_key_with_valid_pem() {
-        let temp_dir = std::env::temp_dir();
-        let key_path = temp_dir.join("test_key.pem");
-
-        // Write a minimal valid PEM private key
-        let key_content = r#"-----BEGIN PRIVATE KEY-----
-MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg5p0s5p0s5p0s5p0s5p0s
-5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s
-5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s
-5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s
-5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s5p0s
------END PRIVATE KEY-----"#;
-
-        std::fs::write(&key_path, key_content).unwrap();
-
-        let result = load_private_key(key_path.to_str().unwrap());
-        assert!(result.is_ok());
-
-        // Cleanup
-        std::fs::remove_file(key_path).ok();
-    }
-
-    #[test]
-    fn test_load_private_key_invalid_pem() {
-        let temp_dir = std::env::temp_dir();
-        let key_path = temp_dir.join("invalid_key.pem");
-
-        // Write invalid PEM content
-        std::fs::write(&key_path, "not a valid pem key").unwrap();
-
-        let result = load_private_key(key_path.to_str().unwrap());
-        assert!(result.is_err());
-
-        // Cleanup
-        std::fs::remove_file(key_path).ok();
-    }
-
-    #[test]
-    fn test_load_private_key_nonexistent_file() {
-        let result = load_private_key("/nonexistent/path/key.pem");
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_cli_completions_bash() {
-        use std::io::Write;
-
-        let args = CompletionsArgs {
-            shell: clap_complete::Shell::Bash,
-        };
-
-        let mut temp_file = tempfile::NamedTempFile::new().unwrap();
-        let result = completions_with_output(&args, &mut temp_file);
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_cli_completions_zsh() {
-        use std::io::Write;
-
-        let args = CompletionsArgs {
-            shell: clap_complete::Shell::Zsh,
-        };
-
-        let mut temp_file = tempfile::NamedTempFile::new().unwrap();
-        let result = completions_with_output(&args, &mut temp_file);
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_cli_completions_fish() {
-        use std::io::Write;
-
-        let args = CompletionsArgs {
-            shell: clap_complete::Shell::Fish,
-        };
-
-        let mut temp_file = tempfile::NamedTempFile::new().unwrap();
-        let result = completions_with_output(&args, &mut temp_file);
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_cli_completions_powershell() {
-        use std::io::Write;
-
-        let args = CompletionsArgs {
-            shell: clap_complete::Shell::PowerShell,
-        };
-
-        let mut temp_file = tempfile::NamedTempFile::new().unwrap();
-        let result = completions_with_output(&args, &mut temp_file);
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_cli_parse_migrate_dry_run() {
-        let cli = Cli::parse_from(&["horizon", "migrate", "--dry-run"]);
-        match cli.command {
-            Commands::Migrate(args) => {
-                assert!(args.dry_run);
-            },
-            _ => panic!("Expected Migrate command"),
-        }
-    }
-
-    #[test]
-    fn test_cli_parse_migrate_threads() {
-        let cli = Cli::parse_from(&["horizon", "migrate", "--threads", "8"]);
-        match cli.command {
-            Commands::Migrate(args) => {
-                assert_eq!(args.threads, 8);
-            },
-            _ => panic!("Expected Migrate command"),
-        }
-    }
-
-    #[test]
-    fn test_cli_parse_serve_with_tls() {
+    fn test_cli_parse_with_log_options() {
         let cli = Cli::parse_from(&[
             "horizon",
-            "serve",
-            "--host",
-            "0.0.0.0",
-            "--port",
-            "443",
-            "--tls",
-            "--tls-cert",
-            "/path/to/cert.pem",
-            "--tls-key",
-            "/path/to/key.pem",
+            "--log-level",
+            "debug",
+            "--log-format",
+            "json",
+            "validate",
         ]);
+
+        assert_eq!(cli.log_level, "debug");
+        assert_eq!(cli.log_format, "json");
         match cli.command {
-            Commands::Serve(args) => {
-                assert_eq!(args.host, "0.0.0.0");
-                assert_eq!(args.port, 443);
-                assert!(args.tls);
-                assert_eq!(args.tls_cert, Some("/path/to/cert.pem".to_string()));
-                assert_eq!(args.tls_key, Some("/path/to/key.pem".to_string()));
-            },
-            _ => panic!("Expected Serve command"),
+            Commands::Validate => {},
+            _ => panic!("Expected Validate command"),
         }
     }
 
     #[test]
-    fn test_database_config_env_override() {
-        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    fn test_serve_args_tls_validation() {
+        // TLS enabled but missing cert
+        let args = ServeArgs {
+            host:     "0.0.0.0".to_string(),
+            port:     3000,
+            tls:      true,
+            tls_cert: None,
+            tls_key:  Some("/path/to/key".to_string()),
+        };
+        assert!(args.tls);
+        assert!(args.tls_cert.is_none());
+        assert!(args.tls_key.is_some());
 
-        // Clear env vars first
-        unsafe {
-            std::env::remove_var("HORIZON_DATABASE_HOST");
-            std::env::remove_var("HORIZON_DATABASE_PORT");
-            std::env::remove_var("HORIZON_DATABASE_NAME");
-            std::env::remove_var("HORIZON_DATABASE_USER");
-            std::env::remove_var("HORIZON_DATABASE_PASSWORD");
-            std::env::remove_var("HORIZON_DATABASE_SSL_MODE");
-            std::env::remove_var("HORIZON_DATABASE_POOL_SIZE");
-        }
-
-        // Set custom env vars
-        unsafe {
-            std::env::set_var("HORIZON_DATABASE_HOST", "custom-host");
-            std::env::set_var("HORIZON_DATABASE_PORT", "5433");
-            std::env::set_var("HORIZON_DATABASE_NAME", "custom-db");
-            std::env::set_var("HORIZON_DATABASE_USER", "custom-user");
-            std::env::set_var("HORIZON_DATABASE_PASSWORD", "custom-pass");
-            std::env::set_var("HORIZON_DATABASE_SSL_MODE", "disable");
-            std::env::set_var("HORIZON_DATABASE_POOL_SIZE", "20");
-        }
-
-        let config = DatabaseConfig::default();
-        assert_eq!(config.host, "custom-host");
-        assert_eq!(config.port, 5433);
-        assert_eq!(config.database, "custom-db");
-        assert_eq!(config.username, "custom-user");
-        assert_eq!(config.password, "custom-pass");
-        assert_eq!(config.ssl_mode, "disable");
-        assert_eq!(config.pool_size, 20);
-
-        // Cleanup
-        unsafe {
-            std::env::remove_var("HORIZON_DATABASE_HOST");
-            std::env::remove_var("HORIZON_DATABASE_PORT");
-            std::env::remove_var("HORIZON_DATABASE_NAME");
-            std::env::remove_var("HORIZON_DATABASE_USER");
-            std::env::remove_var("HORIZON_DATABASE_PASSWORD");
-            std::env::remove_var("HORIZON_DATABASE_SSL_MODE");
-            std::env::remove_var("HORIZON_DATABASE_POOL_SIZE");
-        }
+        // TLS enabled but missing key
+        let args = ServeArgs {
+            host:     "0.0.0.0".to_string(),
+            port:     3000,
+            tls:      true,
+            tls_cert: Some("/path/to/cert".to_string()),
+            tls_key:  None,
+        };
+        assert!(args.tls);
+        assert!(args.tls_cert.is_some());
+        assert!(args.tls_key.is_none());
     }
 
-    use std::sync::Mutex;
+    #[test]
+    fn test_migrate_args_full() {
+        let args = MigrateArgs {
+            dry_run:       true,
+            rollback:      false,
+            create:        Some("test_migration".to_string()),
+            migration_dir: Some("/custom/migrations".to_string()),
+            threads:       8,
+        };
 
-    static ENV_LOCK: Mutex<()> = Mutex::new(());
+        assert!(args.dry_run);
+        assert!(!args.rollback);
+        assert_eq!(args.create, Some("test_migration".to_string()));
+        assert_eq!(args.migration_dir, Some("/custom/migrations".to_string()));
+        assert_eq!(args.threads, 8);
+    }
 
     #[test]
-    fn test_database_config_defaults() {
-        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    fn test_cli_parse_unknown_command() {
+        use std::process::Command;
 
-        // Clear all env vars first
-        unsafe {
-            std::env::remove_var("HORIZON_DATABASE_HOST");
-            std::env::remove_var("HORIZON_DATABASE_PORT");
-            std::env::remove_var("HORIZON_DATABASE_NAME");
-            std::env::remove_var("HORIZON_DATABASE_USER");
-            std::env::remove_var("HORIZON_DATABASE_PASSWORD");
-            std::env::remove_var("HORIZON_DATABASE_SSL_MODE");
-            std::env::remove_var("HORIZON_DATABASE_POOL_SIZE");
-        }
+        let output = Command::new("cargo")
+            .args(&["run", "--bin", "cli", "--", "unknown"])
+            .current_dir(env!("CARGO_MANIFEST_DIR"))
+            .output()
+            .expect("Failed to run command");
 
-        // Ensure defaults are used by setting them explicitly
-        unsafe {
-            std::env::set_var("HORIZON_DATABASE_HOST", "localhost");
-            std::env::set_var("HORIZON_DATABASE_PORT", "5432");
-            std::env::set_var("HORIZON_DATABASE_NAME", "horizon");
-            std::env::set_var("HORIZON_DATABASE_USER", "horizon");
-            std::env::set_var("HORIZON_DATABASE_PASSWORD", "");
-            std::env::set_var("HORIZON_DATABASE_SSL_MODE", "require");
-            std::env::set_var("HORIZON_DATABASE_POOL_SIZE", "10");
-        }
-
-        let config = DatabaseConfig::default();
-        assert_eq!(config.host, "localhost");
-        assert_eq!(config.port, 5432);
-        assert_eq!(config.database, "horizon");
-        assert_eq!(config.username, "horizon");
-        assert_eq!(config.password, "");
-        assert_eq!(config.ssl_mode, "require");
-        assert_eq!(config.pool_size, 10);
+        // Should exit with non-zero status for unknown command
+        assert!(!output.status.success());
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(stderr.contains("unrecognized subcommand"));
     }
 
     #[test]
@@ -1127,7 +473,6 @@ MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg5p0s5p0s5p0s5p0s5p0s
         assert!(has_completions);
     }
 
-    // Test error conditions for validate function
     #[test]
     fn test_validate_partial_missing_vars() {
         // Save original env vars
@@ -1153,7 +498,7 @@ MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg5p0s5p0s5p0s5p0s5p0s
             // Leave others unset
         }
 
-        let result = validate();
+        let result = commands::validate::validate();
         assert!(result.is_err());
         let err_msg = format!("{}", result.unwrap_err());
         assert!(err_msg.contains("Missing required environment variables"));
@@ -1166,180 +511,19 @@ MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg5p0s5p0s5p0s5p0s5p0s
         restore_env_var("HORIZON_DATABASE_PASSWORD", orig_pass);
     }
 
-    // Test build_database_url with special characters
-    #[test]
-    fn test_build_database_url_special_chars() {
-        let config = DatabaseConfig {
-            host:      "localhost".to_string(),
-            port:      5432,
-            database:  "test_db".to_string(),
-            username:  "user@domain".to_string(),
-            password:  "pass:word@123".to_string(),
-            ssl_mode:  "require".to_string(),
-            pool_size: 10,
-        };
-
-        let url = build_database_url(&config);
-        // The URL should contain percent-encoded special characters
-        assert_eq!(
-            url,
-            "postgres://user%40domain:pass%3Aword%40123@localhost:5432/test_db?sslmode=require"
-        );
-    }
-
-    // Test load_private_key_empty_file
-    #[test]
-    fn test_load_private_key_empty_file() {
-        let temp_dir = std::env::temp_dir();
-        let key_path = temp_dir.join("empty_key.pem");
-
-        // Write empty file
-        std::fs::write(&key_path, "").unwrap();
-
-        let result = load_private_key(key_path.to_str().unwrap());
-        assert!(result.is_err());
-
-        // Cleanup
-        std::fs::remove_file(key_path).ok();
-    }
-
-    // Test completions function directly
     #[test]
     fn test_completions_direct() {
+        use std::io::Write;
+
         let args = CompletionsArgs {
             shell: clap_complete::Shell::Bash,
         };
 
-        let result = completions(&args);
+        let mut temp_file = tempfile::NamedTempFile::new().unwrap();
+        let result = completions_with_output(&args, &mut temp_file);
         assert!(result.is_ok());
     }
 
-    // Test CLI parsing with log level and format
-    #[test]
-    fn test_cli_parse_with_log_options() {
-        let cli = Cli::parse_from(&[
-            "horizon",
-            "--log-level",
-            "debug",
-            "--log-format",
-            "json",
-            "validate",
-        ]);
-
-        assert_eq!(cli.log_level, "debug");
-        assert_eq!(cli.log_format, "json");
-        match cli.command {
-            Commands::Validate => {},
-            _ => panic!("Expected Validate command"),
-        }
-    }
-
-    // Test serve args validation (TLS requires cert and key)
-    #[test]
-    fn test_serve_args_tls_validation() {
-        // TLS enabled but missing cert
-        let args = ServeArgs {
-            host:     "0.0.0.0".to_string(),
-            port:     3000,
-            tls:      true,
-            tls_cert: None,
-            tls_key:  Some("/path/to/key".to_string()),
-        };
-        assert!(args.tls);
-        assert!(args.tls_cert.is_none());
-        assert!(args.tls_key.is_some());
-
-        // TLS enabled but missing key
-        let args = ServeArgs {
-            host:     "0.0.0.0".to_string(),
-            port:     3000,
-            tls:      true,
-            tls_cert: Some("/path/to/cert".to_string()),
-            tls_key:  None,
-        };
-        assert!(args.tls);
-        assert!(args.tls_cert.is_some());
-        assert!(args.tls_key.is_none());
-    }
-
-    // Test migrate args with all options
-    #[test]
-    fn test_migrate_args_full() {
-        let args = MigrateArgs {
-            dry_run:       true,
-            rollback:      false,
-            create:        Some("test_migration".to_string()),
-            migration_dir: Some("/custom/migrations".to_string()),
-            threads:       8,
-        };
-
-        assert!(args.dry_run);
-        assert!(!args.rollback);
-        assert_eq!(args.create, Some("test_migration".to_string()));
-        assert_eq!(args.migration_dir, Some("/custom/migrations".to_string()));
-        assert_eq!(args.threads, 8);
-    }
-
-    // Test database config with invalid port (should use default)
-    #[test]
-    fn test_database_config_invalid_port() {
-        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-
-        // Save original env var
-        let orig_port = std::env::var("HORIZON_DATABASE_PORT").ok();
-
-        unsafe {
-            std::env::set_var("HORIZON_DATABASE_PORT", "invalid_port");
-        }
-
-        let config = DatabaseConfig::default();
-
-        // Restore env var
-        restore_env_var("HORIZON_DATABASE_PORT", orig_port);
-
-        // Check that it uses default
-        assert_eq!(config.port, 5432);
-    }
-
-    // Test database config with invalid pool size (should use default)
-    #[test]
-    fn test_database_config_invalid_pool_size() {
-        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-
-        // Save original env var
-        let orig_pool_size = std::env::var("HORIZON_DATABASE_POOL_SIZE").ok();
-
-        unsafe {
-            std::env::set_var("HORIZON_DATABASE_POOL_SIZE", "invalid_size");
-        }
-
-        let config = DatabaseConfig::default();
-
-        // Restore env var
-        restore_env_var("HORIZON_DATABASE_POOL_SIZE", orig_pool_size);
-
-        // Check that it uses default
-        assert_eq!(config.pool_size, 10);
-    }
-
-    // Test CLI parsing with unknown subcommand should fail
-    #[test]
-    fn test_cli_parse_unknown_command() {
-        use std::process::Command;
-
-        let output = Command::new("cargo")
-            .args(&["run", "--bin", "cli", "--", "unknown"])
-            .current_dir(env!("CARGO_MANIFEST_DIR"))
-            .output()
-            .expect("Failed to run command");
-
-        // Should exit with non-zero status for unknown command
-        assert!(!output.status.success());
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        assert!(stderr.contains("unrecognized subcommand"));
-    }
-
-    // Test completions for all supported shells
     #[test]
     fn test_completions_all_shells() {
         let shells = vec![
@@ -1354,95 +538,15 @@ MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg5p0s5p0s5p0s5p0s5p0s
             let args = CompletionsArgs {
                 shell,
             };
-            let result = completions(&args);
+            let result = commands::completions::completions(args.shell, &mut Cli::command());
             assert!(result.is_ok(), "Completions failed for {:?}", shell);
         }
-    }
-
-    // Test build_database_url with empty password
-    #[test]
-    fn test_build_database_url_empty_password() {
-        let config = DatabaseConfig {
-            host:      "localhost".to_string(),
-            port:      5432,
-            database:  "test".to_string(),
-            username:  "user".to_string(),
-            password:  "".to_string(),
-            ssl_mode:  "require".to_string(),
-            pool_size: 10,
-        };
-
-        let url = build_database_url(&config);
-        assert_eq!(url, "postgres://user:@localhost:5432/test?sslmode=require");
-    }
-
-    // Test build_database_url with special database name
-    #[test]
-    fn test_build_database_url_special_db_name() {
-        let config = DatabaseConfig {
-            host:      "localhost".to_string(),
-            port:      5432,
-            database:  "test-database_name".to_string(),
-            username:  "user".to_string(),
-            password:  "pass".to_string(),
-            ssl_mode:  "require".to_string(),
-            pool_size: 10,
-        };
-
-        let url = build_database_url(&config);
-        assert_eq!(
-            url,
-            "postgres://user:pass@localhost:5432/test-database_name?sslmode=require"
-        );
-    }
-
-    // Test DatabaseConfig default with all env vars set
-    #[test]
-    fn test_database_config_all_env_vars() {
-        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-
-        // Save original env vars
-        let orig_vars = save_all_db_env_vars();
-
-        // Clear all env vars first to ensure clean state
-        unsafe {
-            std::env::remove_var("HORIZON_DATABASE_HOST");
-            std::env::remove_var("HORIZON_DATABASE_PORT");
-            std::env::remove_var("HORIZON_DATABASE_NAME");
-            std::env::remove_var("HORIZON_DATABASE_USER");
-            std::env::remove_var("HORIZON_DATABASE_PASSWORD");
-            std::env::remove_var("HORIZON_DATABASE_SSL_MODE");
-            std::env::remove_var("HORIZON_DATABASE_POOL_SIZE");
-        }
-
-        // Set all env vars
-        unsafe {
-            std::env::set_var("HORIZON_DATABASE_HOST", "prod-host");
-            std::env::set_var("HORIZON_DATABASE_PORT", "9999");
-            std::env::set_var("HORIZON_DATABASE_NAME", "prod-db");
-            std::env::set_var("HORIZON_DATABASE_USER", "prod-user");
-            std::env::set_var("HORIZON_DATABASE_PASSWORD", "prod-pass");
-            std::env::set_var("HORIZON_DATABASE_SSL_MODE", "verify-full");
-            std::env::set_var("HORIZON_DATABASE_POOL_SIZE", "50");
-        }
-
-        let config = DatabaseConfig::default();
-        assert_eq!(config.host, "prod-host");
-        assert_eq!(config.port, 9999);
-        assert_eq!(config.database, "prod-db");
-        assert_eq!(config.username, "prod-user");
-        assert_eq!(config.password, "prod-pass");
-        assert_eq!(config.ssl_mode, "verify-full");
-        assert_eq!(config.pool_size, 50);
-
-        // Restore
-        restore_all_db_env_vars(orig_vars);
     }
 
     // Helper functions for comprehensive testing
 
     // Helper function for completions that writes to a provided writer
-    fn completions_with_output<T: std::io::Write>(args: &CompletionsArgs, writer: &mut T) -> Result<()> {
+    fn completions_with_output<T: std::io::Write>(args: &CompletionsArgs, writer: &mut T) -> error::Result<()> {
         clap_complete::generate(args.shell, &mut Cli::command(), "horizon", writer);
         Ok(())
     }
@@ -1456,32 +560,6 @@ MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg5p0s5p0s5p0s5p0s5p0s
             else {
                 std::env::remove_var(name);
             }
-        }
-    }
-
-    // Helper to save all DB env vars
-    fn save_all_db_env_vars() -> std::collections::HashMap<String, Option<String>> {
-        let vars = vec![
-            "HORIZON_DATABASE_HOST",
-            "HORIZON_DATABASE_PORT",
-            "HORIZON_DATABASE_NAME",
-            "HORIZON_DATABASE_USER",
-            "HORIZON_DATABASE_PASSWORD",
-            "HORIZON_DATABASE_SSL_MODE",
-            "HORIZON_DATABASE_POOL_SIZE",
-        ];
-
-        let mut saved = std::collections::HashMap::new();
-        for var in vars {
-            saved.insert(var.to_string(), std::env::var(var).ok());
-        }
-        saved
-    }
-
-    // Helper to restore all DB env vars
-    fn restore_all_db_env_vars(saved: std::collections::HashMap<String, Option<String>>) {
-        for (key, value) in saved {
-            restore_env_var(&key, value);
         }
     }
 }

@@ -34,6 +34,7 @@ logging = { path = "../logging" }
 
 # Error handling
 error = { path = "../error" }
+thiserror = { workspace = true }
 anyhow = { workspace = true }
 
 # Migration
@@ -44,6 +45,7 @@ server = { path = "../server" }
 
 # Tower for Service trait
 tower = { workspace = true }
+tower-service = "0.3.3"
 
 # Redis for token blacklisting
 redis = { workspace = true }
@@ -62,4 +64,4 @@ auth = { path = "../auth" }
 workspace = true
 
 [dev-dependencies]
-tempfile = "3.12"
+tempfile = "3.25.0"
