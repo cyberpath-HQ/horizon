@@ -322,18 +322,24 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 #### C-02: Authentication Pages
 
 - Implement login page with email/password form
-- Implement setup page with validation
+- Implement setup page for first user creation
 - Implement MFA verification page
-- Create password reset request and reset pages
-- Implement session timeout and refresh handling
+- Create password reset request and reset pages, add the necessary backend endpoints and email templates for password reset functionality
+- Implement session timeout and automatic refresh handling
 
 #### C-03: Layout and Navigation Components
 
 - Create main application layout with sidebar
-- Implement navigation menu with role-based visibility
+- Implement navigation menu with permission-based visibility (based on user roles and permissions)
 - Create header with user menu and notifications
 - Implement breadcrumb navigation
 - Create page wrapper with loading states
+- ensure that the frontend checks for user permissions before rendering navigation links and pages. If a user does not have permission to access a certain page, the link should be hidden from the navigation menu, and if they attempt to access it directly via URL, they should be redirected to an appropriate page (e.g., dashboard or access denied page) with a message indicating insufficient permissions. Additionally, implement a mechanism to dynamically update the navigation menu and accessible pages when a user's roles or permissions change during their session, ensuring that they immediately lose access to any pages they no longer have permission to view without needing to log out and back in.
+- create a global error handling component that listens for API responses and displays user-friendly error messages based on the error type (e.g., network errors, authentication errors, validation errors). This component should also handle unauthorized responses by redirecting users to the login page or showing an appropriate message if their session has expired or if they do not have permission to access a resource.
+- create the necessary API client utilities to include the JWT token in the Authorization header for all API requests, and implement logic to handle token expiration by automatically refreshing the token using the refresh token endpoint. If the refresh token has also expired or is invalid, the user should be logged out and redirected to the login page with a message indicating that their session has expired.
+- create the profile page where users can view and update their profile information, including changing their password and managing their MFA settings. This page should also allow users to view their active sessions and revoke any sessions they do not recognize for added security.
+- create the team management pages where users can view their teams, create new teams, and manage team members. This should include functionality for team owners/managers to invite users to the team, assign roles, and remove members. Additionally, implement a team settings page where team owners/managers can update team information and manage team permissions.
+- implement API key management pages where users can create, view, and revoke their API keys. This should include functionality for setting permissions and expiration dates for each API key, as well as viewing usage statistics and last used timestamps for auditing purposes.
 
 #### C-04: Session and Token Management
 
@@ -342,6 +348,8 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement automatic token refresh on expiration
 - Handle authentication state changes across the app
 - Implement logout on all tabs/sessions
+- ensure that the frontend checks for token validity before making API calls and handles unauthorized responses by redirecting to the login page or showing appropriate error messages. Additionally, implement a mechanism to synchronize logout across multiple tabs or windows, so that when a user logs out from one tab, all other tabs are also logged out immediately.
+- ensure that the frontend securely stores JWT tokens, using HttpOnly cookies or secure storage mechanisms to prevent XSS attacks. Additionally, implement CSRF protection for state-changing requests by including anti-CSRF tokens in the headers or request body, and validate these tokens on the server side for all relevant endpoints.
 
 ---
 
