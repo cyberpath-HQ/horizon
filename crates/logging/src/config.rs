@@ -94,7 +94,8 @@ impl LoggingConfig {
             .map(|c| format!("{}={}", c, level_str))
             .collect();
 
-        let filter_str = format!("{},off", allowed.join(","));
+        // Important: 'off' must come FIRST to set default, then specific crates override
+        let filter_str = format!("off,{}", allowed.join(","));
 
         tracing::info!("Using log filter: {}", filter_str);
         EnvFilter::new(filter_str)
