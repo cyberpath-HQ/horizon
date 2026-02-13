@@ -67,8 +67,6 @@ fn ensure_base64(secret: &str) -> String {
 }
 
 use error::Result;
-#[cfg(test)]
-use base64::Engine;
 
 /// JWT claims structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
