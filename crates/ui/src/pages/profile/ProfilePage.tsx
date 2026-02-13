@@ -73,10 +73,13 @@ export default function ProfilePage() {
 
   const loadApiKeys = async () => {
     try {
+      console.log("Loading API keys...");
       const keys = await api.getApiKeys();
+      console.log("API keys loaded:", keys);
       setApiKeys(keys.items || []);
     } catch (err) {
       console.error("Failed to load API keys:", err);
+      setMessage({ type: "error", text: "Failed to load API keys" });
     }
   };
 

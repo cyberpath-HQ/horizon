@@ -24,9 +24,12 @@ export default function TeamsPage() {
   const loadTeams = async () => {
     setLoading(true);
     try {
+      console.log("Loading teams...");
       const result = await api.getTeams();
+      console.log("Teams loaded:", result);
       setTeams(result.items || []);
     } catch (err: any) {
+      console.error("Failed to load teams:", err);
       setMessage({ type: "error", text: err.message || "Failed to load teams" });
     } finally {
       setLoading(false);
