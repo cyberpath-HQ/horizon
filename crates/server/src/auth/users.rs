@@ -5,15 +5,15 @@
 use axum::Json;
 use chrono::Utc;
 use entity::{
-    sea_orm_active_enums::UserStatus,
+    sea_orm_active_enums::{RoleScopeType, UserStatus},
     users::{Column as UserColumn, Entity as UsersEntity},
 };
 use error::{AppError, Result};
 use sea_orm::{ActiveModelTrait, ColumnTrait, Condition, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set};
-use tracing::info;
+use tracing::{debug, info};
 use auth::{
     permissions::{Permission, UserAction},
-    roles::get_user_roles,
+    roles::{assign_role_to_user, get_user_roles},
     secrecy::ExposeSecret,
 };
 use permissions_macro::with_permission;
@@ -96,7 +96,7 @@ pub async fn update_my_profile_handler(
     let roles = get_user_roles(&state.db, &updated_user.id).await?;
     let profile = user_model_to_response(&updated_user, roles);
 
-    info!(user_id = %user.id, "User profile updated");
+    debug!(user_id = %user.id, "User profile updated");
 
     Ok(Json(profile))
 }
@@ -166,7 +166,7 @@ pub async fn create_user_handler(
     // Create the user
     let new_user = entity::users::ActiveModel {
         email: Set(req.email.clone()),
-        username: Set(req.username),
+        username: Set(req.username.clone()),
         password_hash: Set(hashed_password.expose_secret().to_string()),
         status: Set(UserStatus::Active),
         created_at: Set(Utc::now().naive_utc()),
@@ -174,9 +174,26 @@ pub async fn create_user_handler(
         ..Default::default()
     };
 
-    let _created_user = new_user.insert(&state.db).await.map_err(|e| {
+    let created_user = new_user.insert(&state.db).await.map_err(|e| {
         AppError::Database {
             message: e.to_string(),
+        }
+    })?;
+
+    // Assign role if provided (default to "viewer" if not specified)
+    let role_to_assign = req.role.as_deref().unwrap_or("viewer");
+    assign_role_to_user(
+        &state.db,
+        &created_user.id,
+        role_to_assign,
+        RoleScopeType::Global,
+        None,
+        None,
+    )
+    .await
+    .map_err(|e| {
+        AppError::Database {
+            message: format!("Failed to assign role: {}", e),
         }
     })?;
 

@@ -14,7 +14,7 @@ use entity::{
 };
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
 use chrono::{DateTime, FixedOffset, Utc};
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 use axum::{extract::Request, Json};
 use validator::Validate;
 use error::{AppError, Result};
@@ -119,7 +119,7 @@ pub async fn setup_handler_inner(state: &AppState, req: SetupRequest) -> Result<
     .await
     .map_err(|e| AppError::database(format!("Failed to assign super_admin role: {}", e)))?;
 
-    info!(user_id = %created_user.id, email = %req.email, "Admin user created during setup");
+    debug!(user_id = %created_user.id, email = %req.email, "Admin user created during setup");
 
     let user = AuthenticatedUser {
         id:           created_user.id,

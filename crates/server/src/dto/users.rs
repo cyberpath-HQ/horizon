@@ -52,6 +52,8 @@ pub struct CreateUserRequest {
     /// User's password
     #[validate(length(min = 8, message = "Password must be at least 8 characters"))]
     pub password: String,
+    /// Role to assign to the user (admin, manager, viewer, user)
+    pub role:     Option<String>,
 }
 
 /// Request to update user profile
