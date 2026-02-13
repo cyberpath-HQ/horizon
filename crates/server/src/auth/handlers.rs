@@ -254,7 +254,9 @@ pub async fn login_handler_inner(
     }
 
     // Check if global MFA enforcement is enabled
-    let require_mfa = crate::settings::is_setting_enabled(state, "require_mfa").await.unwrap_or(false);
+    let require_mfa = crate::settings::is_setting_enabled(state, "require_mfa")
+        .await
+        .unwrap_or(false);
 
     // If require_mfa is true and user hasn't set up MFA, return special response
     if require_mfa && !user.mfa_enabled {
