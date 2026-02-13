@@ -14,6 +14,7 @@ mod m20260204_000009_create_user_sessions_table;
 mod m20260205_000001_add_updated_at_triggers;
 mod m20260207_000001_add_mfa_and_lockout_columns;
 mod m20260207_000002_create_api_key_usage_log_table;
+mod m20260213_000001_create_system_settings_table;
 
 pub struct Migrator;
 
@@ -35,6 +36,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260205_000001_add_updated_at_triggers::Migration),
             Box::new(m20260207_000001_add_mfa_and_lockout_columns::Migration),
             Box::new(m20260207_000002_create_api_key_usage_log_table::Migration),
+            Box::new(m20260213_000001_create_system_settings_table::Migration),
         ]
     }
 }
