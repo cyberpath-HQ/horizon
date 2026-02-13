@@ -53,12 +53,8 @@ impl LoggingConfig {
     /// Create configuration from environment variables.
     pub fn from_env(level: &str, format: &str, log_file: Option<&str>) -> Self {
         Self {
-            level: std::env::var("RUST_LOG")
-                .ok()
-                .unwrap_or_else(|| level.to_string()),
-            format: std::env::var("HORIZON_LOG_FORMAT")
-                .ok()
-                .unwrap_or_else(|| format.to_string()),
+            level: level.to_string(),
+            format: format.to_string(),
             log_file: std::env::var("HORIZON_LOG_FILE")
                 .ok()
                 .or(log_file.map(|s| s.to_string())),
@@ -81,16 +77,6 @@ impl LoggingConfig {
     /// Build an EnvFilter that only allows logs from Horizon project crates.
     /// This filters both tracing and log crate messages (including SQLx).
     fn build_env_filter(&self) -> EnvFilter {
-        // If RUST_LOG is explicitly set, try to use it but ensure we filter out external deps
-        if let Ok(rust_log) = std::env::var("RUST_LOG") {
-            // Try to parse the RUST_LOG value and add filtering for external dependencies
-            // This respects user-provided granular settings like "auth=debug,server=info"
-            let filter_str = format!("{},off", rust_log);
-            if let Ok(filter) = EnvFilter::try_new(&filter_str) {
-                return filter;
-            }
-        }
-
         // Fall back to default level if RUST_LOG is not set or invalid
         let level = self.level.parse().unwrap_or(tracing::Level::INFO);
         let level_str = match level {
@@ -99,19 +85,15 @@ impl LoggingConfig {
             tracing::Level::INFO => "info",
             tracing::Level::WARN => "warn",
             tracing::Level::ERROR => "error",
-        };
-
-        // Create filter that allows our crates and disables everything else
+        };        
         let allowed: Vec<String> = ALLOWED_CRATES
             .iter()
             .map(|c| format!("{}={}", c, level_str))
             .collect();
 
-        // Default to off for everything not in our crates
-        // This includes: sqlx, tokio, hyper, rustls, sea_orm, etc.
         let filter_str = format!("{},off", allowed.join(","));
 
-        // Use our custom filter with default level
+        tracing::info!("Using default filter: {}", filter_str);
         EnvFilter::new(filter_str)
     }
 
