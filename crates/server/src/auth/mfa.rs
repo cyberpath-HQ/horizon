@@ -2,27 +2,16 @@
 //!
 //! HTTP request handlers for Multi-Factor Authentication endpoints.
 
-const REFRESH_TOKEN_TTL_SECONDS: u64 = 30 * 24 * 60 * 60;
+use std::sync::Arc;
 
-use auth::{
-    jwt::create_access_token,
-    mfa::{
-        deserialize_backup_codes,
-        generate_backup_codes,
-        generate_mfa_setup,
-        hash_backup_codes,
-        serialize_backup_codes,
-        verify_and_consume_backup_code,
-        verify_totp_code,
-    },
-    password::verify_password,
-};
 use axum::Json;
 use chrono::Utc;
-use entity::users::Entity as UsersEntity;
+use entity::users::{Entity as UsersEntity, Model as UserModel};
 use error::{AppError, Result};
-use sea_orm::{ActiveModelTrait, EntityTrait, Set};
+use serde::{Deserialize, Serialize};
+use totp_rs::{Secret, TOTP};
 use tracing::info;
+use validator::Validate;
 
 use crate::{
     dto::{
@@ -62,6 +51,13 @@ pub async fn mfa_enable_handler(
     user: MiddlewareUser,
     req: MfaEnableRequest,
 ) -> Result<Json<MfaSetupResponse>> {
+    // Validate request
+    req.validate().map_err(|e| {
+        AppError::Validation {
+            message: e.to_string(),
+        }
+    })?;
+
     // Find the user
     let db_user = UsersEntity::find_by_id(&user.id)
         .one(&state.db)
@@ -129,6 +125,13 @@ pub async fn mfa_verify_setup_handler(
     user: MiddlewareUser,
     req: MfaVerifyRequest,
 ) -> Result<Json<SuccessResponse>> {
+    // Validate request
+    req.validate().map_err(|e| {
+        AppError::Validation {
+            message: e.to_string(),
+        }
+    })?;
+
     // Find the user
     let db_user = UsersEntity::find_by_id(&user.id)
         .one(&state.db)
@@ -189,6 +192,13 @@ pub async fn mfa_verify_login_handler(
     mfa_token: &str,
     req: MfaVerifyRequest,
 ) -> Result<Json<MfaVerifyResponse>> {
+    // Validate request
+    req.validate().map_err(|e| {
+        AppError::Validation {
+            message: e.to_string(),
+        }
+    })?;
+
     // Validate the MFA token (it's a short-lived JWT with special claims)
     let claims = auth::jwt::validate_token(&state.jwt_config, mfa_token)?;
 
@@ -275,6 +285,13 @@ pub async fn mfa_verify_backup_code_handler(
     mfa_token: &str,
     req: MfaBackupCodeRequest,
 ) -> Result<Json<MfaVerifyResponse>> {
+    // Validate request
+    req.validate().map_err(|e| {
+        AppError::Validation {
+            message: e.to_string(),
+        }
+    })?;
+
     // Validate the MFA token
     let claims = auth::jwt::validate_token(&state.jwt_config, mfa_token)?;
 
@@ -374,6 +391,13 @@ pub async fn mfa_disable_handler(
     user: MiddlewareUser,
     req: MfaDisableRequest,
 ) -> Result<Json<SuccessResponse>> {
+    // Validate request
+    req.validate().map_err(|e| {
+        AppError::Validation {
+            message: e.to_string(),
+        }
+    })?;
+
     // Find the user
     let db_user = UsersEntity::find_by_id(&user.id)
         .one(&state.db)
@@ -457,6 +481,13 @@ pub async fn mfa_regenerate_backup_codes_handler(
     user: MiddlewareUser,
     req: MfaVerifyRequest,
 ) -> Result<Json<MfaBackupCodesResponse>> {
+    // Validate request
+    req.validate().map_err(|e| {
+        AppError::Validation {
+            message: e.to_string(),
+        }
+    })?;
+
     // Find the user
     let db_user = UsersEntity::find_by_id(&user.id)
         .one(&state.db)

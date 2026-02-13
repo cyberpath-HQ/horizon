@@ -63,6 +63,13 @@ pub async fn update_my_profile_handler(
     user: AuthenticatedUser,
     req: UpdateUserProfileRequest,
 ) -> Result<Json<UserProfileResponse>> {
+    // Validate request
+    req.validate().map_err(|e| {
+        AppError::Validation {
+            message: e.to_string(),
+        }
+    })?;
+
     let db_user = UsersEntity::find_by_id(&user.id)
         .one(&state.db)
         .await?

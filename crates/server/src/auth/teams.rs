@@ -13,6 +13,7 @@ use entity::{
 use error::{AppError, Result};
 use sea_orm::{ActiveModelTrait, ColumnTrait, Condition, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set};
 use tracing::info;
+use validator::Validate;
 use permissions_macro::with_permission;
 use auth::permissions::{Permission, TeamAction};
 
@@ -47,6 +48,13 @@ pub async fn create_team_handler(
     user: AuthenticatedUser,
     req: CreateTeamRequest,
 ) -> Result<Json<TeamResponse>> {
+    // Validate request
+    req.validate().map_err(|e| {
+        AppError::Validation {
+            message: e.to_string(),
+        }
+    })?;
+
     // Generate slug from name
     let slug = slugify(&req.name);
 
@@ -207,6 +215,13 @@ pub async fn update_team_handler(
     team_id: &str,
     req: UpdateTeamRequest,
 ) -> Result<Json<TeamResponse>> {
+    // Validate request
+    req.validate().map_err(|e| {
+        AppError::Validation {
+            message: e.to_string(),
+        }
+    })?;
+
     let team = TeamsEntity::find_by_id(team_id)
         .one(&state.db)
         .await?
@@ -312,6 +327,13 @@ pub async fn add_team_member_handler(
     team_id: &str,
     req: AddTeamMemberRequest,
 ) -> Result<Json<TeamMemberResponse>> {
+    // Validate request
+    req.validate().map_err(|e| {
+        AppError::Validation {
+            message: e.to_string(),
+        }
+    })?;
+
     // Check permissions
     let permission_service = auth::permissions::PermissionService::new(state.db.clone());
     permission_service
@@ -403,6 +425,13 @@ pub async fn update_team_member_handler(
     member_id: &str,
     req: UpdateTeamMemberRequest,
 ) -> Result<Json<TeamMemberResponse>> {
+    // Validate request
+    req.validate().map_err(|e| {
+        AppError::Validation {
+            message: e.to_string(),
+        }
+    })?;
+
     let team = TeamsEntity::find_by_id(team_id)
         .one(&state.db)
         .await?

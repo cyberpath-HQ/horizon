@@ -306,6 +306,13 @@ pub async fn update_api_key_permissions_handler(
     key_id: &str,
     req: UpdateApiKeyPermissionsRequest,
 ) -> Result<Json<ApiKeyDetail>> {
+    // Validate request
+    req.validate().map_err(|e| {
+        AppError::Validation {
+            message: e.to_string(),
+        }
+    })?;
+
     let api_key = find_user_api_key(state, &user.id, key_id).await?;
 
     let mut active_model: entity::api_keys::ActiveModel = api_key.into();
