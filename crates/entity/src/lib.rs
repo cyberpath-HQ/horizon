@@ -18,6 +18,8 @@ pub mod refresh_tokens;
 pub use refresh_tokens::Entity as RefreshTokens;
 pub mod roles;
 pub use roles::Entity as Roles;
+pub mod system_settings;
+pub use system_settings::Entity as SystemSettings;
 pub mod team_members;
 pub use team_members::Entity as TeamMembers;
 pub mod teams;
