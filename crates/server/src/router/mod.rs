@@ -12,6 +12,7 @@ use axum::{
 };
 use error::Result;
 use redis::AsyncCommands;
+use sea_orm::{EntityTrait, PaginatorTrait};
 use tracing::error;
 
 use crate::{
