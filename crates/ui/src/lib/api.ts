@@ -465,7 +465,7 @@ class ApiClient {
     async regenerateBackupCodes(password: string): Promise<any> {
         return this.request<any>(`/api/v1/auth/mfa/regenerate-backup-codes`, {
             method: `POST`,
-            body: JSON.stringify({
+            body:   JSON.stringify({
                 password,
             }),
         });
@@ -473,26 +473,42 @@ class ApiClient {
 
     // User management
     async createUser(data: { email: string
-        password?:                       string
-        first_name?:                     string
-        last_name?:                      string
-        role?:                           string }): Promise<any> {
+        username?:                  string
+        password?:                  string
+        first_name?:                string
+        last_name?:                 string
+        role?:                      string }): Promise<any> {
+        // Generate username from email if not provided
+        const username = data.username || data.email.split(`@`)[0];
         return this.request<any>(`/api/v1/users`, {
             method: `POST`,
-            body:   JSON.stringify(data),
+            body:   JSON.stringify({
+                email:      data.email,
+                username,
+                password:   data.password,
+                first_name: data.first_name,
+                last_name:  data.last_name,
+                role:       data.role || `user`,
+            }),
         });
     }
 
     async listUsers(query?: { page?: number
-        per_page?:                  number
-        search?:                    string }): Promise<any> {
+        per_page?:                   number
+        search?:                     string }): Promise<any> {
         const params = new URLSearchParams();
-        if (query?.page) params.append(`page`, String(query.page));
-        if (query?.per_page) params.append(`per_page`, String(query.per_page));
-        if (query?.search) params.append(`search`, query.search);
+        if (query?.page) {
+            params.append(`page`, String(query.page));
+        }
+        if (query?.per_page) {
+            params.append(`per_page`, String(query.per_page));
+        }
+        if (query?.search) {
+            params.append(`search`, query.search);
+        }
         const response = await this.request<{ success: boolean
-            users:                                   Array<any>
-            pagination:                              any }>(`/api/v1/users?${ params }`, {
+            users:                                     Array<any>
+            pagination:                                any }>(`/api/v1/users?${ params }`, {
             method: `GET`,
         });
         return {
@@ -509,7 +525,7 @@ class ApiClient {
     }
 
     async updateTeam(teamId: string, data: { name?: string
-        description?:                     string }): Promise<any> {
+        description?:                               string }): Promise<any> {
         return this.request<any>(`/api/v1/teams/${ teamId }`, {
             method: `PUT`,
             body:   JSON.stringify(data),
@@ -523,7 +539,7 @@ class ApiClient {
     }
 
     async addTeamMember(teamId: string, data: { user_id: string
-        role?:                 string }): Promise<any> {
+        role?:                                           string }): Promise<any> {
         return this.request<any>(`/api/v1/teams/${ teamId }/members`, {
             method: `POST`,
             body:   JSON.stringify(data),
