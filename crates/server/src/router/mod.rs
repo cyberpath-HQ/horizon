@@ -14,7 +14,10 @@ use error::Result;
 use redis::AsyncCommands;
 use tracing::error;
 
-use crate::{AppState, middleware::{auth::AuthenticatedUser, security_headers::CorsConfig}};
+use crate::{
+    middleware::{auth::AuthenticatedUser, security_headers::CorsConfig},
+    AppState,
+};
 
 /// Creates the API router with all routes
 ///
@@ -523,6 +526,13 @@ async fn health_check_handler(State(state): State<AppState>) -> Result<Json<serd
             "environment": if cfg!(debug_assertions) { "development" } else { "production" }
         }),
     );
+
+    // Check if system needs setup (no users exist)
+    let needs_setup = match entity::users::Entity::find().count(&state.db).await {
+        Ok(count) => count == 0,
+        Err(_) => false, // If we can't check, assume setup is done
+    };
+    checks["needs_setup"] = needs_setup.into();
 
     // Update overall status
     checks["status"] = status.into();
