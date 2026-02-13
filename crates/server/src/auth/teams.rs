@@ -12,7 +12,7 @@ use entity::{
 };
 use error::{AppError, Result};
 use sea_orm::{ActiveModelTrait, ColumnTrait, Condition, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set};
-use tracing::info;
+use tracing::debug;
 use validator::Validate;
 use permissions_macro::with_permission;
 use auth::permissions::{Permission, TeamAction};
@@ -108,7 +108,7 @@ pub async fn create_team_handler(
         .await
         .map_err(|e| AppError::database(format!("Failed to add creator as team member: {}", e)))?;
 
-    info!(team_id = %created_team.id, user_id = %user.id, "Team created");
+    debug!(team_id = %created_team.id, user_id = %user.id, "Team created");
 
     Ok(Json(team_model_to_response(&created_team, Some(1))))
 }
@@ -272,7 +272,7 @@ pub async fn update_team_handler(
         .await
         .map_err(|e| AppError::database(format!("Failed to update team: {}", e)))?;
 
-    info!(team_id = %team_id, user_id = %user.id, "Team updated");
+    debug!(team_id = %team_id, user_id = %user.id, "Team updated");
 
     Ok(Json(team_model_to_response(&updated, None)))
 }
@@ -309,7 +309,7 @@ pub async fn delete_team_handler(
         .await
         .map_err(|e| AppError::database(format!("Failed to delete team: {}", e)))?;
 
-    info!(team_id = %team_id, user_id = %user.id, "Team soft-deleted");
+    debug!(team_id = %team_id, user_id = %user.id, "Team soft-deleted");
 
     Ok(Json(crate::dto::auth::SuccessResponse {
         success: true,
@@ -394,7 +394,7 @@ pub async fn add_team_member_handler(
         .await
         .map_err(|e| AppError::database(format!("Failed to add team member: {}", e)))?;
 
-    info!(team_id = %team_id, target_user_id = %req.user_id, user_id = %user.id, "Team member added");
+    debug!(team_id = %team_id, target_user_id = %req.user_id, user_id = %user.id, "Team member added");
 
     let display_name = format!(
         "{} {}",
@@ -481,7 +481,7 @@ pub async fn update_team_member_handler(
     .trim()
     .to_string();
 
-    info!(
+    debug!(
         team_id = %team_id,
         member_id = %member_id,
         new_role = %format!("{:?}", role),
@@ -553,7 +553,7 @@ pub async fn remove_team_member_handler(
         .await
         .map_err(|e| AppError::database(format!("Failed to remove team member: {}", e)))?;
 
-    info!(team_id = %team_id, member_id = %member_id, user_id = %user.id, "Team member removed");
+    debug!(team_id = %team_id, member_id = %member_id, user_id = %user.id, "Team member removed");
 
     Ok(Json(crate::dto::auth::SuccessResponse {
         success: true,
