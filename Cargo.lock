@@ -1008,6 +1008,7 @@ dependencies = [
  "axum",
  "clap",
  "clap_complete",
+ "dotenvy",
  "error",
  "hyper",
  "hyper-util",
