@@ -2,7 +2,6 @@ import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import {
-  Leaf,
   LayoutDashboard,
   FolderKanban,
   Shield,
@@ -42,7 +41,7 @@ const settingsNavItems: NavItem[] = [
   { title: "Notifications", href: "/settings/notifications", icon: Bell },
   { title: "AI Providers", href: "/settings/ai", icon: Bot },
   { title: "Import/Export", href: "/settings/import-export", icon: FileSpreadsheet },
-  { title: "Settings", href: "/settings", icon: Settings },
+  { title: "Application", href: "/settings", icon: Settings },
 ];
 
 export function Sidebar() {
@@ -60,9 +59,7 @@ export function Sidebar() {
     <div className="flex flex-col h-full w-64 border-r bg-card">
       {/* Logo */}
       <div className="flex items-center gap-3 px-6 py-5 border-b">
-        <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
-          <Leaf className="w-5 h-5 text-primary" />
-        </div>
+        <img src="/logo.svg" alt="Horizon" className="w-9 h-9" />
         <div>
           <h1 className="font-semibold text-sm tracking-tight">Horizon</h1>
           <p className="text-xs text-muted-foreground">CMDB</p>
@@ -119,7 +116,7 @@ export function Sidebar() {
       {/* User Info */}
       <div className="px-4 py-3 border-t">
         <Link
-          to="/settings"
+          to="/profile"
           className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-accent transition-colors"
         >
           <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">

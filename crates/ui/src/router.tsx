@@ -8,6 +8,9 @@ import SetupPage from "@/pages/auth/SetupPage";
 import MfaVerifyPage from "@/pages/auth/MfaVerifyPage";
 import DashboardPage from "@/pages/DashboardPage";
 import SettingsPage from "@/pages/settings/SettingsPage";
+import ProfilePage from "@/pages/profile/ProfilePage";
+import TeamsPage from "@/pages/settings/TeamsPage";
+import NotificationsPage from "@/pages/settings/NotificationsPage";
 
 // Protected route wrapper
 function ProtectedRoute({
@@ -100,35 +103,29 @@ const router = createBrowserRouter([
                 element: <DashboardPage />,
             },
             {
+                path:    `/profile`,
+                element: <ProfilePage />,
+            },
+            {
                 path:    `/settings`,
                 element: <SettingsPage />,
             },
             {
                 path:    `/settings/teams`,
-                element: (
-                    <div className="space-y-4">
-                        <h1 className="text-2xl font-semibold">Teams</h1>
-                        <p className="text-muted-foreground">Team management coming soon.</p>
-                    </div>
-                ),
+                element: <TeamsPage />,
             },
             {
                 path:    `/settings/api-keys`,
                 element: (
                     <div className="space-y-4">
                         <h1 className="text-2xl font-semibold">API Keys</h1>
-                        <p className="text-muted-foreground">API key management coming soon.</p>
+                        <p className="text-muted-foreground">Loading API keys...</p>
                     </div>
                 ),
             },
             {
                 path:    `/settings/notifications`,
-                element: (
-                    <div className="space-y-4">
-                        <h1 className="text-2xl font-semibold">Notifications</h1>
-                        <p className="text-muted-foreground">Notification settings coming soon.</p>
-                    </div>
-                ),
+                element: <NotificationsPage />,
             },
             {
                 path:    `/settings/ai`,

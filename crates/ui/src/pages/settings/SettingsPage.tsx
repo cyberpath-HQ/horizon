@@ -1,101 +1,96 @@
-import { useAuth } from "@/context/AuthContext";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { User, Shield, Bell } from "lucide-react";
+import { Bell, Palette, Database, CheckCircle, AlertCircle } from "lucide-react";
+import { useTheme } from "@/hooks/useTheme";
 
 export default function SettingsPage() {
-  const { user } = useAuth();
+  const { theme, setTheme } = useTheme();
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const handleThemeChange = (newTheme: "light" | "dark" | "system") => {
+    setTheme(newTheme);
+    setMessage({ type: "success", text: "Theme updated" });
+  };
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
         <p className="text-muted-foreground">
-          Manage your account settings and preferences.
+          Configure application settings and preferences.
         </p>
       </div>
 
-      <Tabs defaultValue="profile" className="space-y-4">
+      {message && (
+        <div className={`p-4 rounded-lg flex items-center gap-2 ${message.type === "success" ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"}`}>
+          {message.type === "success" ? <CheckCircle className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+          {message.text}
+        </div>
+      )}
+
+      <Tabs defaultValue="appearance" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="profile" className="gap-2">
-            <User className="w-4 h-4" />
-            Profile
-          </TabsTrigger>
-          <TabsTrigger value="security" className="gap-2">
-            <Shield className="w-4 h-4" />
-            Security
+          <TabsTrigger value="appearance" className="gap-2">
+            <Palette className="w-4 h-4" />
+            Appearance
           </TabsTrigger>
           <TabsTrigger value="notifications" className="gap-2">
             <Bell className="w-4 h-4" />
             Notifications
           </TabsTrigger>
+          <TabsTrigger value="database" className="gap-2">
+            <Database className="w-4 h-4" />
+            Database
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="profile" className="space-y-4">
+        <TabsContent value="appearance" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Profile Information</CardTitle>
+              <CardTitle>Theme</CardTitle>
               <CardDescription>
-                Update your personal information and email address.
+                Choose how Horizon looks to you.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">First Name</Label>
-                  <Input id="firstName" defaultValue={user?.displayName?.split(" ")[0] || ""} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lastName">Last Name</Label>
-                  <Input id="lastName" defaultValue={user?.displayName?.split(" ")[1] || ""} />
-                </div>
+              <div className="grid gap-4 md:grid-cols-3">
+                <button
+                  onClick={() => handleThemeChange("light")}
+                  className={`p-4 border-2 rounded-lg text-center transition-all ${
+                    theme === "light" ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
+                  }`}
+                >
+                  <div className="w-16 h-12 mx-auto mb-2 bg-white border rounded flex items-center justify-center">
+                    <div className="w-8 h-8 bg-gray-200 rounded-full" />
+                  </div>
+                  <p className="text-sm font-medium">Light</p>
+                </button>
+                <button
+                  onClick={() => handleThemeChange("dark")}
+                  className={`p-4 border-2 rounded-lg text-center transition-all ${
+                    theme === "dark" ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
+                  }`}
+                >
+                  <div className="w-16 h-12 mx-auto mb-2 bg-gray-900 border border-gray-700 rounded flex items-center justify-center">
+                    <div className="w-8 h-8 bg-gray-700 rounded-full" />
+                  </div>
+                  <p className="text-sm font-medium">Dark</p>
+                </button>
+                <button
+                  onClick={() => handleThemeChange("system")}
+                  className={`p-4 border-2 rounded-lg text-center transition-all ${
+                    theme === "system" ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
+                  }`}
+                >
+                  <div className="w-16 h-12 mx-auto mb-2 bg-gradient-to-r from-white to-gray-900 border rounded flex items-center justify-center">
+                    <div className="w-8 h-8 bg-gradient-to-r from-gray-200 to-gray-700 rounded-full" />
+                  </div>
+                  <p className="text-sm font-medium">System</p>
+                </button>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" defaultValue={user?.email || ""} disabled />
-              </div>
-              <Button>Save Changes</Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="security" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Password</CardTitle>
-              <CardDescription>
-                Change your password to keep your account secure.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="currentPassword">Current Password</Label>
-                <Input id="currentPassword" type="password" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="newPassword">New Password</Label>
-                <Input id="newPassword" type="password" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                <Input id="confirmPassword" type="password" />
-              </div>
-              <Button>Update Password</Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Two-Factor Authentication</CardTitle>
-              <CardDescription>
-                Add an extra layer of security to your account.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button variant="outline">Enable 2FA</Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -110,7 +105,27 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                Notification settings coming soon.
+                Notification settings will be available in a future update.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="database" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Database Connection</CardTitle>
+              <CardDescription>
+                Manage database connection settings.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Database URL</Label>
+                <Input type="password" value="••••••••••••••••" disabled />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Database configuration is managed through environment variables.
               </p>
             </CardContent>
           </Card>
