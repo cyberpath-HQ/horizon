@@ -26,10 +26,14 @@ pub fn generate_mfa_setup(issuer: &str, email: &str) -> Result<MfaSetup> {
         return Err(error::AppError::internal("Generated secret is empty"));
     }
 
-    // Create the encoded secret string (Base32)
-    let secret = Secret::Encoded(secret_bytes.clone())
-        .to_string()
-        .map_err(|e| error::AppError::internal(format!("Failed to encode secret: {}", e)))?;
+    // Convert bytes to Base32 encoded string
+    // Use the totp_rs crate's encoding
+    let encoded = base32::encode(
+        base32::Alphabet::Rfc4648 {
+            padding: false,
+        },
+        &secret_bytes,
+    );
 
     // Create TOTP instance
     let totp = TOTP::new(
@@ -52,7 +56,7 @@ pub fn generate_mfa_setup(issuer: &str, email: &str) -> Result<MfaSetup> {
         .map_err(|e| error::AppError::internal(format!("Failed to generate QR code: {}", e)))?;
 
     Ok(MfaSetup {
-        secret,
+        secret: encoded,
         backup_codes,
         otpauth_uri: totp.get_url(),
         qr_code_base64,
