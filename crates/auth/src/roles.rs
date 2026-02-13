@@ -4,7 +4,7 @@
 
 use entity::{roles::Entity as RolesEntity, sea_orm_active_enums::RoleScopeType, user_roles::Entity as UserRoleEntity};
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
-use tracing::info;
+use tracing::{debug, info};
 use error::Result;
 use chrono;
 
@@ -30,7 +30,7 @@ pub async fn get_user_roles(db: &DatabaseConnection, user_id: &str) -> Result<Ve
     use sea_orm::sea_query::Condition;
     use entity::user_roles::Column;
 
-    info!(user_id = %user_id, "Loading user roles from database");
+    debug!(user_id = %user_id, "Loading user roles from database");
 
     // Find all active user role assignments for this user
     let now = chrono::Utc::now();
@@ -56,14 +56,14 @@ pub async fn get_user_roles(db: &DatabaseConnection, user_id: &str) -> Result<Ve
         // The application should handle users without roles appropriately,
         // such as denying access or assigning a default role at the application level.
         // Note: A 'user' role should be seeded in the database for basic user permissions.
-        info!(
+        debug!(
             user_id = %user_id,
             "User has no roles assigned"
         );
         return Ok(vec![]);
     }
 
-    info!(
+    debug!(
         user_id = %user_id,
         roles = ?role_slugs,
         "Successfully loaded user roles"
