@@ -1,8 +1,7 @@
-import {
-    Link, useLocation
-} from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
+import { useTheme } from "@/hooks/useTheme";
 import {
     LayoutDashboard,
     FolderKanban,
@@ -10,12 +9,10 @@ import {
     Network,
     Building2,
     Users,
-    Key,
     Settings,
     Bell,
     Database,
     Bot,
-    FileSpreadsheet,
     Workflow
 } from "lucide-react";
 
@@ -76,11 +73,6 @@ const settingsNavItems: Array<NavItem> = [
         icon:  Users,
     },
     {
-        title: `API Keys`,
-        href:  `/settings/api-keys`,
-        icon:  Key,
-    },
-    {
         title: `Notifications`,
         href:  `/settings/notifications`,
         icon:  Bell,
@@ -91,11 +83,6 @@ const settingsNavItems: Array<NavItem> = [
         icon:  Bot,
     },
     {
-        title: `Import/Export`,
-        href:  `/settings/import-export`,
-        icon:  FileSpreadsheet,
-    },
-    {
         title: `Application`,
         href:  `/settings`,
         icon:  Settings,
@@ -104,9 +91,8 @@ const settingsNavItems: Array<NavItem> = [
 
 export function Sidebar() {
     const location = useLocation();
-    const {
-        user,
-    } = useAuth();
+    const { user } = useAuth();
+    const { resolvedTheme } = useTheme();
 
     const isActive = (href: string) => {
         if (href === `/`) {
@@ -115,15 +101,13 @@ export function Sidebar() {
         return location.pathname.startsWith(href);
     };
 
+    const logoSrc = resolvedTheme === "dark" ? "/logo-white.svg" : "/logo.svg";
+
     return (
         <div className="flex flex-col h-full w-64 border-r bg-card">
             {/* Logo */}
             <div className="flex items-center gap-3 px-6 py-5 border-b">
-                <picture>
-                    <source srcSet="/logo.svg" media="(prefers-color-scheme: dark)" />
-                    <source srcSet="/logo-white.svg" media="(prefers-color-scheme: light)" />
-                    <img src="/logo.svg" alt="Horizon" className="w-full" />
-                </picture>
+                <img src={logoSrc} alt="Horizon" className="h-8 w-auto" />
             </div>
 
             {/* Main Navigation */}
