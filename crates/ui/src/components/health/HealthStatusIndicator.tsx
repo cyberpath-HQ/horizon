@@ -46,7 +46,6 @@ export function HealthStatusIndicator() {
     return `System status: ${health.status}`;
   };
 
-  const isHealthy = health?.status === "healthy";
   const dbHealth = health?.checks?.database?.status;
   const redisHealth = health?.checks?.redis?.status;
 
