@@ -11,7 +11,7 @@ mod logging_config_tests {
         let config = LoggingConfig::default();
         // Verify defaults are sensible
         assert_eq!(config.level, "info");
-        assert_eq!(config.format, "json");
+        assert_eq!(config.format, "compact");
         assert_eq!(config.environment, "development");
     }
 

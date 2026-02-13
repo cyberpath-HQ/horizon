@@ -7,7 +7,18 @@ use std::path::PathBuf;
 
 use derivative::Derivative;
 use serde::{Deserialize, Serialize};
-use tracing_subscriber::{filter::LevelFilter, fmt, prelude::*, Registry};
+use tracing_subscriber::{filter::Targets, fmt, prelude::*, Registry};
+
+/// Allowed crates in the Horizon project - only logs from these crates will be shown
+const ALLOWED_CRATES: &[&str] = &[
+    "horizon",
+    "server",
+    "error",
+    "logging",
+    "auth",
+    "entity",
+    "migration",
+];
 
 /// Logging configuration structure.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Derivative)]
@@ -18,8 +29,8 @@ pub struct LoggingConfig {
     #[derivative(Default(value = "\"info\".to_string()"))]
     pub level: String,
 
-    /// Output format (json, pretty, compact)
-    #[derivative(Default(value = "\"json\".to_string()"))]
+    /// Output format (json, compact)
+    #[derivative(Default(value = "\"compact\".to_string()"))]
     pub format: String,
 
     /// Optional log file path
@@ -55,18 +66,35 @@ impl LoggingConfig {
 
     /// Build the tracing subscriber from this configuration.
     pub fn build(&self) -> Box<dyn tracing::Subscriber + Send + Sync> {
-        let level: LevelFilter = self.level.parse().unwrap_or(LevelFilter::INFO);
+        let filter = self.build_filter();
 
         match self.format.as_str() {
-            "json" => self.build_json_subscriber(level),
-            "pretty" => self.build_pretty_subscriber(level),
-            "compact" => self.build_compact_subscriber(level),
-            _ => self.build_json_subscriber(level),
+            "json" => self.build_json_subscriber(filter),
+            "compact" => self.build_compact_subscriber(filter),
+            _ => self.build_compact_subscriber(filter),
         }
     }
 
+    /// Build a filter that only allows logs from Horizon project crates.
+    fn build_filter(&self) -> Targets {
+        let level: tracing::Level = self.level.parse().unwrap_or(tracing::Level::INFO);
+        let mut targets = Targets::new();
+
+        // Enable the specified level for all allowed crates
+        for crate_name in ALLOWED_CRATES {
+            targets = targets.with_target(*crate_name, level);
+        }
+
+        // Optionally enable debug for specific targets if debug level is set
+        if level == tracing::Level::DEBUG || level == tracing::Level::TRACE {
+            targets = targets.with_default(level);
+        }
+
+        targets
+    }
+
     /// Build a JSON subscriber for production logging.
-    fn build_json_subscriber(&self, level: LevelFilter) -> Box<dyn tracing::Subscriber + Send + Sync> {
+    fn build_json_subscriber(&self, filter: Targets) -> Box<dyn tracing::Subscriber + Send + Sync> {
         let subscriber = fmt::layer()
             .json()
             .with_timer(fmt::time::UtcTime::rfc_3339());
@@ -86,30 +114,22 @@ impl LoggingConfig {
             let file_layer = fmt::layer().json().with_writer(non_blocking);
             Box::new(
                 Registry::default()
-                    .with(level)
+                    .with(filter)
                     .with(subscriber)
                     .with(file_layer),
             )
         }
         else {
-            Box::new(Registry::default().with(level).with(subscriber))
+            Box::new(Registry::default().with(filter).with(subscriber))
         }
     }
 
-    /// Build a pretty subscriber for development logging.
-    fn build_pretty_subscriber(&self, level: LevelFilter) -> Box<dyn tracing::Subscriber + Send + Sync> {
-        let subscriber = fmt::layer()
-            .pretty()
-            .with_timer(fmt::time::UtcTime::rfc_3339());
-        Box::new(Registry::default().with(level).with(subscriber))
-    }
-
     /// Build a compact subscriber for testing.
-    fn build_compact_subscriber(&self, level: LevelFilter) -> Box<dyn tracing::Subscriber + Send + Sync> {
+    fn build_compact_subscriber(&self, filter: Targets) -> Box<dyn tracing::Subscriber + Send + Sync> {
         let subscriber = fmt::layer()
             .compact()
             .with_timer(fmt::time::UtcTime::rfc_3339());
-        Box::new(Registry::default().with(level).with(subscriber))
+        Box::new(Registry::default().with(filter).with(subscriber))
     }
 }
 
@@ -151,12 +171,12 @@ mod tests {
         // Set test values
         unsafe {
             std::env::set_var("RUST_LOG", "debug");
-            std::env::set_var("HORIZON_LOG_FORMAT", "pretty");
+            std::env::set_var("HORIZON_LOG_FORMAT", "compact");
         }
 
         let config = LoggingConfig::from_env("info", "json", None);
         assert_eq!(config.level, "debug");
-        assert_eq!(config.format, "pretty");
+        assert_eq!(config.format, "compact");
 
         // Restore original values
         unsafe {
@@ -176,17 +196,6 @@ mod tests {
         let config = LoggingConfig {
             level: "debug".to_string(),
             format: "json".to_string(),
-            log_file: None,
-            ..Default::default()
-        };
-        let _subscriber = config.build();
-    }
-
-    #[test]
-    fn test_build_pretty_subscriber() {
-        let config = LoggingConfig {
-            level: "debug".to_string(),
-            format: "pretty".to_string(),
             log_file: None,
             ..Default::default()
         };
