@@ -12,7 +12,7 @@ use entity::{
 };
 use error::{AppError, Result};
 use sea_orm::{ActiveModelTrait, ColumnTrait, Condition, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set};
-use tracing::info;
+use tracing::debug;
 use validator::Validate;
 
 use crate::{
@@ -116,7 +116,7 @@ pub async fn create_api_key_handler(
         .await
         .map_err(|e| AppError::database(format!("Failed to create API key: {}", e)))?;
 
-    info!(
+    debug!(
         api_key_id = %created.id,
         user_id = %user.id,
         name = %req.name,
@@ -238,7 +238,7 @@ pub async fn delete_api_key_handler(
         .await
         .map_err(|e| AppError::database(format!("Failed to delete API key: {}", e)))?;
 
-    info!(api_key_id = %key_id, user_id = %user.id, "API key revoked");
+    debug!(api_key_id = %key_id, user_id = %user.id, "API key revoked");
 
     Ok(Json(SuccessResponse {
         success: true,
@@ -279,7 +279,7 @@ pub async fn rotate_api_key_handler(
         .await
         .map_err(|e| AppError::database(format!("Failed to rotate API key: {}", e)))?;
 
-    info!(api_key_id = %key_id, user_id = %user.id, "API key rotated");
+    debug!(api_key_id = %key_id, user_id = %user.id, "API key rotated");
 
     Ok(Json(RotateApiKeyResponse {
         success: true,
@@ -324,7 +324,7 @@ pub async fn update_api_key_permissions_handler(
         .await
         .map_err(|e| AppError::database(format!("Failed to update API key permissions: {}", e)))?;
 
-    info!(api_key_id = %key_id, user_id = %user.id, "API key permissions updated");
+    debug!(api_key_id = %key_id, user_id = %user.id, "API key permissions updated");
 
     Ok(Json(api_key_model_to_detail(&updated)))
 }
