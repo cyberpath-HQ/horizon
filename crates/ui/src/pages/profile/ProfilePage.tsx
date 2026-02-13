@@ -1,15 +1,17 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
+import { useTheme } from "@/hooks/useTheme";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { User, Shield, Key, Loader2, AlertCircle, CheckCircle } from "lucide-react";
+import { User, Shield, Key, Palette, Loader2, AlertCircle, CheckCircle } from "lucide-react";
 
 export default function ProfilePage() {
   const { user, refreshUser } = useAuth();
+  const { theme, setTheme } = useTheme();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   
@@ -194,6 +196,10 @@ export default function ProfilePage() {
             <User className="w-4 h-4" />
             Profile
           </TabsTrigger>
+          <TabsTrigger value="appearance" className="gap-2">
+            <Palette className="w-4 h-4" />
+            Appearance
+          </TabsTrigger>
           <TabsTrigger value="security" className="gap-2">
             <Shield className="w-4 h-4" />
             Security
@@ -241,6 +247,43 @@ export default function ProfilePage() {
                   Save Changes
                 </Button>
               </form>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="appearance" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Theme</CardTitle>
+              <CardDescription>
+                Choose how Horizon looks to you.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <button
+                  onClick={() => setTheme("light")}
+                  className={`p-4 border-2 rounded-lg text-center transition-all ${
+                    theme === "light" ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
+                  }`}
+                >
+                  <div className="w-16 h-12 mx-auto mb-2 bg-white border rounded flex items-center justify-center">
+                    <div className="w-8 h-8 bg-gray-200 rounded-full" />
+                  </div>
+                  <p className="text-sm font-medium">Light</p>
+                </button>
+                <button
+                  onClick={() => setTheme("dark")}
+                  className={`p-4 border-2 rounded-lg text-center transition-all ${
+                    theme === "dark" ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
+                  }`}
+                >
+                  <div className="w-16 h-12 mx-auto mb-2 bg-gray-900 border border-gray-700 rounded flex items-center justify-center">
+                    <div className="w-8 h-8 bg-gray-700 rounded-full" />
+                  </div>
+                  <p className="text-sm font-medium">Dark</p>
+                </button>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
