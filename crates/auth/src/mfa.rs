@@ -102,9 +102,28 @@ pub fn deserialize_backup_codes(json: &str) -> Result<Vec<String>> {
 
 /// Verify TOTP code
 pub fn verify_totp_code(secret: &str, code: &str, issuer: &str, account_name: &str) -> Result<bool> {
-    let secret_bytes = Secret::Encoded(secret.to_string())
+    // Validate secret is not empty
+    if secret.is_empty() {
+        return Err(error::AppError::internal("TOTP secret is empty"));
+    }
+
+    // Clean the secret - remove any whitespace and convert to uppercase
+    let cleaned_secret: String = secret
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect::<String>()
+        .to_uppercase();
+
+    if cleaned_secret.is_empty() {
+        return Err(error::AppError::internal(
+            "TOTP secret is invalid (empty after cleaning)",
+        ));
+    }
+
+    // Try to decode the base32 secret
+    let secret_bytes = Secret::Encoded(cleaned_secret)
         .to_bytes()
-        .map_err(|e| error::AppError::internal(format!("Failed to decode TOTP secret: {}", e)))?;
+        .map_err(|e| error::AppError::internal(format!("Failed to decode base32 secret: {}", e)))?;
 
     let totp = TOTP::new(
         Algorithm::SHA1,
