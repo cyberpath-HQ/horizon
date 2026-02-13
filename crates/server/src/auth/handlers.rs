@@ -5,7 +5,7 @@
 use auth::{
     jwt::create_access_token,
     password::{hash_password, validate_password_strength, verify_password},
-    roles::get_user_roles,
+    roles::{assign_role_to_user, get_user_roles},
     secrecy::ExposeSecret,
 };
 use entity::{
@@ -105,6 +105,19 @@ pub async fn setup_handler_inner(state: &AppState, req: SetupRequest) -> Result<
         .insert(&state.db)
         .await
         .map_err(|e| AppError::database(format!("Failed to create admin user: {}", e)))?;
+
+    // Assign super_admin role to the user in the database
+    use entity::sea_orm_active_enums::RoleScopeType;
+    assign_role_to_user(
+        &state.db,
+        &created_user.id,
+        "super_admin",
+        RoleScopeType::Global,
+        None,
+        None,
+    )
+    .await
+    .map_err(|e| AppError::database(format!("Failed to assign super_admin role: {}", e)))?;
 
     info!(user_id = %created_user.id, email = %req.email, "Admin user created during setup");
 
