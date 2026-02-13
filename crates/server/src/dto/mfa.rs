@@ -107,3 +107,15 @@ pub struct LoginMfaResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tokens:       Option<super::auth::AuthTokens>,
 }
+
+/// Request to set up MFA when required by global policy
+/// This is used when the user logs in and global MFA is enforced but they haven't set up MFA yet
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Validate)]
+pub struct MfaSetupEnforceRequest {
+    /// Current password for verification before enabling MFA
+    #[validate(length(min = 1, message = "Password is required"))]
+    pub password: String,
+    /// The 6-digit TOTP code from authenticator app to verify setup
+    #[validate(length(equal = 6, message = "TOTP code must be exactly 6 digits"))]
+    pub code:     String,
+}
