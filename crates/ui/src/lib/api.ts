@@ -290,10 +290,17 @@ class ApiClient {
     });
   }
 
-  async enableMfa(): Promise<{ secret: string; qr_code: string }> {
-    return this.request<{ secret: string; qr_code: string }>("/api/v1/auth/mfa/enable", {
+  async enableMfa(password: string): Promise<{ success: boolean; secret: string; qr_code_base64: string; backup_codes: string[] }> {
+    return this.request<{ success: boolean; secret: string; qr_code_base64: string; backup_codes: string[] }>("/api/v1/auth/mfa/enable", {
       method: "POST",
-      body: JSON.stringify({}),
+      body: JSON.stringify({ password }),
+    });
+  }
+
+  async verifyMfaSetup(code: string): Promise<SuccessResponse> {
+    return this.request<SuccessResponse>("/api/v1/auth/mfa/verify-setup", {
+      method: "POST",
+      body: JSON.stringify({ code }),
     });
   }
 

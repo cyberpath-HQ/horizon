@@ -64,6 +64,16 @@ const mainNavItems: Array<NavItem> = [
         href:  `/vendors`,
         icon:  Building2,
     },
+    {
+        title: `Agents`,
+        href:  `/agents`,
+        icon:  Bot,
+    },
+    {
+        title: `Notifications`,
+        href:  `/notifications`,
+        icon:  Bell,
+    },
 ];
 
 const settingsNavItems: Array<NavItem> = [
@@ -71,16 +81,6 @@ const settingsNavItems: Array<NavItem> = [
         title: `Teams`,
         href:  `/settings/teams`,
         icon:  Users,
-    },
-    {
-        title: `Notifications`,
-        href:  `/settings/notifications`,
-        icon:  Bell,
-    },
-    {
-        title: `AI Providers`,
-        href:  `/settings/ai`,
-        icon:  Bot,
     },
     {
         title: `Application`,
@@ -106,9 +106,9 @@ export function Sidebar() {
     return (
         <div className="flex flex-col h-full w-64 border-r bg-card">
             {/* Logo */}
-            <div className="flex items-center gap-3 px-6 py-5 border-b">
+            <Link to="/" className="flex items-center gap-3 px-6 py-5 border-b hover:bg-accent/50 transition-colors">
                 <img src={logoSrc} alt="Horizon" className="h-8 w-auto" />
-            </div>
+            </Link>
 
             {/* Main Navigation */}
             <nav className="flex-1 overflow-y-auto py-4 px-3">

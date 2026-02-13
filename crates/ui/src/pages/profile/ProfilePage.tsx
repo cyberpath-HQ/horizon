@@ -1,19 +1,18 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { api } from "@/lib/api";
-import { useTheme } from "@/hooks/useTheme";
+import { api, setStoredUser } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { User, Shield, Key, Palette, Loader2, AlertCircle, CheckCircle } from "lucide-react";
+import { User, Shield, Key, Loader2, AlertCircle, CheckCircle } from "lucide-react";
 
 export default function ProfilePage() {
   const { user, refreshUser } = useAuth();
-  const { theme, setTheme } = useTheme();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [activeTab, setActiveTab] = useState("profile");
   
   // Profile form
   const [firstName, setFirstName] = useState("");
@@ -30,6 +29,7 @@ export default function ProfilePage() {
   const [mfaSecret, setMfaSecret] = useState("");
   const [mfaQrCode, setMfaQrCode] = useState("");
   const [mfaCode, setMfaCode] = useState("");
+  const [mfaPassword, setMfaPassword] = useState("");
   const [mfaStep, setMfaStep] = useState<"none" | "enabling" | "verify">("none");
   
   // API Keys
@@ -37,6 +37,20 @@ export default function ProfilePage() {
   const [apiKeyName, setApiKeyName] = useState("");
   const [newApiKey, setNewApiKey] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
+
+  // Initialize active tab from localStorage
+  useEffect(() => {
+    const savedTab = localStorage.getItem("profile_active_tab");
+    if (savedTab) {
+      setActiveTab(savedTab);
+    }
+  }, []);
+
+  // Save active tab to localStorage whenever it changes
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    localStorage.setItem("profile_active_tab", value);
+  };
 
   useEffect(() => {
     if (user) {
@@ -73,7 +87,17 @@ export default function ProfilePage() {
     
     try {
       await api.updateProfile({ first_name: firstName, last_name: lastName });
-      await refreshUser();
+      // Fetch fresh user profile to update the display
+      const updatedProfile = await api.getProfile();
+      if (updatedProfile) {
+        // Update the stored user with new display name
+        const updatedUser = {
+          ...updatedProfile.user || updatedProfile,
+          displayName: `${updatedProfile.first_name || ''} ${updatedProfile.last_name || ''}`.trim()
+        };
+        setStoredUser(updatedUser);
+        await refreshUser();
+      }
       setMessage({ type: "success", text: "Profile updated successfully" });
     } catch (err: any) {
       setMessage({ type: "error", text: err.message || "Failed to update profile" });
@@ -105,12 +129,17 @@ export default function ProfilePage() {
   };
 
   const handleEnableMfa = async () => {
+    if (!mfaPassword) {
+      setMessage({ type: "error", text: "Password is required to enable MFA" });
+      return;
+    }
     setMfaLoading(true);
     try {
-      const result = await api.enableMfa();
+      const result = await api.enableMfa(mfaPassword);
       setMfaSecret(result.secret);
-      setMfaQrCode(result.qr_code);
+      setMfaQrCode(result.qr_code_base64);
       setMfaStep("enabling");
+      setMfaPassword("");
     } catch (err: any) {
       setMessage({ type: "error", text: err.message || "Failed to enable MFA" });
     } finally {
@@ -123,7 +152,7 @@ export default function ProfilePage() {
     setMfaLoading(true);
     try {
       // Verify and enable MFA
-      await api.verifyMfa(mfaCode);
+      await api.verifyMfaSetup(mfaCode);
       setMfaEnabled(true);
       setMfaStep("none");
       setMfaCode("");
@@ -190,15 +219,11 @@ export default function ProfilePage() {
         </div>
       )}
 
-      <Tabs defaultValue="profile" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
         <TabsList>
           <TabsTrigger value="profile" className="gap-2">
             <User className="w-4 h-4" />
             Profile
-          </TabsTrigger>
-          <TabsTrigger value="appearance" className="gap-2">
-            <Palette className="w-4 h-4" />
-            Appearance
           </TabsTrigger>
           <TabsTrigger value="security" className="gap-2">
             <Shield className="w-4 h-4" />
@@ -247,43 +272,6 @@ export default function ProfilePage() {
                   Save Changes
                 </Button>
               </form>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="appearance" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Theme</CardTitle>
-              <CardDescription>
-                Choose how Horizon looks to you.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <button
-                  onClick={() => setTheme("light")}
-                  className={`p-4 border-2 rounded-lg text-center transition-all ${
-                    theme === "light" ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
-                  }`}
-                >
-                  <div className="w-16 h-12 mx-auto mb-2 bg-white border rounded flex items-center justify-center">
-                    <div className="w-8 h-8 bg-gray-200 rounded-full" />
-                  </div>
-                  <p className="text-sm font-medium">Light</p>
-                </button>
-                <button
-                  onClick={() => setTheme("dark")}
-                  className={`p-4 border-2 rounded-lg text-center transition-all ${
-                    theme === "dark" ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
-                  }`}
-                >
-                  <div className="w-16 h-12 mx-auto mb-2 bg-gray-900 border border-gray-700 rounded flex items-center justify-center">
-                    <div className="w-8 h-8 bg-gray-700 rounded-full" />
-                  </div>
-                  <p className="text-sm font-medium">Dark</p>
-                </button>
-              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -356,10 +344,23 @@ export default function ProfilePage() {
                   </Button>
                 </div>
               ) : mfaStep === "none" ? (
-                <Button onClick={handleEnableMfa} disabled={mfaLoading}>
-                  {mfaLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  Enable 2FA
-                </Button>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="mfaPassword">Enter your password to enable 2FA</Label>
+                    <Input
+                      id="mfaPassword"
+                      type="password"
+                      value={mfaPassword}
+                      onChange={(e) => setMfaPassword(e.target.value)}
+                      placeholder="Enter your password"
+                      required
+                    />
+                  </div>
+                  <Button onClick={handleEnableMfa} disabled={mfaLoading || !mfaPassword}>
+                    {mfaLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    Enable 2FA
+                  </Button>
+                </div>
               ) : mfaStep === "enabling" && mfaQrCode ? (
                 <div className="space-y-4">
                   <div className="flex justify-center">
@@ -426,26 +427,26 @@ export default function ProfilePage() {
                 </Button>
               </form>
 
-              <div className="space-y-2">
-                {apiKeys.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">No API keys yet.</p>
-                ) : (
-                  apiKeys.map((key) => (
-                    <div key={key.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <p className="font-medium">{key.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Created {new Date(key.created_at).toLocaleDateString()}
-                          {key.expires_at && ` • Expires ${new Date(key.expires_at).toLocaleDateString()}`}
-                        </p>
-                      </div>
-                      <Button variant="ghost" size="sm" onClick={() => handleDeleteApiKey(key.id)}>
-                        Delete
-                      </Button>
-                    </div>
-                  ))
-                )}
-              </div>
+               <div className="space-y-2">
+                 {apiKeys.length === 0 ? (
+                   <p className="text-muted-foreground text-sm">No API keys yet.</p>
+                 ) : (
+                   apiKeys.map((key, index) => (
+                     <div key={key.id} className={`flex items-center justify-between p-3 border rounded-lg animate-stagger-${Math.min(index + 1, 5)}`}>
+                       <div>
+                         <p className="font-medium">{key.name}</p>
+                         <p className="text-xs text-muted-foreground">
+                           Created {new Date(key.created_at).toLocaleDateString()}
+                           {key.expires_at && ` • Expires ${new Date(key.expires_at).toLocaleDateString()}`}
+                         </p>
+                       </div>
+                       <Button variant="ghost" size="sm" onClick={() => handleDeleteApiKey(key.id)}>
+                         Delete
+                       </Button>
+                     </div>
+                   ))
+                 )}
+               </div>
             </CardContent>
           </Card>
         </TabsContent>

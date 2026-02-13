@@ -96,11 +96,11 @@ export default function TeamsPage() {
               <p className="text-muted-foreground text-sm">No teams yet.</p>
             ) : (
               <div className="space-y-2">
-                {teams.map((team) => (
+                {teams.map((team, index) => (
                   <button
                     key={team.id}
                     onClick={() => handleSelectTeam(team)}
-                    className={`w-full p-3 text-left border rounded-lg transition-all ${
+                    className={`w-full p-3 text-left border rounded-lg transition-all animate-stagger-${Math.min(index + 1, 5)} ${
                       selectedTeam?.id === team.id 
                         ? "border-primary bg-primary/5" 
                         : "border-border hover:border-primary/50"

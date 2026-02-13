@@ -1,7 +1,9 @@
 import {
-    createBrowserRouter, Navigate
+    createBrowserRouter, Navigate, useNavigate
 } from "react-router-dom";
+import { useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { api } from "@/lib/api";
 import { MainLayout } from "@/components/layout/MainLayout";
 import LoginPage from "@/pages/auth/LoginPage";
 import SetupPage from "@/pages/auth/SetupPage";
@@ -11,6 +13,30 @@ import SettingsPage from "@/pages/settings/SettingsPage";
 import ProfilePage from "@/pages/profile/ProfilePage";
 import TeamsPage from "@/pages/settings/TeamsPage";
 import NotificationsPage from "@/pages/settings/NotificationsPage";
+import AgentsPage from "@/pages/AgentsPage";
+
+// Health check component to redirect based on backend status
+function HealthCheckRoute({
+    children,
+}: { children: React.ReactNode }) {
+    const navigate = useNavigate();
+    useEffect(() => {
+        const checkHealth = async () => {
+            try {
+                const health = await api.healthCheck();
+                if (health.setup_required) {
+                    navigate("/setup", { replace: true });
+                }
+            } catch (err) {
+                // Backend unreachable, redirect to login
+                navigate("/login", { replace: true });
+            }
+        };
+        checkHealth();
+    }, [navigate]);
+
+    return <>{children}</>;
+}
 
 // Protected route wrapper
 function ProtectedRoute({
@@ -69,9 +95,11 @@ const router = createBrowserRouter([
     // Public routes (no auth required)
         path:    `/login`,
         element: (
-            <PublicRoute>
-                <LoginPage />
-            </PublicRoute>
+            <HealthCheckRoute>
+                <PublicRoute>
+                    <LoginPage />
+                </PublicRoute>
+            </HealthCheckRoute>
         ),
     },
     {
@@ -103,6 +131,14 @@ const router = createBrowserRouter([
                 element: <DashboardPage />,
             },
             {
+                path:    `/notifications`,
+                element: <NotificationsPage />,
+            },
+            {
+                path:    `/agents`,
+                element: <AgentsPage />,
+            },
+            {
                 path:    `/profile`,
                 element: <ProfilePage />,
             },
@@ -121,15 +157,6 @@ const router = createBrowserRouter([
             {
                 path:    `/settings/notifications`,
                 element: <NotificationsPage />,
-            },
-            {
-                path:    `/settings/ai`,
-                element: (
-                    <div className="space-y-4">
-                        <h1 className="text-2xl font-semibold">AI Providers</h1>
-                        <p className="text-muted-foreground">AI provider configuration coming soon.</p>
-                    </div>
-                ),
             },
             {
                 path:    `/settings/import-export`,

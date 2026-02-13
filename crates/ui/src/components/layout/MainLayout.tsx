@@ -3,6 +3,7 @@ import { Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/hooks/useTheme";
 import { Sidebar } from "./Sidebar";
+import { HealthStatusIndicator } from "@/components/health/HealthStatusIndicator";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -87,6 +88,9 @@ export function MainLayout() {
 
             {/* Right Side Actions */}
             <div className="flex items-center gap-2">
+              {/* Health Status */}
+              <HealthStatusIndicator />
+
               {/* Theme Toggle */}
               <Button variant="ghost" size="icon" onClick={cycleTheme} className="hidden sm:flex" title={`Current: ${theme}`}>
                 <Sun className="w-4 h-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
@@ -143,7 +147,7 @@ export function MainLayout() {
 
         {/* Page Content */}
         <main className="flex-1 overflow-auto">
-          <div className="container mx-auto p-6 max-w-7xl">
+          <div className="container mx-auto p-6 max-w-7xl animate-fade-in">
             <Outlet />
           </div>
         </main>
