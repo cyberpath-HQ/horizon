@@ -10,7 +10,7 @@ use entity::{
 };
 use error::{AppError, Result};
 use sea_orm::{ActiveModelTrait, ColumnTrait, Condition, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set};
-use tracing::{debug, info};
+use tracing::debug;
 use auth::{
     permissions::{Permission, UserAction},
     roles::{assign_role_to_user, get_user_roles},
