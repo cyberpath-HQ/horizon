@@ -40,10 +40,13 @@ impl ErrorHandler {
     pub fn to_response(&self, err: &AppError) -> Response {
         let status = err.status();
         let code = err.code();
-        let message = if self.include_details {
+        
+        // Always show details for validation errors - users need to know what went wrong
+        let show_details = self.include_details || matches!(err, AppError::Validation { .. });
+        
+        let message = if show_details {
             err.message()
-        }
-        else {
+        } else {
             match status {
                 StatusCode::INTERNAL_SERVER_ERROR => "Internal server error".to_string(),
                 StatusCode::NOT_FOUND => "Resource not found".to_string(),
@@ -51,6 +54,7 @@ impl ErrorHandler {
                 StatusCode::UNAUTHORIZED => "Unauthorized".to_string(),
                 StatusCode::FORBIDDEN => "Forbidden".to_string(),
                 StatusCode::TOO_MANY_REQUESTS => "Rate limit exceeded".to_string(),
+                StatusCode::UNPROCESSABLE_ENTITY => "Validation error".to_string(),
                 _ => "An error occurred".to_string(),
             }
         };
