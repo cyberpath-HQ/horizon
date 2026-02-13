@@ -441,6 +441,135 @@ class ApiClient {
     async healthCheck(): Promise<any> {
         return fetch(`${ this.baseUrl }/health`).then(async(res) => res.json());
     }
+
+    // Session management
+    async getSessions(): Promise<any> {
+        return this.request<any>(`/api/v1/auth/sessions`, {
+            method: `GET`,
+        });
+    }
+
+    async deleteSession(sessionId: string): Promise<SuccessResponse> {
+        return this.request<SuccessResponse>(`/api/v1/auth/sessions/${ sessionId }`, {
+            method: `DELETE`,
+        });
+    }
+
+    async deleteAllSessions(): Promise<SuccessResponse> {
+        return this.request<SuccessResponse>(`/api/v1/auth/sessions`, {
+            method: `DELETE`,
+        });
+    }
+
+    // MFA
+    async regenerateBackupCodes(password: string): Promise<any> {
+        return this.request<any>(`/api/v1/auth/mfa/regenerate-backup-codes`, {
+            method: `POST`,
+            body: JSON.stringify({
+                password,
+            }),
+        });
+    }
+
+    // User management
+    async createUser(data: { email: string
+        password?:                       string
+        first_name?:                     string
+        last_name?:                      string
+        role?:                           string }): Promise<any> {
+        return this.request<any>(`/api/v1/users`, {
+            method: `POST`,
+            body:   JSON.stringify(data),
+        });
+    }
+
+    async listUsers(query?: { page?: number
+        per_page?:                  number
+        search?:                    string }): Promise<any> {
+        const params = new URLSearchParams();
+        if (query?.page) params.append(`page`, String(query.page));
+        if (query?.per_page) params.append(`per_page`, String(query.per_page));
+        if (query?.search) params.append(`search`, query.search);
+        const response = await this.request<{ success: boolean
+            users:                                   Array<any>
+            pagination:                              any }>(`/api/v1/users?${ params }`, {
+            method: `GET`,
+        });
+        return {
+            items:      response.users,
+            pagination: response.pagination,
+        };
+    }
+
+    // Team management - additional methods
+    async getTeam(teamId: string): Promise<any> {
+        return this.request<any>(`/api/v1/teams/${ teamId }`, {
+            method: `GET`,
+        });
+    }
+
+    async updateTeam(teamId: string, data: { name?: string
+        description?:                     string }): Promise<any> {
+        return this.request<any>(`/api/v1/teams/${ teamId }`, {
+            method: `PUT`,
+            body:   JSON.stringify(data),
+        });
+    }
+
+    async deleteTeam(teamId: string): Promise<SuccessResponse> {
+        return this.request<SuccessResponse>(`/api/v1/teams/${ teamId }`, {
+            method: `DELETE`,
+        });
+    }
+
+    async addTeamMember(teamId: string, data: { user_id: string
+        role?:                 string }): Promise<any> {
+        return this.request<any>(`/api/v1/teams/${ teamId }/members`, {
+            method: `POST`,
+            body:   JSON.stringify(data),
+        });
+    }
+
+    async updateTeamMember(teamId: string, memberId: string, data: { role: string }): Promise<any> {
+        return this.request<any>(`/api/v1/teams/${ teamId }/members/${ memberId }`, {
+            method: `PUT`,
+            body:   JSON.stringify(data),
+        });
+    }
+
+    async removeTeamMember(teamId: string, memberId: string): Promise<SuccessResponse> {
+        return this.request<SuccessResponse>(`/api/v1/teams/${ teamId }/members/${ memberId }`, {
+            method: `DELETE`,
+        });
+    }
+
+    // API Key management - additional methods
+    async getApiKey(id: string): Promise<any> {
+        return this.request<any>(`/api/v1/auth/api-keys/${ id }`, {
+            method: `GET`,
+        });
+    }
+
+    async rotateApiKey(id: string): Promise<any> {
+        return this.request<any>(`/api/v1/auth/api-keys/${ id }/rotate`, {
+            method: `POST`,
+        });
+    }
+
+    async updateApiKeyPermissions(id: string, permissions: Array<string>): Promise<any> {
+        return this.request<any>(`/api/v1/auth/api-keys/${ id }/permissions`, {
+            method: `PUT`,
+            body:   JSON.stringify({
+                permissions,
+            }),
+        });
+    }
+
+    async getApiKeyUsage(id: string): Promise<any> {
+        return this.request<any>(`/api/v1/auth/api-keys/${ id }/usage`, {
+            method: `GET`,
+        });
+    }
 }
 
 export const api = new ApiClient();
