@@ -16,12 +16,20 @@ pub struct MfaSetup {
 
 /// Generate MFA setup data for a user
 pub fn generate_mfa_setup(issuer: &str, email: &str) -> Result<MfaSetup> {
-    // Generate a random secret
-    let secret_obj = Secret::generate_secret();
-    let secret = secret_obj.to_string();
-    let secret_bytes = secret_obj
+    // Generate a random secret (20 bytes for standard TOTP)
+    let secret_bytes = Secret::generate_secret()
         .to_bytes()
         .map_err(|e| error::AppError::internal(format!("Failed to get secret bytes: {}", e)))?;
+
+    // Verify we have valid bytes
+    if secret_bytes.is_empty() {
+        return Err(error::AppError::internal("Generated secret is empty"));
+    }
+
+    // Create the encoded secret string (Base32)
+    let secret = Secret::Encoded(secret_bytes.clone())
+        .to_string()
+        .map_err(|e| error::AppError::internal(format!("Failed to encode secret: {}", e)))?;
 
     // Create TOTP instance
     let totp = TOTP::new(
