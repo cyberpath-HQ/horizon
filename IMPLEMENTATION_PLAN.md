@@ -307,6 +307,25 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
   auditing purposes.
 - ensure all api keys are linked to their creator user for accountability.
 
+#### B-09: MFA Enforcement and System Settings
+
+- Define system_settings table (id, key, value, description, updated_at)
+- Create settings for MFA enforcement (require_mfa: boolean)
+- Implement MFA enforcement check on login - redirect to MFA setup if required
+- Create dedicated MFA setup page for enforcement flow
+- Implement system settings API endpoints (GET/PUT /api/v1/settings)
+- Add middleware to check MFA enforcement before allowing access
+
+#### B-10: Module System
+
+- Define modules table (id, name, slug, description, is_enabled, version, created_at, updated_at)
+- Create Sea-ORM entity for modules
+- Pre-populate modules: assets, software, security, network, vulnerabilities, bia, vendors, notifications, agents, import_export
+- Implement module enable/disable endpoints (super-admin only)
+- Add middleware to check if module is enabled before processing API requests
+- Return module_disabled error with admin contact email when accessing disabled module via API
+- Hide disabled modules from UI navigation
+
 ---
 
 ### Group C: Web Frontend Foundation
@@ -466,6 +485,18 @@ Docker Compose with PostgreSQL, Redis, server, worker, web. Kubernetes manifests
 - Implement agent status tracking
 - Create agent dashboard in web UI
 - Implement real-time status updates via WebSocket
+
+#### E-07: Agent Module System
+
+- Define agent_modules table (id, name, slug, description, version, download_url, size, checksum, is_enabled)
+- Create Sea-ORM entity for agent_modules
+- Pre-populate agent modules: hardware, software, network, process, container
+- Implement agent module download endpoint (GET /api/v1/agents/modules/{id}/download)
+- Implement agent module list endpoint (GET /api/v1/agents/modules)
+- Admins and super-admins can download orchestrator and deploy modules
+- Orchestrator contacts backend to check for available modules
+- Orchestrator downloads modules from backend when deployed
+- Implement module deployment UI in web interface
 
 ---
 
