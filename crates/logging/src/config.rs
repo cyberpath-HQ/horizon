@@ -7,7 +7,7 @@ use std::path::PathBuf;
 
 use derivative::Derivative;
 use serde::{Deserialize, Serialize};
-use tracing_subscriber::{filter::Targets, fmt, prelude::*, Registry};
+use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter, Registry};
 
 /// Allowed crates in the Horizon project - only logs from these crates will be shown
 const ALLOWED_CRATES: &[&str] = &[
@@ -18,6 +18,9 @@ const ALLOWED_CRATES: &[&str] = &[
     "auth",
     "entity",
     "migration",
+    "sea_orm_migration",
+    "app",
+    "serve",
 ];
 
 /// Logging configuration structure.
@@ -66,35 +69,43 @@ impl LoggingConfig {
 
     /// Build the tracing subscriber from this configuration.
     pub fn build(&self) -> Box<dyn tracing::Subscriber + Send + Sync> {
-        let filter = self.build_filter();
+        let env_filter = self.build_env_filter();
 
         match self.format.as_str() {
-            "json" => self.build_json_subscriber(filter),
-            "compact" => self.build_compact_subscriber(filter),
-            _ => self.build_compact_subscriber(filter),
+            "json" => self.build_json_subscriber(env_filter),
+            "compact" => self.build_compact_subscriber(env_filter),
+            _ => self.build_compact_subscriber(env_filter),
         }
     }
 
-    /// Build a filter that only allows logs from Horizon project crates.
-    fn build_filter(&self) -> Targets {
-        let level: tracing::Level = self.level.parse().unwrap_or(tracing::Level::INFO);
-        let mut targets = Targets::new();
+    /// Build an EnvFilter that only allows logs from Horizon project crates.
+    /// This filters both tracing and log crate messages (including SQLx).
+    fn build_env_filter(&self) -> EnvFilter {
+        let level = self.level.parse().unwrap_or(tracing::Level::INFO);
+        let level_str = match level {
+            tracing::Level::TRACE => "trace",
+            tracing::Level::DEBUG => "debug",
+            tracing::Level::INFO => "info",
+            tracing::Level::WARN => "warn",
+            tracing::Level::ERROR => "error",
+        };
 
-        // Enable the specified level for all allowed crates
-        for crate_name in ALLOWED_CRATES {
-            targets = targets.with_target(*crate_name, level);
-        }
+        // Create filter that allows our crates and disables everything else
+        let allowed: Vec<String> = ALLOWED_CRATES
+            .iter()
+            .map(|c| format!("{}={}", c, level_str))
+            .collect();
 
-        // Optionally enable debug for specific targets if debug level is set
-        if level == tracing::Level::DEBUG || level == tracing::Level::TRACE {
-            targets = targets.with_default(level);
-        }
+        // Default to off for everything not in our crates
+        // This includes: sqlx, tokio, hyper, rustls, sea_orm, etc.
+        let filter_str = format!("{},off", allowed.join(","));
 
-        targets
+        // Always use our custom filter, ignore any RUST_LOG env var
+        EnvFilter::new(filter_str)
     }
 
     /// Build a JSON subscriber for production logging.
-    fn build_json_subscriber(&self, filter: Targets) -> Box<dyn tracing::Subscriber + Send + Sync> {
+    fn build_json_subscriber(&self, filter: EnvFilter) -> Box<dyn tracing::Subscriber + Send + Sync> {
         let subscriber = fmt::layer()
             .json()
             .with_timer(fmt::time::UtcTime::rfc_3339());
@@ -125,7 +136,7 @@ impl LoggingConfig {
     }
 
     /// Build a compact subscriber for testing.
-    fn build_compact_subscriber(&self, filter: Targets) -> Box<dyn tracing::Subscriber + Send + Sync> {
+    fn build_compact_subscriber(&self, filter: EnvFilter) -> Box<dyn tracing::Subscriber + Send + Sync> {
         let subscriber = fmt::layer()
             .compact()
             .with_timer(fmt::time::UtcTime::rfc_3339());
