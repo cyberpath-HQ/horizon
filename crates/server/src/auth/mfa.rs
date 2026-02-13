@@ -2,14 +2,26 @@
 //!
 //! HTTP request handlers for Multi-Factor Authentication endpoints.
 
-use std::sync::Arc;
+const REFRESH_TOKEN_TTL_SECONDS: u64 = 30 * 24 * 60 * 60;
 
+use auth::{
+    jwt::create_access_token,
+    mfa::{
+        deserialize_backup_codes,
+        generate_backup_codes,
+        generate_mfa_setup,
+        hash_backup_codes,
+        serialize_backup_codes,
+        verify_and_consume_backup_code,
+        verify_totp_code,
+    },
+    password::verify_password,
+};
 use axum::Json;
 use chrono::Utc;
-use entity::users::{Entity as UsersEntity, Model as UserModel};
+use entity::users::Entity as UsersEntity;
 use error::{AppError, Result};
-use serde::{Deserialize, Serialize};
-use totp_rs::{Secret, TOTP};
+use sea_orm::{ActiveModelTrait, EntityTrait, Set};
 use tracing::info;
 use validator::Validate;
 
