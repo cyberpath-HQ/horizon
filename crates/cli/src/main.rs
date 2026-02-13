@@ -52,6 +52,7 @@ enum Commands {
 
 #[tokio::main]
 async fn main() -> error::Result<()> {
+    dotenvy::dotenv().map_err(|e| anyhow::anyhow!("Failed to load .env file: {}", e))?;
     let cli = Cli::parse();
 
     // Initialize logging
