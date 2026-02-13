@@ -14,7 +14,7 @@ use entity::{
 };
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
 use chrono::{DateTime, FixedOffset, Utc};
-use tracing::{debug, info, warn};
+use tracing::{debug, warn};
 use axum::{extract::Request, Json};
 use validator::Validate;
 use error::{AppError, Result};
@@ -253,7 +253,54 @@ pub async fn login_handler_inner(
         let _ = active_model.update(&state.db).await;
     }
 
-    // Check MFA requirement
+    // Check if global MFA enforcement is enabled
+    let require_mfa = crate::settings::is_setting_enabled(state, "require_mfa").await.unwrap_or(false);
+
+    // If require_mfa is true and user hasn't set up MFA, return special response
+    if require_mfa && !user.mfa_enabled {
+        // Issue a short-lived MFA enforcement token
+        let mfa_token = create_access_token(
+            &crate::JwtConfig {
+                secret:             state.jwt_config.secret.clone(),
+                expiration_seconds: 300, // 5 minutes for MFA setup
+                issuer:             state.jwt_config.issuer.clone(),
+                audience:           state.jwt_config.audience.clone(),
+            },
+            &user.id,
+            &user.email,
+            &["mfa_required".to_string()],
+        )?;
+
+        debug!(user_id = %user.id, email = %req.email, "MFA enforcement required - user must set up MFA");
+
+        // Return a response indicating MFA setup is required
+        let user_response = AuthenticatedUser {
+            id:           user.id.clone(),
+            email:        user.email.clone(),
+            display_name: format!(
+                "{} {}",
+                user.first_name.clone().unwrap_or_default(),
+                user.last_name.clone().unwrap_or_default()
+            )
+            .trim()
+            .to_string(),
+            roles:        vec!["mfa_required".to_string()],
+        };
+
+        // Embed the MFA token as the access token, with no refresh token
+        return Ok(Json(AuthSuccessResponse {
+            success: false,
+            user:    user_response,
+            tokens:  Some(AuthTokens {
+                access_token:  mfa_token,
+                refresh_token: String::new(),
+                expires_in:    300,
+                token_type:    "MfaRequired".to_string(),
+            }),
+        }));
+    }
+
+    // Check MFA requirement (user has MFA enabled)
     if user.mfa_enabled {
         // Issue a short-lived MFA pending token
         let mfa_token = create_access_token(
@@ -268,7 +315,7 @@ pub async fn login_handler_inner(
             &["mfa_pending".to_string()],
         )?;
 
-        info!(user_id = %user.id, email = %req.email, "MFA verification required");
+        debug!(user_id = %user.id, email = %req.email, "MFA verification required");
 
         // Return a response indicating MFA is needed
         // We use AuthSuccessResponse with success=false and no tokens
@@ -363,7 +410,7 @@ pub async fn login_handler_inner(
         token_type:    "Bearer".to_string(),
     };
 
-    info!(user_id = %user_id, email = %req.email, "User logged in successfully");
+    debug!(user_id = %user_id, email = %req.email, "User logged in successfully");
 
     let user_response = AuthenticatedUser {
         id:           user_id,
@@ -413,7 +460,7 @@ pub async fn logout_handler_inner(state: &AppState, request: Request) -> Result<
 
     match delete_result {
         Ok(result) => {
-            tracing::info!(user_id = %user_id, deleted_count = result.rows_affected, "Deleted user sessions on logout");
+            tracing::debug!(user_id = %user_id, deleted_count = result.rows_affected, "Deleted user sessions on logout");
         },
         Err(e) => {
             tracing::warn!("Failed to delete user sessions on logout: {}", e);
@@ -529,7 +576,7 @@ pub async fn refresh_handler_inner(state: &AppState, req: RefreshRequest) -> Res
         roles:        user_roles,
     };
 
-    info!(user_id = %user_id_str, "Refresh token successfully used");
+    debug!(user_id = %user_id_str, "Refresh token successfully used");
 
     Ok(Json(AuthSuccessResponse {
         success: true,
