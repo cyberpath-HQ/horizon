@@ -12,6 +12,7 @@ import DashboardPage from "@/pages/DashboardPage";
 import SettingsPage from "@/pages/settings/SettingsPage";
 import ProfilePage from "@/pages/profile/ProfilePage";
 import TeamsPage from "@/pages/settings/TeamsPage";
+import UsersPage from "@/pages/settings/UsersPage";
 import NotificationsPage from "@/pages/settings/NotificationsPage";
 import AgentsPage from "@/pages/AgentsPage";
 
@@ -149,6 +150,10 @@ const router = createBrowserRouter([
             {
                 path:    `/settings/teams`,
                 element: <TeamsPage />,
+            },
+            {
+                path:    `/settings/users`,
+                element: <UsersPage />,
             },
             {
                 path:    `/settings/api-keys`,

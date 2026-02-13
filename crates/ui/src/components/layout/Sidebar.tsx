@@ -13,7 +13,8 @@ import {
     Bell,
     Database,
     Bot,
-    Workflow
+    Workflow,
+    User
 } from "lucide-react";
 
 interface NavItem {
@@ -77,6 +78,11 @@ const mainNavItems: Array<NavItem> = [
 ];
 
 const settingsNavItems: Array<NavItem> = [
+    {
+        title: `Users`,
+        href:  `/settings/users`,
+        icon:  User,
+    },
     {
         title: `Teams`,
         href:  `/settings/teams`,
