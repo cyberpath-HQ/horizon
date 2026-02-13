@@ -40,13 +40,14 @@ impl ErrorHandler {
     pub fn to_response(&self, err: &AppError) -> Response {
         let status = err.status();
         let code = err.code();
-        
+
         // Always show details for validation errors - users need to know what went wrong
         let show_details = self.include_details || matches!(err, AppError::Validation { .. });
-        
+
         let message = if show_details {
             err.message()
-        } else {
+        }
+        else {
             match status {
                 StatusCode::INTERNAL_SERVER_ERROR => "Internal server error".to_string(),
                 StatusCode::NOT_FOUND => "Resource not found".to_string(),
@@ -192,6 +193,17 @@ impl IntoResponse for AppError {
 // Implement axum's IntoResponse trait for AppError
 impl axum::response::IntoResponse for AppError {
     fn into_response(self) -> axum::response::Response {
+        // Log all errors for debugging
+        let error_msg = self.message();
+        let status = self.status();
+
+        if status == StatusCode::INTERNAL_SERVER_ERROR {
+            tracing::error!(code = %self.code(), "Internal server error: {}", error_msg);
+        }
+        else {
+            tracing::warn!(code = %self.code(), status = %status, "Request error: {}", error_msg);
+        }
+
         let handler = ErrorHandler::new(false);
         handler.to_response(&self)
     }
