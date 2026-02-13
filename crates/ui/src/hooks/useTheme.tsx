@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 
-type Theme = "light" | "dark" | "system";
+type Theme = "light" | "dark";
 
 interface ThemeContextType {
   theme: Theme;
@@ -15,39 +15,25 @@ function getSystemTheme(): "light" | "dark" {
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(() => {
+  // On first load, detect system preference if no stored theme
+  const getInitialTheme = (): Theme => {
     const stored = localStorage.getItem("horizon-theme");
-    return (stored as Theme) || "system";
-  });
+    if (stored === "light" || stored === "dark") {
+      return stored;
+    }
+    // First time - detect system and save the resolved theme
+    const systemTheme = getSystemTheme();
+    localStorage.setItem("horizon-theme", systemTheme);
+    return systemTheme;
+  };
   
-  const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">(() => {
-    if (theme === "system") return getSystemTheme();
-    return theme;
-  });
-
-  useEffect(() => {
-    const stored = localStorage.getItem("horizon-theme");
-    const currentTheme = (stored as Theme) || "system";
-    setThemeState(currentTheme);
-  }, []);
+  const [theme, setThemeState] = useState<Theme>(getInitialTheme);
+  const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">(() => theme);
 
   useEffect(() => {
     localStorage.setItem("horizon-theme", theme);
-    
-    const applyTheme = () => {
-      const resolved = theme === "system" ? getSystemTheme() : theme;
-      setResolvedTheme(resolved);
-      document.documentElement.classList.toggle("dark", resolved === "dark");
-    };
-
-    applyTheme();
-
-    if (theme === "system") {
-      const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-      const handler = () => applyTheme();
-      mediaQuery.addEventListener("change", handler);
-      return () => mediaQuery.removeEventListener("change", handler);
-    }
+    setResolvedTheme(theme);
+    document.documentElement.classList.toggle("dark", theme === "dark");
   }, [theme]);
 
   const setTheme = (newTheme: Theme) => {
