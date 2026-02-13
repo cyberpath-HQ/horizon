@@ -5,6 +5,7 @@
 pub mod codes;
 pub mod middleware;
 pub mod response;
+pub mod rejection;
 pub mod traits;
 
 pub use response::{ApiResponse, ApiResponseBuilder, PaginationMeta};
