@@ -16,6 +16,7 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryF
 use chrono::{DateTime, FixedOffset, Utc};
 use tracing::{info, warn};
 use axum::{extract::Request, Json};
+use validator::Validate;
 use error::{AppError, Result};
 
 use crate::{
@@ -45,6 +46,13 @@ fn to_utc_tz(utc_time: DateTime<Utc>) -> DateTime<FixedOffset> {
 /// This function doesn't use State extractor and accepts references to AppState.
 /// It's intended to be called by wrapper handlers that use State extractor.
 pub async fn setup_handler_inner(state: &AppState, req: SetupRequest) -> Result<Json<AuthSuccessResponse>> {
+    // Validate request
+    req.validate().map_err(|e| {
+        AppError::Validation {
+            message: e.to_string(),
+        }
+    })?;
+
     // Check if any users exist
     let count_result = UsersEntity::find().count(&state.db).await?;
     let user_exists = count_result > 0;
@@ -158,6 +166,13 @@ pub async fn login_handler_inner(
     req: LoginRequest,
     headers: axum::http::HeaderMap,
 ) -> Result<Json<AuthSuccessResponse>> {
+    // Validate request
+    req.validate().map_err(|e| {
+        AppError::Validation {
+            message: e.to_string(),
+        }
+    })?;
+
     // Find user by email
     let user_option = UsersEntity::find()
         .filter(Column::Email.eq(req.email.clone()))
