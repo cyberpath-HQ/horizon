@@ -74,8 +74,8 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/v1/auth/mfa/verify", post(mfa_verify_login_handler))
         .route("/api/v1/auth/mfa/verify-backup", post(mfa_verify_backup_code_handler));
 
-    // Health check route
-    let health_route = Router::new().route("/health", get(health_check_handler));
+    // Health check route - must be public and unauthenticated
+    let health_route = Router::new().route("/api/v1/health", get(health_check_handler));
 
     // Combine all routes
     let all_routes = public_routes
@@ -592,7 +592,7 @@ mod tests {
         };
 
         Router::new()
-            .route("/health", get(health_check_handler))
+            .route("/api/v1/health", get(health_check_handler))
             .with_state(state)
     }
 
