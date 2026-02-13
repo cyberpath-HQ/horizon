@@ -14,7 +14,7 @@ use error::Result;
 use redis::AsyncCommands;
 use tracing::error;
 
-use crate::{middleware::auth::AuthenticatedUser, AppState};
+use crate::{AppState, middleware::{auth::AuthenticatedUser, security_headers::CorsConfig}};
 
 /// Creates the API router with all routes
 ///
@@ -82,9 +82,13 @@ pub fn create_router(state: AppState) -> Router {
         .layer(Extension(state));
 
     // Apply rate limiting to all routes (ConnectInfo will be provided by the tower service)
-    all_routes.layer(middleware::from_fn(
-        crate::middleware::rate_limit::rate_limit_middleware,
-    ))
+    all_routes
+        .layer(middleware::from_fn(
+            crate::middleware::rate_limit::rate_limit_middleware,
+        ))
+        .layer(middleware::from_fn(|req, next| {
+            crate::middleware::security_headers::cors_middleware(req, next, CorsConfig::from_env())
+        }))
 }
 
 // ==================== AUTH HANDLERS ====================
