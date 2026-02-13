@@ -82,7 +82,9 @@ impl CorsConfig {
                 .map(|s| s.trim().to_string())
                 .collect(),
             exposed_headers:   std::env::var("HORIZON_CORS_EXPOSED_HEADERS")
-                .unwrap_or_else(|_| "X-RateLimit-Limit,X-RateLimit-Remaining,X-RateLimit-Reset,Retry-After,X-Request-ID".to_string())
+                .unwrap_or_else(|_| {
+                    "X-RateLimit-Limit,X-RateLimit-Remaining,X-RateLimit-Reset,Retry-After,X-Request-ID".to_string()
+                })
                 .split(',')
                 .map(|s| s.trim().to_string())
                 .collect(),
@@ -212,7 +214,10 @@ pub async fn security_headers_middleware(request: Request, next: Next, enable_tl
 /// Handles preflight (OPTIONS) requests automatically.
 pub async fn cors_middleware(request: Request, next: Next, config: CorsConfig) -> Response {
     let origin = get_request_origin(&request);
-    tracing::debug!("Request origin: {}", origin.clone().unwrap_or_else(|| "None".into()));
+    tracing::debug!(
+        "Request origin: {}",
+        origin.clone().unwrap_or_else(|| "None".into())
+    );
     tracing::debug!("CORS config: {:?}", config);
 
     // Handle preflight (OPTIONS) requests
