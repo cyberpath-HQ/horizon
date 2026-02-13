@@ -1,5 +1,7 @@
 import { useAuth } from "@/context/AuthContext";
+import { api } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   FolderKanban,
   Shield,
@@ -7,10 +9,46 @@ import {
   AlertTriangle,
   Activity,
   TrendingUp,
+  Server,
+  CheckCircle,
+  XCircle,
+  Loader2,
 } from "lucide-react";
+import { useEffect, useState } from "react";
+
+interface HealthStatus {
+  status: string;
+  database: string;
+  redis: string;
+  timestamp: string;
+}
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const [health, setHealth] = useState<HealthStatus | null>(null);
+  const [healthLoading, setHealthLoading] = useState(true);
+  const [healthError, setHealthError] = useState<string | null>(null);
+
+  const checkHealth = async () => {
+    try {
+      setHealthLoading(true);
+      const healthData = await api.healthCheck();
+      setHealth(healthData);
+      setHealthError(null);
+    } catch (err) {
+      setHealthError("Unable to connect to server");
+      setHealth(null);
+    } finally {
+      setHealthLoading(false);
+    }
+  };
+
+  // Check health on mount and then every 30 seconds
+  useEffect(() => {
+    checkHealth();
+    const interval = setInterval(checkHealth, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const stats = [
     {
@@ -45,6 +83,64 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      {/* Health Status Banner */}
+      <Card className={healthError ? "border-destructive" : health?.status === "healthy" ? "border-green-500" : "border-yellow-500"}>
+        <CardContent className="py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Server className="h-5 w-5" />
+              <div>
+                <p className="font-medium">System Status</p>
+                <p className="text-sm text-muted-foreground">
+                  {healthLoading ? (
+                    <span className="flex items-center gap-1">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Checking...
+                    </span>
+                  ) : healthError ? (
+                    <span className="text-destructive flex items-center gap-1">
+                      <XCircle className="h-3 w-3" />
+                      {healthError}
+                    </span>
+                  ) : health?.status === "healthy" ? (
+                    <span className="text-green-500 flex items-center gap-1">
+                      <CheckCircle className="h-3 w-3" />
+                      All systems operational
+                    </span>
+                  ) : (
+                    <span className="text-yellow-500 flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" />
+                      Systems degraded
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              {health && (
+                <>
+                  <span className="flex items-center gap-1">
+                    Database: 
+                    <span className={health.database === "healthy" ? "text-green-500" : "text-destructive"}>
+                      {health.database}
+                    </span>
+                  </span>
+                  <span className="flex items-center gap-1">
+                    Cache: 
+                    <span className={health.redis === "healthy" ? "text-green-500" : "text-destructive"}>
+                      {health.redis}
+                    </span>
+                  </span>
+                </>
+              )}
+              <Button variant="ghost" size="sm" onClick={checkHealth} disabled={healthLoading}>
+                <Activity className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Welcome Header */}
       <div className="flex flex-col gap-2">
         <h1 className="text-2xl font-semibold tracking-tight">

@@ -14,8 +14,9 @@ import { Label } from "@/components/ui/label";
 import {
     Tabs, TabsContent, TabsList, TabsTrigger
 } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
 import {
-    User, Shield, Key, Loader2, AlertCircle, CheckCircle, Monitor, Trash2, RefreshCw
+    User, Shield, Key, Loader2, AlertCircle, CheckCircle, Monitor, Trash2, RefreshCw, Bell
 } from "lucide-react";
 
 export default function ProfilePage() {
@@ -120,6 +121,21 @@ export default function ProfilePage() {
     const [
         sessionsLoading,
         setSessionsLoading,
+    ] = useState(false);
+
+    // Notification settings
+    const [
+        notificationSettings,
+        setNotificationSettings,
+    ] = useState({
+        email_alerts:    true,
+        security_alerts: true,
+        team_updates:    true,
+        weekly_digest:  true,
+    });
+    const [
+        savingNotifications,
+        setSavingNotifications,
     ] = useState(false);
 
     // Initialize active tab from localStorage
@@ -424,6 +440,35 @@ export default function ProfilePage() {
         }
     };
 
+    const handleNotificationSettingChange = async(key: keyof typeof notificationSettings) => {
+        const newSettings = {
+            ...notificationSettings,
+            [key]: !notificationSettings[key],
+        };
+        setNotificationSettings(newSettings);
+
+        // Save to backend
+        setSavingNotifications(true);
+        try {
+            await api.updateSetting(`notification_${ key }`, String(newSettings[key]));
+            setMessage({
+                type: `success`,
+                text: `Notification settings updated`,
+            });
+        }
+        catch (err: any) {
+            // Revert on error
+            setNotificationSettings(notificationSettings);
+            setMessage({
+                type: `error`,
+                text: err.message || `Failed to update notification settings`,
+            });
+        }
+        finally {
+            setSavingNotifications(false);
+        }
+    };
+
     return (
         <div className="space-y-6">
             <div>
@@ -664,6 +709,75 @@ export default function ProfilePage() {
                     ))}
                 </div>
               )}
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Bell className="w-5 h-5" />
+                                Notification Preferences
+                            </CardTitle>
+                            <CardDescription>
+                                Choose how you want to receive notifications.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="flex items-center justify-between">
+                                <div className="space-y-1">
+                                    <p className="font-medium">Email Notifications</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        Receive notifications via email.
+                                    </p>
+                                </div>
+                                <Switch
+                                    checked={notificationSettings.email_alerts}
+                                    onCheckedChange={() => handleNotificationSettingChange(`email_alerts`)}
+                                    disabled={savingNotifications}
+                                />
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                                <div className="space-y-1">
+                                    <p className="font-medium">Security Alerts</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        Get notified about security events and login attempts.
+                                    </p>
+                                </div>
+                                <Switch
+                                    checked={notificationSettings.security_alerts}
+                                    onCheckedChange={() => handleNotificationSettingChange(`security_alerts`)}
+                                    disabled={savingNotifications}
+                                />
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                                <div className="space-y-1">
+                                    <p className="font-medium">Team Updates</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        Get notified about team member changes and invitations.
+                                    </p>
+                                </div>
+                                <Switch
+                                    checked={notificationSettings.team_updates}
+                                    onCheckedChange={() => handleNotificationSettingChange(`team_updates`)}
+                                    disabled={savingNotifications}
+                                />
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                                <div className="space-y-1">
+                                    <p className="font-medium">Weekly Digest</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        Receive a weekly summary of activities.
+                                    </p>
+                                </div>
+                                <Switch
+                                    checked={notificationSettings.weekly_digest}
+                                    onCheckedChange={() => handleNotificationSettingChange(`weekly_digest`)}
+                                    disabled={savingNotifications}
+                                />
+                            </div>
                         </CardContent>
                     </Card>
                 </TabsContent>

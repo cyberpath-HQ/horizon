@@ -29,6 +29,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { 
   Loader2, 
   Plus, 
@@ -39,7 +46,8 @@ import {
   Users,
   Shield,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  MoreHorizontal
 } from "lucide-react";
 
 export default function TeamsPage() {
@@ -144,6 +152,17 @@ export default function TeamsPage() {
       setAlert({ type: "success", title: "Success", message: "Member removed" });
     } catch (err: any) {
       setAlert({ type: "error", title: "Error", message: err.message || "Failed to remove member" });
+    }
+  };
+
+  const handleUpdateMemberRole = async (memberId: string, newRole: string) => {
+    if (!selectedTeam) return;
+    try {
+      await api.updateTeamMember(selectedTeam.id, memberId, { role: newRole });
+      loadTeamMembers(selectedTeam.id);
+      setAlert({ type: "success", title: "Success", message: "Member role updated" });
+    } catch (err: any) {
+      setAlert({ type: "error", title: "Error", message: err.message || "Failed to update member role" });
     }
   };
 
@@ -364,10 +383,45 @@ export default function TeamsPage() {
                 <div className="flex items-center justify-between">
                   <Label className="text-sm font-medium">Members</Label>
                   {!showAddMember && !editingTeam && (
-                    <Button variant="outline" size="sm" onClick={() => setShowAddMember(true)}>
-                      <UserPlus className="w-4 h-4 mr-1" />
-                      Add
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          <UserPlus className="w-4 h-4 mr-1" />
+                          Add Member
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-[300px]">
+                        <form onSubmit={handleAddMember} className="space-y-3 p-3">
+                          <div className="space-y-1">
+                            <Label className="text-xs">Email</Label>
+                            <Input
+                              value={newMemberEmail}
+                              onChange={(e) => setNewMemberEmail(e.target.value)}
+                              placeholder="user@example.com"
+                              required
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Role</Label>
+                            <Select value={newMemberRole} onValueChange={setNewMemberRole}>
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="member">Member</SelectItem>
+                                <SelectItem value="admin">Admin</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button type="submit" disabled={saving} size="sm" className="flex-1">
+                              {saving && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
+                              Add
+                            </Button>
+                          </div>
+                        </form>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   )}
                 </div>
 
@@ -428,9 +482,28 @@ export default function TeamsPage() {
                             <Shield className="h-4 w-4 text-muted-foreground" />
                           )}
                           {member.role !== "owner" && (
-                            <Button variant="ghost" size="sm" onClick={() => handleRemoveMember(member.id)}>
-                              <X className="w-4 h-4" />
-                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleUpdateMemberRole(member.id, "member")}>
+                                  <Badge variant="secondary" className="mr-2">Member</Badge>
+                                  Set as Member
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleUpdateMemberRole(member.id, "admin")}>
+                                  <Badge variant="default" className="mr-2">Admin</Badge>
+                                  Set as Admin
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => handleRemoveMember(member.id)} className="text-destructive focus:text-destructive">
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Remove Member
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           )}
                         </div>
                       </div>

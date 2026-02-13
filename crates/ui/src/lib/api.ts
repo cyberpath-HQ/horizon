@@ -517,6 +517,21 @@ class ApiClient {
         };
     }
 
+    async updateUser(userId: string, data: { role?: string
+        first_name?:                  string
+        last_name?:                   string }): Promise<any> {
+        return this.request<any>(`/api/v1/users/${ userId }`, {
+            method: `PUT`,
+            body:   JSON.stringify(data),
+        });
+    }
+
+    async deleteUser(userId: string): Promise<SuccessResponse> {
+        return this.request<SuccessResponse>(`/api/v1/users/${ userId }`, {
+            method: `DELETE`,
+        });
+    }
+
     // Team management - additional methods
     async getTeam(teamId: string): Promise<any> {
         return this.request<any>(`/api/v1/teams/${ teamId }`, {
@@ -584,6 +599,52 @@ class ApiClient {
     async getApiKeyUsage(id: string): Promise<any> {
         return this.request<any>(`/api/v1/auth/api-keys/${ id }/usage`, {
             method: `GET`,
+        });
+    }
+
+    // Settings endpoints
+    async getSettings(): Promise<{ settings: Array<{ id: string
+        key:          string
+        value:        string
+        description?: string
+        updated_at:   string }> }> {
+        return this.request<{ settings: Array<{ id: string
+            key:           string
+            value:         string
+            description?:  string
+            updated_at:    string }> }>(`/api/v1/settings`, {
+            method: `GET`,
+        });
+    }
+
+    async getSetting(key: string): Promise<{ id: string
+        key:         string
+        value:       string
+        description?: string
+        updated_at:  string }> {
+        return this.request<{ id: string
+            key:          string
+            value:        string
+            description?: string
+            updated_at:   string }>(`/api/v1/settings/${ key }`, {
+            method: `GET`,
+        });
+    }
+
+    async updateSetting(key: string, value: string): Promise<{ id: string
+        key:         string
+        value:       string
+        description?: string
+        updated_at:  string }> {
+        return this.request<{ id: string
+            key:          string
+            value:        string
+            description?: string
+            updated_at:   string }>(`/api/v1/settings/${ key }`, {
+            method: `PUT`,
+            body:   JSON.stringify({
+                value,
+            }),
         });
     }
 }

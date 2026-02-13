@@ -51,7 +51,14 @@ import {
     AlertTitle
 } from "@/components/ui/alert";
 import {
-    Loader2, UserPlus, Users, AlertCircle, CheckCircle
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
+import {
+    Loader2, UserPlus, Users, AlertCircle, CheckCircle, MoreHorizontal, Trash2
 } from "lucide-react";
 
 export default function UsersPage() {
@@ -106,6 +113,16 @@ export default function UsersPage() {
     ] = useState<{ type: `success` | `error`
         title:           string
         message:         string } | null>(null);
+
+    // Role update state
+    const [
+        updatingRole,
+        setUpdatingRole,
+    ] = useState<string | null>(null);
+    const [
+        deletingUser,
+        setDeletingUser,
+    ] = useState<string | null>(null);
 
     useEffect(() => {
         loadUsers();
@@ -175,6 +192,57 @@ export default function UsersPage() {
         }
         finally {
             setSaving(false);
+        }
+    };
+
+    const handleUpdateUserRole = async(userId: string, newRole: string) => {
+        setUpdatingRole(userId);
+        setAlert(null);
+        try {
+            await api.updateUser(userId, { role: newRole });
+            loadUsers();
+            setAlert({
+                type:    `success`,
+                title:   `Success`,
+                message: `User role updated successfully`,
+            });
+        }
+        catch (err: any) {
+            setAlert({
+                type:    `error`,
+                title:   `Error`,
+                message: err.message || `Failed to update user role`,
+            });
+        }
+        finally {
+            setUpdatingRole(null);
+        }
+    };
+
+    const handleDeleteUser = async(userId: string) => {
+        if (!confirm(`Are you sure you want to delete this user? This action cannot be undone.`)) {
+            return;
+        }
+        setDeletingUser(userId);
+        setAlert(null);
+        try {
+            await api.deleteUser(userId);
+            loadUsers();
+            setAlert({
+                type:    `success`,
+                title:   `Success`,
+                message: `User deleted successfully`,
+            });
+        }
+        catch (err: any) {
+            setAlert({
+                type:    `error`,
+                title:   `Error`,
+                message: err.message || `Failed to delete user`,
+            });
+        }
+        finally {
+            setDeletingUser(null);
         }
     };
 
@@ -289,6 +357,7 @@ export default function UsersPage() {
                                     <SelectContent>
                                         <SelectItem value="user">User</SelectItem>
                                         <SelectItem value="admin">Admin</SelectItem>
+                                        <SelectItem value="super_admin">Super Admin</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -374,9 +443,35 @@ export default function UsersPage() {
                                     {user.email}
                                 </TableCell>
                                 <TableCell>
-                                    <Badge variant={user.role === `admin` ? `default` : `secondary`}>
-                                        {user.role || `user`}
-                                    </Badge>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" className="h-8 w-full justify-start gap-2 px-2">
+                                                <Badge variant={user.role === `admin` ? `default` : user.role === `super_admin` ? `destructive` : `secondary`}>
+                                                    {user.role || `user`}
+                                                </Badge>
+                                                <MoreHorizontal className="h-4 w-4 ml-auto" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="w-[160px]">
+                                            <DropdownMenuItem onClick={() => handleUpdateUserRole(user.id, `user`)} disabled={updatingRole === user.id}>
+                                                <Badge variant="secondary" className="mr-2">User</Badge>
+                                                Set as User
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => handleUpdateUserRole(user.id, `admin`)} disabled={updatingRole === user.id}>
+                                                <Badge variant="default" className="mr-2">Admin</Badge>
+                                                Set as Admin
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => handleUpdateUserRole(user.id, `super_admin`)} disabled={updatingRole === user.id}>
+                                                <Badge variant="destructive" className="mr-2">Super Admin</Badge>
+                                                Set as Super Admin
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem onClick={() => handleDeleteUser(user.id)} disabled={deletingUser === user.id} className="text-destructive focus:text-destructive">
+                                                <Trash2 className="h-4 w-4 mr-2" />
+                                                Delete User
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
                                 </TableCell>
                                 <TableCell className="text-muted-foreground text-sm">
                                     {user.created_at ? new Date(user.created_at).toLocaleDateString() : `—`}

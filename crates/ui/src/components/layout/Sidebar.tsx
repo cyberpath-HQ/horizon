@@ -101,9 +101,16 @@ export function Sidebar() {
     const { resolvedTheme } = useTheme();
 
     const isActive = (href: string) => {
+        // Exact match for root
         if (href === `/`) {
             return location.pathname === `/`;
         }
+        // For settings, use exact match or check if it's a sub-path
+        // /settings should only match exactly, not /settings/users or /settings/teams
+        if (href === `/settings`) {
+            return location.pathname === `/settings`;
+        }
+        // For other paths, use startsWith
         return location.pathname.startsWith(href);
     };
 
