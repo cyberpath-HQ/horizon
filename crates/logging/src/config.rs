@@ -81,6 +81,17 @@ impl LoggingConfig {
     /// Build an EnvFilter that only allows logs from Horizon project crates.
     /// This filters both tracing and log crate messages (including SQLx).
     fn build_env_filter(&self) -> EnvFilter {
+        // If RUST_LOG is explicitly set, try to use it but ensure we filter out external deps
+        if let Ok(rust_log) = std::env::var("RUST_LOG") {
+            // Try to parse the RUST_LOG value and add filtering for external dependencies
+            // This respects user-provided granular settings like "auth=debug,server=info"
+            let filter_str = format!("{},off", rust_log);
+            if let Ok(filter) = EnvFilter::try_new(&filter_str) {
+                return filter;
+            }
+        }
+
+        // Fall back to default level if RUST_LOG is not set or invalid
         let level = self.level.parse().unwrap_or(tracing::Level::INFO);
         let level_str = match level {
             tracing::Level::TRACE => "trace",
@@ -100,7 +111,7 @@ impl LoggingConfig {
         // This includes: sqlx, tokio, hyper, rustls, sea_orm, etc.
         let filter_str = format!("{},off", allowed.join(","));
 
-        // Always use our custom filter, ignore any RUST_LOG env var
+        // Use our custom filter with default level
         EnvFilter::new(filter_str)
     }
 
