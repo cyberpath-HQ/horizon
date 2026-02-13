@@ -77,7 +77,7 @@ impl LoggingConfig {
     /// Build an EnvFilter that only allows logs from Horizon project crates.
     /// This filters both tracing and log crate messages (including SQLx).
     fn build_env_filter(&self) -> EnvFilter {
-        // Fall back to default level if RUST_LOG is not set or invalid
+        // Use the level from CLI argument/config, not RUST_LOG env var
         let level = self.level.parse().unwrap_or(tracing::Level::INFO);
         let level_str = match level {
             tracing::Level::TRACE => "trace",
@@ -85,7 +85,10 @@ impl LoggingConfig {
             tracing::Level::INFO => "info",
             tracing::Level::WARN => "warn",
             tracing::Level::ERROR => "error",
-        };        
+        };
+
+        // Only show logs from Horizon crates at the specified level
+        // Silence all external dependencies (sqlx, tower, hyper, etc.)
         let allowed: Vec<String> = ALLOWED_CRATES
             .iter()
             .map(|c| format!("{}={}", c, level_str))
@@ -93,7 +96,7 @@ impl LoggingConfig {
 
         let filter_str = format!("{},off", allowed.join(","));
 
-        tracing::info!("Using default filter: {}", filter_str);
+        tracing::info!("Using log filter: {}", filter_str);
         EnvFilter::new(filter_str)
     }
 

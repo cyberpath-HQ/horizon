@@ -29,13 +29,7 @@ struct Cli {
     command: Commands,
 
     /// Log level (debug, info, warn, error)
-    #[arg(
-        short = 'L',
-        long,
-        env = "RUST_LOG",
-        default_value = "info",
-        global = true
-    )]
+    #[arg(short = 'L', long, default_value = "info", global = true)]
     log_level: String,
 
     /// Output format (json, compact)
