@@ -7,6 +7,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
+use base64::Engine;
 use jsonwebtoken::{EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 use error::AppError;
@@ -38,6 +39,9 @@ impl Default for JwtConfig {
             }
         });
 
+        // Auto-encode to Base64 if not already valid Base64
+        let secret = ensure_base64(&secret);
+
         Self {
             secret,
             expiration_seconds: 3600, // 1 hour
@@ -45,6 +49,21 @@ impl Default for JwtConfig {
             audience: "horizon-api".to_string(),
         }
     }
+}
+
+/// Ensure the secret is valid Base64, encode if it's plain text.
+fn ensure_base64(secret: &str) -> String {
+    // Try to decode as Base64 first - if it works and produces valid output, it's already Base64
+    if let Ok(decoded) = base64::engine::general_purpose::STANDARD.decode(secret) {
+        // Check if decoded result is at least 32 bytes (minimum for HS256)
+        if decoded.len() >= 32 && decoded.len() == secret.len() {
+            // Likely already Base64-encoded, return as-is
+            return secret.to_string();
+        }
+    }
+
+    // Not valid Base64 or too short after decode, encode the plain text
+    base64::engine::general_purpose::STANDARD.encode(secret.as_bytes())
 }
 
 use error::Result;
