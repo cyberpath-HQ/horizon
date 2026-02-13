@@ -22,7 +22,7 @@ use chrono::Utc;
 use entity::users::Entity as UsersEntity;
 use error::{AppError, Result};
 use sea_orm::{ActiveModelTrait, EntityTrait, Set};
-use tracing::info;
+use tracing::debug;
 use validator::Validate;
 
 use crate::{
@@ -107,7 +107,7 @@ pub async fn mfa_enable_handler(
         .await
         .map_err(|e| AppError::database(format!("Failed to update user MFA settings: {}", e)))?;
 
-    info!(user_id = %user.id, "MFA setup initiated, awaiting verification");
+    debug!(user_id = %user.id, "MFA setup initiated, awaiting verification");
 
     Ok(Json(MfaSetupResponse {
         success:        true,
@@ -180,7 +180,7 @@ pub async fn mfa_verify_setup_handler(
         .await
         .map_err(|e| AppError::database(format!("Failed to enable MFA: {}", e)))?;
 
-    info!(user_id = %user.id, "MFA successfully enabled");
+    debug!(user_id = %user.id, "MFA successfully enabled");
 
     Ok(Json(SuccessResponse {
         success: true,
@@ -272,7 +272,7 @@ pub async fn mfa_verify_login_handler(
         roles:        user_roles,
     };
 
-    info!(user_id = %db_user.id, "MFA verification successful, login complete");
+    debug!(user_id = %db_user.id, "MFA verification successful, login complete");
 
     Ok(Json(MfaVerifyResponse {
         success: true,
@@ -374,7 +374,7 @@ pub async fn mfa_verify_backup_code_handler(
         roles:        user_roles,
     };
 
-    info!(
+    debug!(
         user_id = %db_user.id,
         remaining_codes = remaining_codes.len(),
         "MFA backup code used successfully"
@@ -469,7 +469,7 @@ pub async fn mfa_disable_handler(
         .await
         .map_err(|e| AppError::database(format!("Failed to disable MFA: {}", e)))?;
 
-    info!(user_id = %user.id, "MFA disabled");
+    debug!(user_id = %user.id, "MFA disabled");
 
     Ok(Json(SuccessResponse {
         success: true,
@@ -540,7 +540,7 @@ pub async fn mfa_regenerate_backup_codes_handler(
         .map_err(|e| AppError::database(format!("Failed to update backup codes: {}", e)))?;
 
     let count = new_codes.len();
-    info!(user_id = %user.id, count, "Backup codes regenerated");
+    debug!(user_id = %user.id, count, "Backup codes regenerated");
 
     Ok(Json(MfaBackupCodesResponse {
         success: true,
@@ -577,6 +577,127 @@ pub async fn mfa_status_handler(state: &AppState, user: MiddlewareUser) -> Resul
     Ok(Json(MfaStatusResponse {
         mfa_enabled: db_user.mfa_enabled,
         backup_codes_remaining,
+    }))
+}
+
+/// Handle MFA setup when required by global policy
+///
+/// This endpoint is used when a user logs in and global MFA is enforced,
+/// but the user hasn't set up MFA yet. It:
+/// 1. Verifies the user's password
+/// 2. Generates MFA secret and backup codes
+/// 3. Verifies the TOTP code
+/// 4. Enables MFA for the user
+/// 5. Returns full authentication tokens
+///
+/// # Arguments
+///
+/// * `state` - Application state
+/// * `mfa_token` - Temporary token from login response (with mfa_required role)
+/// * `req` - MFA setup enforce request containing password and TOTP code
+///
+/// # Returns
+///
+/// MFA setup response with full authentication tokens
+pub async fn mfa_enforce_setup_handler(
+    state: &AppState,
+    mfa_token: &str,
+    req: crate::dto::mfa::MfaSetupEnforceRequest,
+) -> Result<Json<crate::dto::mfa::MfaSetupResponse>> {
+    // Validate request
+    req.validate().map_err(|e| {
+        AppError::Validation {
+            message: e.to_string(),
+        }
+    })?;
+
+    // Validate the MFA token (it's a short-lived JWT with special claims)
+    let claims = auth::jwt::validate_token(&state.jwt_config, mfa_token)?;
+
+    // Ensure this is an MFA required token (check for mfa_required role)
+    if !claims.roles.contains(&"mfa_required".to_string()) {
+        return Err(AppError::unauthorized("Invalid MFA enforcement token"));
+    }
+
+    // Find the user
+    let db_user = UsersEntity::find_by_id(&claims.sub)
+        .one(&state.db)
+        .await?
+        .ok_or_else(|| AppError::unauthorized("User not found"))?;
+
+    // Check if MFA is already enabled
+    if db_user.mfa_enabled {
+        return Err(AppError::conflict(
+            "MFA is already enabled for this account",
+        ));
+    }
+
+    // Verify current password
+    let password_secret = auth::secrecy::SecretString::from(req.password.clone());
+    verify_password(&password_secret, &db_user.password_hash)
+        .map_err(|_| AppError::unauthorized("Invalid password"))?;
+
+    // Generate MFA setup (secret, QR code, backup codes)
+    let setup = generate_mfa_setup(MFA_ISSUER, &db_user.email)
+        .map_err(|e| AppError::internal(format!("Failed to generate MFA setup: {}", e)))?;
+
+    // Verify the TOTP code before enabling
+    let is_valid = verify_totp_code(&setup.secret, &req.code, MFA_ISSUER, &db_user.email)
+        .map_err(|e| AppError::internal(format!("TOTP verification error: {}", e)))?;
+
+    if !is_valid {
+        return Err(AppError::unauthorized(
+            "Invalid verification code. Please try again with a new code from your authenticator app.",
+        ));
+    }
+
+    // Hash backup codes for storage
+    let hashed_codes = hash_backup_codes(&setup.backup_codes, &db_user.id);
+    let codes_json = serialize_backup_codes(&hashed_codes)
+        .map_err(|e| AppError::internal(format!("Failed to serialize backup codes: {}", e)))?;
+
+    // Enable MFA directly (user has verified the code)
+    let user_id = db_user.id.clone();
+    let user_email = db_user.email.clone();
+    let mut active_model: entity::users::ActiveModel = db_user.into();
+    let secret_clone = setup.secret.clone();
+    active_model.totp_secret = Set(Some(setup.secret));
+    active_model.backup_codes = Set(Some(codes_json));
+    active_model.mfa_enabled = Set(true);
+    active_model.updated_at = Set(Utc::now().naive_utc());
+    active_model
+        .update(&state.db)
+        .await
+        .map_err(|e| AppError::database(format!("Failed to enable MFA: {}", e)))?;
+
+    // Load actual user roles and generate full tokens
+    let user_roles = auth::roles::get_user_roles(&state.db, &user_id).await?;
+
+    let refresh_token_str = generate_refresh_token();
+    crate::refresh_tokens::create_refresh_token(
+        &state.db,
+        &user_id,
+        &refresh_token_str,
+        REFRESH_TOKEN_TTL_SECONDS,
+    )
+    .await?;
+
+    let _tokens = crate::dto::auth::AuthTokens {
+        access_token:  create_access_token(&state.jwt_config, &user_id, &user_email, &user_roles)?,
+        refresh_token: refresh_token_str,
+        expires_in:    state.jwt_config.expiration_seconds,
+        token_type:    "Bearer".to_string(),
+    };
+
+    debug!(user_id = %user_id, "MFA enforcement setup completed, full login issued");
+
+    // Return the setup response with success=true (indicating full login complete)
+    Ok(Json(crate::dto::mfa::MfaSetupResponse {
+        success:        true,
+        secret:         secret_clone,
+        otpauth_uri:    setup.otpauth_uri,
+        qr_code_base64: setup.qr_code_base64,
+        backup_codes:   setup.backup_codes,
     }))
 }
 
