@@ -4,7 +4,7 @@
 
 use entity::{roles::Entity as RolesEntity, sea_orm_active_enums::RoleScopeType, user_roles::Entity as UserRoleEntity};
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
-use tracing::{debug, info};
+use tracing::debug;
 use error::Result;
 use chrono;
 
@@ -130,7 +130,7 @@ pub async fn assign_role_to_user(
         }
     })?;
 
-    info!(
+    debug!(
         user_id = %user_id,
         role_name = %role.name,
         "Successfully assigned role to user"
