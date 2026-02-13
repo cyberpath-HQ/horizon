@@ -7,7 +7,7 @@ use axum::{extract::Path, Json};
 use entity::user_sessions::{Column, Entity as UserSessionsEntity};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde::Serialize;
-use tracing::info;
+use tracing::debug;
 use error::Result;
 
 use crate::middleware::auth::AuthenticatedUser;
@@ -57,7 +57,7 @@ pub async fn get_sessions_handler(
         })
         .collect();
 
-    info!(
+    debug!(
         user_id = %user_id,
         session_count = session_infos.len(),
         "Retrieved user sessions"
@@ -98,7 +98,7 @@ pub async fn delete_session_handler(
         .await
         .map_err(|e| error::AppError::database(format!("Failed to delete session: {}", e)))?;
 
-    info!(
+    debug!(
         user_id = %user_id,
         session_id = %session_id,
         "Session deleted"
@@ -124,7 +124,7 @@ pub async fn delete_all_sessions_handler(
         .await
         .map_err(|e| error::AppError::database(format!("Failed to delete sessions: {}", e)))?;
 
-    info!(
+    debug!(
         user_id = %user_id,
         deleted_count = delete_result.rows_affected,
         "All user sessions deleted"
