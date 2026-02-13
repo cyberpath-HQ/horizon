@@ -106,7 +106,7 @@ export default function UsersPage() {
     const [
         newRole,
         setNewRole,
-    ] = useState(`user`);
+    ] = useState(`viewer`);
     const [
         alert,
         setAlert,
@@ -168,13 +168,13 @@ export default function UsersPage() {
                 password:   newPassword,
                 first_name: newFirstName,
                 last_name:  newLastName,
-                role:       newRole,
+                role:       newRole || `viewer`,
             });
             setNewEmail(``);
             setNewPassword(``);
             setNewFirstName(``);
             setNewLastName(``);
-            setNewRole(`user`);
+            setNewRole(`viewer`);
             setIsCreateOpen(false);
             loadUsers();
             setAlert({
@@ -199,7 +199,9 @@ export default function UsersPage() {
         setUpdatingRole(userId);
         setAlert(null);
         try {
-            await api.updateUser(userId, { role: newRole });
+            await api.updateUser(userId, {
+                role: newRole,
+            });
             loadUsers();
             setAlert({
                 type:    `success`,
@@ -355,7 +357,8 @@ export default function UsersPage() {
                                         <SelectValue placeholder="Select role" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="user">User</SelectItem>
+                                        <SelectItem value="viewer">Viewer</SelectItem>
+                                        <SelectItem value="manager">Manager</SelectItem>
                                         <SelectItem value="admin">Admin</SelectItem>
                                         <SelectItem value="super_admin">Super Admin</SelectItem>
                                     </SelectContent>
@@ -421,6 +424,7 @@ export default function UsersPage() {
                             <TableHead>Email</TableHead>
                             <TableHead>Role</TableHead>
                             <TableHead>Created</TableHead>
+                            <TableHead className="max-w-5"></TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -443,38 +447,37 @@ export default function UsersPage() {
                                     {user.email}
                                 </TableCell>
                                 <TableCell>
+                                    <Badge variant={user.role === `admin` ? `default` : user.role === `super_admin` ? `destructive` : `secondary`}>
+                                        {user.role || `user`}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell className="text-muted-foreground text-sm">
+                                    {user.created_at ? new Date(user.created_at).toLocaleDateString() : `—`}
+                                </TableCell>
+                                <TableCell className="text-right max-w-5">
                                     <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button variant="ghost" className="h-8 w-full justify-start gap-2 px-2">
-                                                <Badge variant={user.role === `admin` ? `default` : user.role === `super_admin` ? `destructive` : `secondary`}>
-                                                    {user.role || `user`}
-                                                </Badge>
-                                                <MoreHorizontal className="h-4 w-4 ml-auto" />
+                                        <DropdownMenuTrigger>
+                                            <Button variant="ghost" className="size-8 px-2">
+                                                <MoreHorizontal className="h-4 w-4" />
                                             </Button>
                                         </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end" className="w-[160px]">
-                                            <DropdownMenuItem onClick={() => handleUpdateUserRole(user.id, `user`)} disabled={updatingRole === user.id}>
-                                                <Badge variant="secondary" className="mr-2">User</Badge>
+                                        <DropdownMenuContent align="end" className="max-w-[240px]">
+                                            <DropdownMenuItem onClick={async() => handleUpdateUserRole(user.id, `user`)} disabled={updatingRole === user.id}>
                                                 Set as User
                                             </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => handleUpdateUserRole(user.id, `admin`)} disabled={updatingRole === user.id}>
-                                                <Badge variant="default" className="mr-2">Admin</Badge>
+                                            <DropdownMenuItem onClick={async() => handleUpdateUserRole(user.id, `admin`)} disabled={updatingRole === user.id}>
                                                 Set as Admin
                                             </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => handleUpdateUserRole(user.id, `super_admin`)} disabled={updatingRole === user.id}>
-                                                <Badge variant="destructive" className="mr-2">Super Admin</Badge>
+                                            <DropdownMenuItem onClick={async() => handleUpdateUserRole(user.id, `super_admin`)} disabled={updatingRole === user.id}>
                                                 Set as Super Admin
                                             </DropdownMenuItem>
                                             <DropdownMenuSeparator />
-                                            <DropdownMenuItem onClick={() => handleDeleteUser(user.id)} disabled={deletingUser === user.id} className="text-destructive focus:text-destructive">
+                                            <DropdownMenuItem onClick={async() => handleDeleteUser(user.id)} disabled={deletingUser === user.id} className="text-destructive focus:text-destructive">
                                                 <Trash2 className="h-4 w-4 mr-2" />
                                                 Delete User
                                             </DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
-                                </TableCell>
-                                <TableCell className="text-muted-foreground text-sm">
-                                    {user.created_at ? new Date(user.created_at).toLocaleDateString() : `—`}
                                 </TableCell>
                             </TableRow>
                         ))}
