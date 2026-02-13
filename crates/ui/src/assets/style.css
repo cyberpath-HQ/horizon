@@ -248,3 +248,180 @@
     radial-gradient(ellipse at bottom left, oklch(0.6 0.1 180 / 0.08) 0%, transparent 50%),
     oklch(0.145 0 0);
 }
+
+/* ==================== ANIMATIONS ==================== */
+
+/* Staggered list item animations */
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 oklch(0.75 0.15 45 / 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 6px oklch(0.75 0.15 45 / 0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+/* Staggered animation classes */
+.animate-stagger-1 { animation: slideInUp 0.4s ease-out 0.05s both; }
+.animate-stagger-2 { animation: slideInUp 0.4s ease-out 0.1s both; }
+.animate-stagger-3 { animation: slideInUp 0.4s ease-out 0.15s both; }
+.animate-stagger-4 { animation: slideInUp 0.4s ease-out 0.2s both; }
+.animate-stagger-5 { animation: slideInUp 0.4s ease-out 0.25s both; }
+
+/* Fade in */
+.animate-fade-in { animation: fadeIn 0.5s ease-out; }
+.animate-fade-in-slow { animation: fadeIn 0.8s ease-out; }
+
+/* Slide left */
+.animate-slide-left { animation: slideInLeft 0.4s ease-out; }
+
+/* Pulse glow - for active elements */
+.animate-pulse-glow { animation: pulse-glow 2s infinite; }
+
+/* Shimmer loading effect */
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    oklch(0.97 0 0) 0%,
+    oklch(0.99 0 0) 50%,
+    oklch(0.97 0 0) 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}
+
+.dark .animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    oklch(0.2 0 0) 0%,
+    oklch(0.25 0 0) 50%,
+    oklch(0.2 0 0) 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* ==================== COMPONENT ANIMATIONS ==================== */
+
+/* Card entrance animation */
+.animate-card-enter {
+  animation: slideInUp 0.4s ease-out;
+}
+
+/* Button animations */
+.btn-hover-scale {
+  transition: all 150ms ease-out;
+}
+
+.btn-hover-scale:hover {
+  transform: scale(1.02);
+}
+
+.btn-hover-scale:active {
+  transform: scale(0.98);
+}
+
+/* Smooth transitions for all interactive elements */
+button, a, input, select, textarea {
+  transition: color 150ms ease-out, background-color 150ms ease-out, border-color 150ms ease-out;
+}
+
+/* Icon animations */
+.icon-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Sidebar animation on mobile */
+@keyframes slideInFromLeft {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.sidebar-mobile-enter {
+  animation: slideInFromLeft 0.3s ease-out;
+}
+
+/* Health indicator pulse */
+.health-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* Tab transitions */
+.tab-transition {
+  transition: all 200ms ease-in-out;
+}
+
+/* List item hover effect */
+.list-item-hover {
+  transition: all 150ms ease-out;
+}
+
+.list-item-hover:hover {
+  background-color: oklch(0.97 0 0);
+  transform: translateX(4px);
+}
+
+.dark .list-item-hover:hover {
+  background-color: oklch(0.25 0 0);
+  transform: translateX(4px);
+}
