@@ -358,11 +358,23 @@ pub async fn add_team_member_handler(
         ));
     }
 
-    // Verify the user to add exists
-    let target_user = UsersEntity::find_by_id(&req.user_id)
-        .one(&state.db)
-        .await?
-        .ok_or_else(|| AppError::not_found("User not found"))?;
+    // Verify the user to add exists (by user_id or email)
+    // Check if input looks like a UUID/user ID or an email
+    let target_user = if req.user_id.contains('@') {
+        // It's an email, look up by email
+        UsersEntity::find()
+            .filter(entity::users::Column::Email.eq(&req.user_id))
+            .one(&state.db)
+            .await?
+            .ok_or_else(|| AppError::not_found("User not found"))?
+    }
+    else {
+        // It's a user ID
+        UsersEntity::find_by_id(&req.user_id)
+            .one(&state.db)
+            .await?
+            .ok_or_else(|| AppError::not_found("User not found"))?
+    };
 
     // Parse role
     let role = parse_team_member_role(&req.role)?;
