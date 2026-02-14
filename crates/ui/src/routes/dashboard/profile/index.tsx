@@ -403,7 +403,7 @@ export default function ProfilePage() {
     const { data: profileData } = useProfile();
     const { data: mfaStatus } = useMfaStatus();
     const { data: apiKeysData } = useApiKeys();
-    const { data: sessionsData, isLoading: sessionsLoading } = useSessions();
+    const { data: sessionsData, isLoading: sessionsLoading, error: sessionsError } = useSessions();
 
     // Mutations
     const enableMfa = useEnableMfa();
@@ -899,14 +899,26 @@ export default function ProfilePage() {
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
-                            {sessionsLoading
-? (
-                                <div className="flex justify-center py-4">
-                                    <Loader2 className="w-6 h-6 animate-spin" />
+                            {sessionsLoading ? (
+                                <div className="flex justify-center py-8">
+                                    <motion.div 
+                                        animate={{ rotate: 360 }}
+                                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                                    >
+                                        <Loader2 className="w-8 h-8 text-primary" />
+                                    </motion.div>
                                 </div>
-                            )
-: (!sessions || sessions.length === 0)
-? (
+                            ) : sessionsError ? (
+                                <motion.div 
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    className="text-center py-8"
+                                >
+                                    <AlertCircle className="w-10 h-10 mx-auto text-destructive mb-2" />
+                                    <p className="text-destructive">Failed to load sessions</p>
+                                    <p className="text-xs text-muted-foreground mt-1">{String(sessionsError)}</p>
+                                </motion.div>
+                            ) : (!sessions || sessions.length === 0) ? (
                                 <div className="text-center py-6">
                                     <Monitor className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
                                     <p className="text-muted-foreground text-sm">No active sessions found.</p>
