@@ -70,6 +70,14 @@ pub struct MfaVerifyResponse {
     pub user:    Option<super::auth::AuthenticatedUser>,
 }
 
+/// Request to regenerate backup codes - requires password for authentication
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Validate)]
+pub struct MfaRegenerateBackupCodesRequest {
+    /// Current password for verification before regenerating backup codes
+    #[validate(length(min = 1, message = "Password is required"))]
+    pub password: String,
+}
+
 /// Response for regenerated backup codes
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct MfaBackupCodesResponse {
