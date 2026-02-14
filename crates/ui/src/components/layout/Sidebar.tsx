@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useRouter } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/hooks/useTheme";
@@ -10,7 +10,6 @@ import {
     Building2,
     Users,
     Settings,
-    Bell,
     Database,
     Bot,
     Workflow,
@@ -27,91 +26,87 @@ interface NavItem {
 const mainNavItems: Array<NavItem> = [
     {
         title: `Dashboard`,
-        href:  `/`,
+        href:  `/dashboard`,
         icon:  LayoutDashboard,
     },
     {
         title: `Assets`,
-        href:  `/assets`,
+        href:  `/dashboard/assets`,
         icon:  FolderKanban,
     },
     {
         title: `Software`,
-        href:  `/software`,
+        href:  `/dashboard/software`,
         icon:  Database,
     },
     {
         title: `Security`,
-        href:  `/security`,
+        href:  `/dashboard/security`,
         icon:  Shield,
     },
     {
         title: `Network`,
-        href:  `/network`,
+        href:  `/dashboard/network`,
         icon:  Network,
     },
     {
         title: `Vulnerabilities`,
-        href:  `/vulnerabilities`,
+        href:  `/dashboard/vulnerabilities`,
         icon:  Shield,
     },
     {
         title: ` BIA`,
-        href:  `/bia`,
+        href:  `/dashboard/bia`,
         icon:  Workflow,
     },
     {
         title: `Vendors`,
-        href:  `/vendors`,
+        href:  `/dashboard/vendors`,
         icon:  Building2,
     },
     {
         title: `Agents`,
-        href:  `/agents`,
+        href:  `/dashboard/agents`,
         icon:  Bot,
-    },
-    {
-        title: `Notifications`,
-        href:  `/notifications`,
-        icon:  Bell,
     },
 ];
 
 const settingsNavItems: Array<NavItem> = [
     {
         title: `Users`,
-        href:  `/settings/users`,
+        href:  `/dashboard/settings/users`,
         icon:  User,
     },
     {
         title: `Teams`,
-        href:  `/settings/teams`,
+        href:  `/dashboard/settings/teams`,
         icon:  Users,
     },
     {
         title: `Application`,
-        href:  `/settings`,
+        href:  `/dashboard/settings`,
         icon:  Settings,
     },
 ];
 
 export function Sidebar() {
-    const location = useLocation();
+    const router = useRouter();
     const { user } = useAuth();
     const { resolvedTheme } = useTheme();
 
     const isActive = (href: string) => {
-        // Exact match for root
-        if (href === `/`) {
-            return location.pathname === `/`;
+        const pathname = router.state.location.pathname;
+        // Exact match for dashboard root
+        if (href === `/dashboard`) {
+            return pathname === `/dashboard`;
         }
         // For settings, use exact match or check if it's a sub-path
-        // /settings should only match exactly, not /settings/users or /settings/teams
-        if (href === `/settings`) {
-            return location.pathname === `/settings`;
+        // /dashboard/settings should only match exactly, not /dashboard/settings/users or /dashboard/settings/teams
+        if (href === `/dashboard/settings`) {
+            return pathname === `/dashboard/settings`;
         }
         // For other paths, use startsWith
-        return location.pathname.startsWith(href);
+        return pathname.startsWith(href);
     };
 
     const logoSrc = resolvedTheme === "dark" ? "/logo-white.svg" : "/logo.svg";
@@ -119,7 +114,7 @@ export function Sidebar() {
     return (
         <div className="flex flex-col h-full w-64 border-r bg-card">
             {/* Logo */}
-            <Link to="/" className="flex items-center gap-3 px-6 py-5 border-b hover:bg-accent/50 transition-colors">
+            <Link to="/dashboard" className="flex items-center gap-3 px-6 py-5 border-b hover:bg-accent/50 transition-colors">
                 <img src={logoSrc} alt="Horizon" className="h-8 w-auto" />
             </Link>
 
@@ -173,7 +168,7 @@ export function Sidebar() {
             {/* User Info */}
             <div className="px-4 py-3 border-t">
                 <Link
-                    to="/profile"
+                    to="/dashboard/profile"
                     className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-accent transition-colors"
                 >
                     <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">

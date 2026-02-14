@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/hooks/useTheme";
 import { Sidebar } from "./Sidebar";
@@ -32,7 +32,7 @@ export function MainLayout() {
 
   const handleLogout = async () => {
     await logout();
-    navigate("/login");
+    navigate({ to: "/login" });
   };
 
   const cycleTheme = () => {
@@ -99,7 +99,7 @@ export function MainLayout() {
               </Button>
 
               {/* Notifications */}
-              <Button variant="ghost" size="icon" className="relative" onClick={() => navigate("/settings/notifications")}>
+              <Button variant="ghost" size="icon" className="relative" onClick={() => navigate({ to: "/dashboard/settings/notifications" })}>
                 <Bell className="w-4 h-4" />
                 <span className="absolute top-1 right-1 w-2 h-2 bg-destructive rounded-full" />
               </Button>
@@ -126,11 +126,11 @@ export function MainLayout() {
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => navigate("/profile")}>
+                  <DropdownMenuItem onClick={() => navigate({ to: "/dashboard/profile" })}>
                     <User className="mr-2 w-4 h-4" />
                     Profile
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate("/settings")}>
+                  <DropdownMenuItem onClick={() => navigate({ to: "/dashboard/settings" })}>
                     <Settings className="mr-2 w-4 h-4" />
                     Settings
                   </DropdownMenuItem>
