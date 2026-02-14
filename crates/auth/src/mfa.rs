@@ -3,7 +3,7 @@
 //! Multi-Factor Authentication utility functions using TOTP.
 
 use error::Result;
-use totp_rs::{Algorithm, TOTP};
+use totp_rs::{Algorithm, Secret, TOTP};
 
 /// MFA setup data
 #[derive(Debug, Clone)]
