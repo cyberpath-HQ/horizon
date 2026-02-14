@@ -30,6 +30,7 @@ use crate::{
         SuccessResponse,
     },
     refresh_tokens::{generate_refresh_token, revoke_refresh_token, validate_refresh_token},
+    settings::seed_default_settings,
     AppState,
 };
 
@@ -120,6 +121,9 @@ pub async fn setup_handler_inner(state: &AppState, req: SetupRequest) -> Result<
     .map_err(|e| AppError::database(format!("Failed to assign super_admin role: {}", e)))?;
 
     debug!(user_id = %created_user.id, email = %req.email, "Admin user created during setup");
+
+    // Seed default system settings
+    seed_default_settings(state).await?;
 
     let user = AuthenticatedUser {
         id:           created_user.id,
