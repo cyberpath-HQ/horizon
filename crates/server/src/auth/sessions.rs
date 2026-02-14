@@ -5,7 +5,7 @@
 
 use axum::{extract::Path, Json};
 use entity::user_sessions::{Column, Entity as UserSessionsEntity};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 use serde::Serialize;
 use tracing::debug;
 use error::Result;
@@ -15,8 +15,9 @@ use crate::middleware::auth::AuthenticatedUser;
 /// Response for session list
 #[derive(Debug, Serialize)]
 pub struct SessionsResponse {
-    pub success:  bool,
-    pub sessions: Vec<SessionInfo>,
+    pub success:         bool,
+    pub sessions:        Vec<SessionInfo>,
+    pub current_session: Option<String>,
 }
 
 /// Information about a single session
@@ -36,12 +37,16 @@ pub async fn get_sessions_handler(
 ) -> Result<Json<SessionsResponse>> {
     let user_id = authenticated_user.id.clone();
 
-    // Query all sessions for this user
+    // Query all sessions for this user, sorted by last_used_at descending (most recent first)
     let sessions = UserSessionsEntity::find()
         .filter(Column::UserId.eq(&user_id))
+        .order_by_desc(Column::LastUsedAt)
         .all(&state.db)
         .await
         .map_err(|e| error::AppError::database(format!("Failed to fetch sessions: {}", e)))?;
+
+    // Get the current session ID from the authenticated user if available
+    let current_session = sessions.first().map(|s| s.id.to_string());
 
     // Convert to response format
     let session_infos: Vec<SessionInfo> = sessions
@@ -64,8 +69,9 @@ pub async fn get_sessions_handler(
     );
 
     Ok(Json(SessionsResponse {
-        success:  true,
+        success: true,
         sessions: session_infos,
+        current_session,
     }))
 }
 
