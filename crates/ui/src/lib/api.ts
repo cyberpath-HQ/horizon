@@ -45,13 +45,16 @@ export interface SuccessResponse {
 }
 
 export interface ApiKey {
-    id:          string
-    name:        string
-    key?:        string
-    key_prefix:  string
-    created_at:  string
-    expires_at?: string
-    last_used?:  string
+    id:            string
+    name:          string
+    key?:          string
+    key_prefix:    string
+    permissions:   unknown
+    created_at:    string
+    expires_at?:   string
+    last_used_at?: string
+    last_used_ip?: string
+    user_id:       string
 }
 
 export interface Session {

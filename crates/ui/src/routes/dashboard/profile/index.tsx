@@ -12,9 +12,18 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import {
     User, Shield, Key, Loader2, AlertCircle, CheckCircle, Monitor, Trash2, Bell,
-    Copy, RefreshCw, Smartphone, ShieldAlert, ShieldCheck, Eye, EyeOff, LogOut, X
+    Copy, RefreshCw, Smartphone, ShieldAlert, ShieldCheck, Eye, EyeOff, LogOut, X,
+    Clock, Globe, Settings
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { Badge } from "@/components/ui/badge";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import {
     useProfile,
     useUpdateProfile,
@@ -23,6 +32,8 @@ import {
     useCreateApiKey,
     useDeleteApiKey,
     useRotateApiKey,
+    useUpdateApiKeyPermissions,
+    useApiKeyUsage,
     useSessions,
     useDeleteSession,
     useDeleteAllSessions,
@@ -388,6 +399,170 @@ function CreateApiKeyForm({ onSuccess }: { onSuccess: (key: string) => void }) {
     );
 }
 
+// API Key Details Dialog Component
+function ApiKeyDetailsDialog({ keyId, onClose }: { keyId: string; onClose: () => void }) {
+    const { data: apiKeysData } = useApiKeys();
+    const { data: usageData, isLoading: usageLoading } = useApiKeyUsage(keyId);
+    const updatePermissions = useUpdateApiKeyPermissions();
+
+    const apiKey = apiKeysData?.items.find((k) => k.id === keyId);
+    const [editingPermissions, setEditingPermissions] = useState(false);
+    const [permissions, setPermissions] = useState<string[]>([]);
+
+    useEffect(() => {
+        if (apiKey?.permissions) {
+            const perms = apiKey.permissions as Record<string, boolean>;
+            setPermissions(Object.keys(perms).filter((p) => perms[p]));
+        }
+    }, [apiKey]);
+
+    const handleSavePermissions = async() => {
+        try {
+            await updatePermissions.mutateAsync({
+                id: keyId,
+                permissions,
+            });
+            setEditingPermissions(false);
+        }
+        catch (err) {
+            console.error("Failed to update permissions:", err);
+        }
+    };
+
+    if (!apiKey) {
+        return <div className="p-4">Loading...</div>;
+    }
+
+    return (
+        <div className="space-y-6">
+            {/* Key Info */}
+            <div className="p-4 bg-muted/50 rounded-xl">
+                <div className="flex items-center gap-3 mb-3">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+                        <Key className="w-6 h-6 text-primary" />
+                    </div>
+                    <div>
+                        <h3 className="font-semibold text-lg">{apiKey.name}</h3>
+                        <p className="text-sm text-muted-foreground font-mono">{apiKey.key_prefix}...</p>
+                    </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <p className="text-muted-foreground">Created</p>
+                        <p>{new Date(apiKey.created_at).toLocaleString()}</p>
+                    </div>
+                    {apiKey.expires_at && (
+                        <div>
+                            <p className="text-muted-foreground">Expires</p>
+                            <p className="text-amber-600">{new Date(apiKey.expires_at).toLocaleString()}</p>
+                        </div>
+                    )}
+                    {apiKey.last_used_at && (
+                        <div>
+                            <p className="text-muted-foreground">Last Used</p>
+                            <p>{new Date(apiKey.last_used_at).toLocaleString()}</p>
+                        </div>
+                    )}
+                    {apiKey.last_used_ip && (
+                        <div>
+                            <p className="text-muted-foreground">Last IP</p>
+                            <p className="font-mono">{apiKey.last_used_ip}</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Permissions */}
+            <div>
+                <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-medium flex items-center gap-2">
+                        <Shield className="w-4 h-4" />
+                        Permissions
+                    </h4>
+                    {!editingPermissions && (
+                        <Button variant="outline" size="sm" onClick={() => setEditingPermissions(true)}>
+                            Edit
+                        </Button>
+                    )}
+                </div>
+                {editingPermissions ? (
+                    <div className="space-y-2">
+                        <div className="flex flex-wrap gap-2">
+                            {[`read:assets`, `write:assets`, `read:users`, `write:users`, `admin`].map((perm) => (
+                                <Badge
+                                    key={perm}
+                                    variant={permissions.includes(perm) ? `default` : `outline`}
+                                    className="cursor-pointer"
+                                    onClick={() => {
+                                        setPermissions((prev) => prev.includes(perm) ? prev.filter((p) => p !== perm) : [...prev, perm]);
+                                    }}
+                                >
+                                    {perm}
+                                </Badge>
+                            ))}
+                        </div>
+                        <div className="flex gap-2">
+                            <Button size="sm" onClick={handleSavePermissions} disabled={updatePermissions.isPending}>
+                                {updatePermissions.isPending && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
+                                Save
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => setEditingPermissions(false)}>
+                                Cancel
+                            </Button>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="flex flex-wrap gap-2">
+                        {permissions.length > 0 ? (
+                            permissions.map((perm) => (
+                                <Badge key={perm} variant="secondary">
+                                    {perm}
+                                </Badge>
+                            ))
+                        ) : (
+                            <p className="text-sm text-muted-foreground">No specific permissions granted</p>
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {/* Usage History */}
+            <div>
+                <h4 className="font-medium flex items-center gap-2 mb-3">
+                    <Clock className="w-4 h-4" />
+                    Usage History
+                </h4>
+                {usageLoading ? (
+                    <div className="flex items-center justify-center p-4">
+                        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                    </div>
+                ) : usageData?.usage && usageData.usage.length > 0 ? (
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                        {usageData.usage.map((entry: { id: string; timestamp: string; ip_address: string; endpoint: string }) => (
+                            <div key={entry.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg text-sm">
+                                <div className="flex items-center gap-3">
+                                    <Globe className="w-4 h-4 text-muted-foreground" />
+                                    <span className="font-mono text-xs">{entry.endpoint}</span>
+                                </div>
+                                <div className="flex items-center gap-3 text-muted-foreground">
+                                    <span className="font-mono text-xs">{entry.ip_address}</span>
+                                    <span>{new Date(entry.timestamp).toLocaleString()}</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <p className="text-sm text-muted-foreground">No usage history available</p>
+                )}
+            </div>
+
+            <div className="flex justify-end">
+                <Button onClick={onClose}>Close</Button>
+            </div>
+        </div>
+    );
+}
+
 export default function ProfilePage() {
     // Get tab from search params
     const search = useSearch({ from: "/dashboard/profile/" });
@@ -430,6 +605,8 @@ export default function ProfilePage() {
     // API Keys
     const [newApiKey, setNewApiKey] = useState(``);
     const [showApiKey, setShowApiKey] = useState(false);
+    const [selectedApiKeyId, setSelectedApiKeyId] = useState<string | null>(null);
+    const [showApiKeyDetails, setShowApiKeyDetails] = useState(false);
 
     // Notification settings
     const [notificationSettings, setNotificationSettings] = useState({
@@ -569,6 +746,11 @@ export default function ProfilePage() {
             const error = err as { message?: string };
             setMessage({ type: `error`, text: error.message || `Failed to rotate API key` });
         }
+    };
+
+    const handleViewApiKeyDetails = (keyId: string) => {
+        setSelectedApiKeyId(keyId);
+        setShowApiKeyDetails(true);
     };
 
     const handleDeleteSession = async(sessionId: string) => {
@@ -1108,30 +1290,68 @@ export default function ProfilePage() {
                                         <p className="text-muted-foreground text-sm">No API keys yet.</p>
                                         <p className="text-xs text-muted-foreground mt-1">Create an API key to access the platform programmatically.</p>
                                     </div>
-                                )
+)
 : (
                                     apiKeys.map((key) => (
-                                        <div key={key.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/50 transition-colors">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                                                    <Key className="w-5 h-5 text-primary" />
+                                        <motion.div
+                                            key={key.id}
+                                            initial={{ opacity: 0, y: 5 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            className="flex items-center justify-between p-4 border rounded-xl hover:bg-accent/50 transition-all duration-200 group"
+                                        >
+                                            <div className="flex items-center gap-4 flex-1">
+                                                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center shadow-sm">
+                                                    <Key className="w-6 h-6 text-primary" />
                                                 </div>
-                                                <div>
-                                                    <p className="font-medium">{key.name}</p>
-                                                    <p className="text-xs text-muted-foreground">
-                                                        <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">{key.key_prefix}...</span>
-                                                        {` • Created ${ new Date(key.created_at).toLocaleDateString() }`}
-                                                        {key.expires_at && ` • Expires ${ new Date(key.expires_at).toLocaleDateString() }`}
-                                                    </p>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="font-semibold text-foreground">{key.name}</p>
+                                                        {key.last_used_at && (
+                                                            <Badge variant="outline" className="text-xs gap-1">
+                                                                <Clock className="w-3 h-3" />
+                                                                Recently used
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                                                        <span className="font-mono bg-muted px-2 py-1 rounded-md">{key.key_prefix}...</span>
+                                                        <span>•</span>
+                                                        <span>Created {new Date(key.created_at).toLocaleDateString()}</span>
+                                                        {key.expires_at && (
+                                                            <>
+                                                                <span>•</span>
+                                                                <span className="text-amber-600 dark:text-amber-400">Expires {new Date(key.expires_at).toLocaleDateString()}</span>
+                                                            </>
+                                                        )}
+                                                        {key.last_used_ip && (
+                                                            <>
+                                                                <span>•</span>
+                                                                <span className="flex items-center gap-1">
+                                                                    <Globe className="w-3 h-3" />
+                                                                    {key.last_used_ip}
+                                                                </span>
+                                                            </>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <div className="flex gap-1">
+                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => handleViewApiKeyDetails(key.id)}
+                                                    title="View API key details"
+                                                    className="text-muted-foreground hover:text-foreground"
+                                                >
+                                                    <Settings className="w-4 h-4" />
+                                                </Button>
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
                                                     onClick={() => handleRotateApiKey(key.id)}
                                                     disabled={rotateApiKey.isPending}
                                                     title="Rotate API key"
+                                                    className="text-muted-foreground hover:text-foreground"
                                                 >
                                                     {rotateApiKey.isPending
 ? (
@@ -1141,9 +1361,9 @@ export default function ProfilePage() {
                                                         <RefreshCw className="w-4 h-4" />
                                                     )}
                                                 </Button>
-                                                <Button 
-                                                    variant="ghost" 
-                                                    size="sm" 
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
                                                     onClick={() => handleDeleteApiKey(key.id)}
                                                     title="Delete API key"
                                                     className="text-destructive hover:text-destructive"
@@ -1151,10 +1371,31 @@ export default function ProfilePage() {
                                                     <Trash2 className="w-4 h-4" />
                                                 </Button>
                                             </div>
-                                        </div>
+                                        </motion.div>
                                     ))
                                 )}
                             </div>
+
+                            {/* API Key Details Dialog */}
+                            <Dialog open={showApiKeyDetails} onOpenChange={setShowApiKeyDetails}>
+                                <DialogContent className="max-w-2xl">
+                                    <DialogHeader>
+                                        <DialogTitle className="flex items-center gap-2">
+                                            <Key className="w-5 h-5" />
+                                            API Key Details
+                                        </DialogTitle>
+                                        <DialogDescription>
+                                            View and manage your API key permissions and usage
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    {selectedApiKeyId && (
+                                        <ApiKeyDetailsDialog
+                                            keyId={selectedApiKeyId}
+                                            onClose={() => setShowApiKeyDetails(false)}
+                                        />
+                                    )}
+                                </DialogContent>
+                            </Dialog>
                         </CardContent>
                     </Card>
                 </div>

@@ -236,6 +236,27 @@ export function useRotateApiKey() {
     });
 }
 
+export function useUpdateApiKeyPermissions() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async({ id, permissions }: { id: string; permissions: Array<string> }) => api.updateApiKeyPermissions(id, permissions),
+        onSuccess:  () => {
+            queryClient.invalidateQueries({
+                queryKey: queryKeys.apiKeys,
+            });
+        },
+    });
+}
+
+export function useApiKeyUsage(keyId: string) {
+    return useQuery({
+        queryKey: [...queryKeys.apiKeys, keyId, "usage"],
+        queryFn:  async() => api.getApiKeyUsage(keyId),
+        enabled:  Boolean(keyId),
+    });
+}
+
 // Team Hooks
 export function useTeams() {
     return useQuery({
