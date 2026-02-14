@@ -455,7 +455,12 @@ export default function ProfilePage() {
     }, [message]);
 
     const apiKeys = apiKeysData?.items || [];
-    const sessions = sessionsData?.items || [];
+    // Sort sessions by last_used_at to find the most recent (current) session
+    const sessions = (sessionsData?.items || []).sort((a, b) => {
+        const dateA = new Date(a.last_used_at || a.created_at).getTime();
+        const dateB = new Date(b.last_used_at || b.created_at).getTime();
+        return dateB - dateA; // Most recent first
+    });
 
     // Handlers
     const handleProfileSuccess = () => {
@@ -722,6 +727,18 @@ export default function ProfilePage() {
                                         <span className="font-medium">2FA is enabled on your account</span>
                                     </div>
                                     
+                                    {/* Password required for backup code operations */}
+                                    <div className="space-y-2 p-3 bg-muted/50 rounded-lg">
+                                        <Label htmlFor="mfaPasswordOps" className="text-sm">Enter password to manage backup codes</Label>
+                                        <Input
+                                            id="mfaPasswordOps"
+                                            type="password"
+                                            value={mfaPassword}
+                                            onChange={(e) => setMfaPassword(e.target.value)}
+                                            placeholder="Enter your password"
+                                        />
+                                    </div>
+                                    
                                     {/* Backup Codes Section */}
                                     <div className="border rounded-lg p-4 space-y-3">
                                         <div className="flex items-center justify-between">
@@ -779,16 +796,6 @@ export default function ProfilePage() {
                                         )}
                                     </div>
                                     
-                                    <div className="space-y-2 pt-2 border-t">
-                                        <Label htmlFor="disablePassword">Password to disable</Label>
-                                        <Input
-                                            id="disablePassword"
-                                            type="password"
-                                            value={mfaPassword}
-                                            onChange={(e) => setMfaPassword(e.target.value)}
-                                            placeholder="Enter password to disable"
-                                        />
-                                    </div>
                                     <Button variant="destructive" onClick={handleDisableMfa} disabled={mfaLoading || !mfaPassword}>
                                         {mfaLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                                         Disable 2FA

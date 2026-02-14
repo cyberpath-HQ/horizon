@@ -6,7 +6,6 @@ import {
     useTeams,
     useTeamMembers,
     useCreateTeam,
-    useUpdateTeam,
     useDeleteTeam,
     useAddTeamMember,
     useUpdateTeamMember,
@@ -67,6 +66,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "@/components/ui/table";
+import {
   Loader2,
   Plus,
   Crown,
@@ -78,8 +85,10 @@ import {
   AlertCircle,
   CheckCircle,
   MoreHorizontal,
-  Search
+  Search,
+  Settings2
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface Team {
     id: string;
@@ -103,11 +112,6 @@ interface UserSearchResult {
 }
 
 interface CreateTeamFormValues {
-    name: string;
-    description: string;
-}
-
-interface UpdateTeamFormValues {
     name: string;
     description: string;
 }
@@ -200,91 +204,6 @@ function CreateTeamForm({
                 <Plus className="w-4 h-4 mr-2" />
                 Create Team
             </Button>
-        </form>
-    );
-}
-
-function UpdateTeamForm({
-    team,
-    onSuccess,
-    onCancel,
-}: {
-    team: Team;
-    onSuccess: () => void;
-    onCancel: () => void;
-}) {
-    const updateTeam = useUpdateTeam();
-
-    const form = useForm<UpdateTeamFormValues>({
-        defaultValues: {
-            name: team.name,
-            description: team.description || "",
-        },
-        onSubmit: async ({ value }) => {
-            try {
-                await updateTeam.mutateAsync({
-                    id: team.id,
-                    data: { name: value.name, description: value.description },
-                });
-                onSuccess();
-            } catch (err: unknown) {
-                const error = err as { message?: string };
-                throw new Error(error.message || "Failed to update team");
-            }
-        },
-    });
-
-    return (
-        <form
-            onSubmit={(e) => {
-                e.preventDefault();
-                form.handleSubmit();
-            }}
-            className="space-y-3 p-4 bg-muted rounded-lg"
-        >
-            <Label className="text-sm font-medium">Edit Team</Label>
-            <form.Field
-                name="name"
-                children={(field) => (
-                    <div className="space-y-2">
-                        <Input
-                            value={field.state.value}
-                            onChange={(e) => field.handleChange(e.target.value)}
-                            onBlur={field.handleBlur}
-                            placeholder="Team name"
-                            required
-                        />
-                        {field.state.meta.errors ? (
-                            <p className="text-sm text-destructive">{field.state.meta.errors.join(", ")}</p>
-                        ) : null}
-                    </div>
-                )}
-            />
-            <form.Field
-                name="description"
-                children={(field) => (
-                    <div className="space-y-2">
-                        <Input
-                            value={field.state.value}
-                            onChange={(e) => field.handleChange(e.target.value)}
-                            onBlur={field.handleBlur}
-                            placeholder="Description"
-                        />
-                        {field.state.meta.errors ? (
-                            <p className="text-sm text-destructive">{field.state.meta.errors.join(", ")}</p>
-                        ) : null}
-                    </div>
-                )}
-            />
-            <div className="flex gap-2">
-                <Button type="submit" disabled={form.state.isSubmitting} size="sm">
-                    {form.state.isSubmitting && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
-                    Save
-                </Button>
-                <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
-                    Cancel
-                </Button>
-            </div>
         </form>
     );
 }
@@ -478,7 +397,6 @@ function AddMemberForm({
 export default function TeamsPage() {
     // State
     const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
-    const [editingTeam, setEditingTeam] = useState<Team | null>(null);
     const [showAddMember, setShowAddMember] = useState(false);
 
     // Alert state
@@ -488,7 +406,7 @@ export default function TeamsPage() {
     const { data: teamsData, isLoading: teamsLoading } = useTeams();
     const teams: Team[] = teamsData?.items || [];
 
-    const { data: membersData, isLoading: membersLoading } = useTeamMembers(selectedTeamId || "");
+    const { data: membersData, isLoading: membersLoading, refetch: refetchMembers } = useTeamMembers(selectedTeamId || "");
     const members: Member[] = membersData?.items || [];
 
     // Mutations
@@ -507,7 +425,6 @@ export default function TeamsPage() {
     // Handle team selection
     const handleSelectTeam = (team: Team) => {
         setSelectedTeamId(team.id);
-        setEditingTeam(null);
         setShowAddMember(false);
     };
 
@@ -531,6 +448,7 @@ export default function TeamsPage() {
                 memberId,
             });
             setAlert({ type: "success", title: "Success", message: "Member removed" });
+            refetchMembers();
         } catch (err: unknown) {
             const error = err as { message?: string };
             setAlert({ type: "error", title: "Error", message: error.message || "Failed to remove member" });
@@ -546,15 +464,11 @@ export default function TeamsPage() {
                 data: { role: newRole },
             });
             setAlert({ type: "success", title: "Success", message: "Member role updated" });
+            refetchMembers();
         } catch (err: unknown) {
             const error = err as { message?: string };
             setAlert({ type: "error", title: "Error", message: error.message || "Failed to update member role" });
         }
-    };
-
-    const startEditTeam = (team: Team) => {
-        setEditingTeam(team);
-        setShowAddMember(false);
     };
 
     const getDisplayName = (member: Member) => {
@@ -573,13 +487,38 @@ export default function TeamsPage() {
     const selectedTeam = teams.find(t => t.id === selectedTeamId);
 
     return (
-        <div className="space-y-6">
-            <div>
+        <div className="space-y-6 relative z-10">
+            {/* Animated Background */}
+            <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
+                <motion.div 
+                    className="absolute -top-40 -right-40 w-[600px] h-[600px] bg-gradient-to-br from-primary/10 via-primary/5 to-transparent rounded-full blur-3xl"
+                    animate={{
+                        scale: [1, 1.3, 1],
+                        x: [0, 50, 0],
+                        opacity: [0.3, 0.5, 0.3],
+                    }}
+                    transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+                />
+                <motion.div 
+                    className="absolute -bottom-40 -left-40 w-[500px] h-[500px] bg-gradient-to-tr from-violet-500/10 via-purple-500/5 to-transparent rounded-full blur-3xl"
+                    animate={{
+                        scale: [1, 1.4, 1],
+                        x: [0, -40, 0],
+                        opacity: [0.2, 0.4, 0.2],
+                    }}
+                    transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+                />
+            </div>
+
+            <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+            >
                 <h1 className="text-3xl font-bold tracking-tight">Teams</h1>
                 <p className="text-muted-foreground mt-1">
                     Manage teams and team members
                 </p>
-            </div>
+            </motion.div>
 
             <AnimatePresence mode="wait">
                 {alert && (
@@ -598,63 +537,96 @@ export default function TeamsPage() {
                 )}
             </AnimatePresence>
 
-            <div className="grid gap-6 lg:grid-cols-2">
-                {/* Teams List */}
-                <Card>
-                    <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <CardTitle className="text-lg">Your Teams</CardTitle>
-                                <CardDescription>
-                                    {teams.length} team{teams.length !== 1 ? "s" : ""}
-                                </CardDescription>
+            {/* Top Section: Teams Cards + Create Team */}
+            <div className="grid gap-6 lg:grid-cols-3">
+                {/* Your Teams */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 }}
+                    className="lg:col-span-2"
+                >
+                    <Card className="h-full">
+                        <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <CardTitle className="text-lg flex items-center gap-2">
+                                        <Users className="h-5 w-5 text-primary" />
+                                        Your Teams
+                                    </CardTitle>
+                                    <CardDescription>
+                                        {teams.length} team{teams.length !== 1 ? "s" : ""}
+                                    </CardDescription>
+                                </div>
                             </div>
-                            <Users className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        {teamsLoading ? (
-                            <div className="flex justify-center py-12">
-                                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                            </div>
-                        ) : teams.length === 0 ? (
-                            <div className="text-center py-8">
-                                <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                                <p className="text-muted-foreground">No teams yet</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-2">
-                                {teams.map((team) => (
-                                    <button
-                                        key={team.id}
-                                        onClick={() => handleSelectTeam(team)}
-                                        className={`w-full p-4 text-left border rounded-lg transition-all hover:shadow-sm ${
-                                            selectedTeamId === team.id
-                                                ? "border-primary bg-primary/5 shadow-sm"
-                                                : "border-border hover:border-primary/50"
-                                        }`}
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <p className="font-semibold">{team.name}</p>
-                                                {team.description && (
-                                                    <p className="text-sm text-muted-foreground line-clamp-1">{team.description}</p>
-                                                )}
+                        </CardHeader>
+                        <CardContent>
+                            {teamsLoading ? (
+                                <div className="flex justify-center py-12">
+                                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                                </div>
+                            ) : teams.length === 0 ? (
+                                <div className="text-center py-8">
+                                    <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                                    <p className="text-muted-foreground">No teams yet</p>
+                                </div>
+                            ) : (
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                    {teams.map((team, index) => (
+                                        <motion.button
+                                            key={team.id}
+                                            initial={{ opacity: 0, scale: 0.95 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            transition={{ delay: index * 0.05 }}
+                                            onClick={() => handleSelectTeam(team)}
+                                            className={cn(
+                                                "p-4 text-left border rounded-xl transition-all hover:shadow-md",
+                                                selectedTeamId === team.id
+                                                    ? "border-primary bg-primary/5 shadow-md"
+                                                    : "border-border hover:border-primary/50"
+                                            )}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className={cn(
+                                                    "p-2 rounded-lg",
+                                                    selectedTeamId === team.id 
+                                                        ? "bg-primary/10" 
+                                                        : "bg-muted"
+                                                )}>
+                                                    <Users className={cn(
+                                                        "h-4 w-4",
+                                                        selectedTeamId === team.id 
+                                                            ? "text-primary" 
+                                                            : "text-muted-foreground"
+                                                    )} />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="font-semibold truncate">{team.name}</p>
+                                                    {team.description && (
+                                                        <p className="text-xs text-muted-foreground truncate">{team.description}</p>
+                                                    )}
+                                                </div>
                                             </div>
-                                            <Users className="h-5 w-5 text-muted-foreground" />
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+                                        </motion.button>
+                                    ))}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </motion.div>
 
-                <div className="space-y-6">
-                    {/* Create Team */}
-                    <Card>
+                {/* Create Team */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                >
+                    <Card className="h-full">
                         <CardHeader>
-                            <CardTitle className="text-lg">Create Team</CardTitle>
+                            <CardTitle className="text-lg flex items-center gap-2">
+                                <Plus className="h-5 w-5 text-primary" />
+                                Create Team
+                            </CardTitle>
                             <CardDescription>
                                 Create a new team to organize members
                             </CardDescription>
@@ -667,118 +639,143 @@ export default function TeamsPage() {
                             />
                         </CardContent>
                     </Card>
+                </motion.div>
+            </div>
 
-                    {/* Team Details */}
-                    {selectedTeam && (
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <div className="flex items-center justify-between">
+            {/* Bottom Section: Team Members DataTable */}
+            {selectedTeam && (
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                >
+                    <Card>
+                        <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 rounded-lg bg-primary/10">
+                                        <Settings2 className="h-5 w-5 text-primary" />
+                                    </div>
                                     <div>
-                                        <CardTitle className="text-lg flex items-center gap-2">
-                                            {selectedTeam.name}
-                                            <Badge variant="secondary">{members.length} members</Badge>
-                                        </CardTitle>
+                                        <CardTitle className="text-lg">{selectedTeam.name}</CardTitle>
                                         <CardDescription>
-                                            {selectedTeam.description || "No description"}
+                                            {selectedTeam.description || "No description"} • {members.length} member{members.length !== 1 ? "s" : ""}
                                         </CardDescription>
                                     </div>
-                                    <div className="flex gap-2">
-                                        <Button variant="outline" size="sm" onClick={() => startEditTeam(selectedTeam)}>
-                                            Edit
-                                        </Button>
-                                        <AlertDialog>
-                                            <AlertDialogTrigger asChild>
-                                                <Button variant="outline" size="sm">
-                                                    <Trash2 className="w-4 h-4 text-destructive" />
-                                                </Button>
-                                            </AlertDialogTrigger>
-                                            <AlertDialogContent>
-                                                <AlertDialogHeader>
-                                                    <AlertDialogTitle>Delete Team</AlertDialogTitle>
-                                                    <AlertDialogDescription>
-                                                        Are you sure you want to delete &quot;{selectedTeam.name}&quot;? This action cannot be undone.
-                                                    </AlertDialogDescription>
-                                                </AlertDialogHeader>
-                                                <AlertDialogFooter>
-                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                    <AlertDialogAction onClick={handleDeleteTeam} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                                                        Delete
-                                                    </AlertDialogAction>
-                                                </AlertDialogFooter>
-                                            </AlertDialogContent>
-                                        </AlertDialog>
-                                    </div>
                                 </div>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                {/* Edit Team Form */}
-                                {editingTeam && (
-                                    <UpdateTeamForm
-                                        team={editingTeam}
-                                        onSuccess={() => {
-                                            setEditingTeam(null);
-                                            setAlert({ type: "success", title: "Success", message: "Team updated" });
-                                        }}
-                                        onCancel={() => setEditingTeam(null)}
-                                    />
-                                )}
-
-                                {/* Members Header */}
-                                <div className="flex items-center justify-between">
-                                    <Label className="text-sm font-medium">Members</Label>
-                                    {!showAddMember && !editingTeam && (
-                                        <Button variant="outline" size="sm" onClick={() => setShowAddMember(true)}>
-                                            <UserPlus className="w-4 h-4 mr-1" />
-                                            Add Member
-                                        </Button>
-                                    )}
+                                <div className="flex items-center gap-2">
+                                    <Button variant="outline" size="sm" onClick={() => setShowAddMember(!showAddMember)}>
+                                        <UserPlus className="w-4 h-4 mr-1" />
+                                        Add Member
+                                    </Button>
+                                    <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                            <Button variant="outline" size="sm">
+                                                <Trash2 className="w-4 h-4 text-destructive" />
+                                            </Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                                <AlertDialogTitle>Delete Team</AlertDialogTitle>
+                                                <AlertDialogDescription>
+                                                    Are you sure you want to delete &quot;{selectedTeam.name}&quot;? This action cannot be undone.
+                                                </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                <AlertDialogAction onClick={handleDeleteTeam} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                                    Delete
+                                                </AlertDialogAction>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
                                 </div>
-
-                                {/* Add Member Form with Autocomplete */}
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            {/* Add Member Form */}
+                            <AnimatePresence>
                                 {showAddMember && (
-                                    <AddMemberForm
-                                        teamId={selectedTeamId || ""}
-                                        onSuccess={() => {
-                                            setShowAddMember(false);
-                                            setAlert({ type: "success", title: "Success", message: "Member added successfully" });
-                                        }}
-                                        onCancel={() => setShowAddMember(false)}
-                                    />
+                                    <motion.div
+                                        initial={{ opacity: 0, height: 0 }}
+                                        animate={{ opacity: 1, height: "auto" }}
+                                        exit={{ opacity: 0, height: 0 }}
+                                        className="mb-4"
+                                    >
+                                        <AddMemberForm
+                                            teamId={selectedTeamId || ""}
+                                            onSuccess={() => {
+                                                setShowAddMember(false);
+                                                setAlert({ type: "success", title: "Success", message: "Member added successfully" });
+                                                refetchMembers();
+                                            }}
+                                            onCancel={() => setShowAddMember(false)}
+                                        />
+                                    </motion.div>
                                 )}
+                            </AnimatePresence>
 
-                                {/* Members List */}
-                                {membersLoading ? (
-                                    <div className="flex justify-center py-4">
-                                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                                    </div>
-                                ) : members.length === 0 ? (
-                                    <p className="text-muted-foreground text-sm py-4 text-center">No members yet</p>
-                                ) : (
-                                    <div className="space-y-2">
-                                        {members.map((member) => (
-                                            <div key={member.id} className="flex items-center justify-between p-3 border rounded-lg">
-                                                <div className="flex items-center gap-3">
-                                                    <Avatar className="h-9 w-9">
-                                                        <AvatarFallback className="text-sm">
+                            {/* Members DataTable */}
+                            {membersLoading ? (
+                                <div className="flex justify-center py-12">
+                                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                                </div>
+                            ) : members.length === 0 ? (
+                                <div className="text-center py-12">
+                                    <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                                    <p className="text-muted-foreground">No members in this team</p>
+                                    <Button variant="outline" className="mt-4" onClick={() => setShowAddMember(true)}>
+                                        Add the first member
+                                    </Button>
+                                </div>
+                            ) : (
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead className="w-[50px]"></TableHead>
+                                            <TableHead>Member</TableHead>
+                                            <TableHead>Role</TableHead>
+                                            <TableHead>Joined</TableHead>
+                                            <TableHead className="w-[50px]"></TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {members.map((member, index) => (
+                                            <motion.tr
+                                                key={member.id}
+                                                initial={{ opacity: 0, x: -10 }}
+                                                animate={{ opacity: 1, x: 0 }}
+                                                transition={{ delay: index * 0.03 }}
+                                                className="group"
+                                            >
+                                                <TableCell>
+                                                    <Avatar className="h-8 w-8">
+                                                        <AvatarFallback className="text-xs bg-primary/10 text-primary">
                                                             {getInitials(member)}
                                                         </AvatarFallback>
                                                     </Avatar>
+                                                </TableCell>
+                                                <TableCell>
                                                     <div>
-                                                        <p className="font-medium text-sm">{getDisplayName(member)}</p>
-                                                        <p className="text-xs text-muted-foreground capitalize">{member.role}</p>
+                                                        <p className="font-medium">{getDisplayName(member)}</p>
+                                                        <p className="text-xs text-muted-foreground">{member.email}</p>
                                                     </div>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    {member.role === "owner" && (
-                                                        <Crown className="h-4 w-4 text-yellow-500" />
-                                                    )}
-                                                    {member.role === "admin" && (
-                                                        <Shield className="h-4 w-4 text-muted-foreground" />
-                                                    )}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge variant={member.role === "owner" ? "default" : member.role === "admin" ? "secondary" : "outline"}>
+                                                        {member.role === "owner" && <Crown className="h-3 w-3 mr-1" />}
+                                                        {member.role === "admin" && <Shield className="h-3 w-3 mr-1" />}
+                                                        {member.role}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className="text-muted-foreground text-sm">
+                                                    {member.joined_at ? new Date(member.joined_at).toLocaleDateString() : "—"}
+                                                </TableCell>
+                                                <TableCell>
                                                     {member.role !== "owner" && (
                                                         <DropdownMenu>
                                                             <DropdownMenuTrigger asChild>
-                                                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
                                                                     <MoreHorizontal className="h-4 w-4" />
                                                                 </Button>
                                                             </DropdownMenuTrigger>
@@ -799,16 +796,16 @@ export default function TeamsPage() {
                                                             </DropdownMenuContent>
                                                         </DropdownMenu>
                                                     )}
-                                                </div>
-                                            </div>
+                                                </TableCell>
+                                            </motion.tr>
                                         ))}
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    )}
-                </div>
-            </div>
+                                    </TableBody>
+                                </Table>
+                            )}
+                        </CardContent>
+                    </Card>
+                </motion.div>
+            )}
         </div>
     );
 }

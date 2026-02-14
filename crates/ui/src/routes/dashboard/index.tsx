@@ -288,13 +288,73 @@ export default function DashboardPage() {
                 </p>
             </motion.div>
 
-            {/* Enabled Modules Grid */}
+            {/* Overview - Stats Grid */}
             <div>
                 <motion.div 
                     className="flex items-center gap-2 mb-4"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.2 }}
+                >
+                    <Zap className="h-5 w-5 text-primary" />
+                    <h2 className="text-xl font-semibold">Overview</h2>
+                </motion.div>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    {stats.map((stat, index) => (
+                        <motion.div
+                            key={stat.title}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.1 * index + 0.3, duration: 0.3 }}
+                            whileHover={{ scale: 1.02, y: -2 }}
+                        >
+                            <Card className="hover-lift">
+                                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                                        {stat.title}
+                                    </CardTitle>
+                                    <motion.div
+                                        whileHover={{ rotate: 15, scale: 1.1 }}
+                                        transition={{ type: "spring", stiffness: 300 }}
+                                    >
+                                        <stat.icon className="h-4 w-4 text-muted-foreground" />
+                                    </motion.div>
+                                </CardHeader>
+                                <CardContent>
+                                    <motion.div 
+                                        className="text-2xl font-bold"
+                                        initial={{ scale: 0.8 }}
+                                        animate={{ scale: 1 }}
+                                        transition={{ delay: 0.4, type: "spring" }}
+                                    >
+                                        {stat.value}
+                                    </motion.div>
+                                    <motion.p 
+                                        className="text-xs text-muted-foreground flex items-center gap-1 mt-1"
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        transition={{ delay: 0.5 }}
+                                    >
+                                        <TrendingUp className={cn("h-3 w-3", stat.changeType === `positive` ? `text-green-500` : `text-red-500`)} />
+                                        <span className={stat.changeType === `positive` ? `text-green-600` : `text-red-600`}>
+                                            {stat.change}
+                                        </span>
+                                        <span className="text-muted-foreground">from last month</span>
+                                    </motion.p>
+                                </CardContent>
+                            </Card>
+                        </motion.div>
+                    ))}
+                </div>
+            </div>
+
+            {/* Your Modules */}
+            <div>
+                <motion.div 
+                    className="flex items-center gap-2 mb-4"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.5 }}
                 >
                     <Layers className="h-5 w-5 text-primary" />
                     <h2 className="text-xl font-semibold">Your Modules</h2>
@@ -306,7 +366,7 @@ export default function DashboardPage() {
                                 key={module.key}
                                 initial={{ opacity: 0, y: 20, scale: 0.95 }}
                                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                                transition={{ delay: 0.1 * index, duration: 0.3 }}
+                                transition={{ delay: 0.1 * index + 0.6, duration: 0.3 }}
                                 whileHover={{ scale: 1.02, y: -4 }}
                                 whileTap={{ scale: 0.98 }}
                             >
@@ -351,7 +411,7 @@ export default function DashboardPage() {
                             className="col-span-full"
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
-                            transition={{ delay: 0.3 }}
+                            transition={{ delay: 0.6 }}
                         >
                             <Card className="border-dashed">
                                 <CardContent className="py-12 text-center">
@@ -371,73 +431,13 @@ export default function DashboardPage() {
                 </div>
             </div>
 
-            {/* Stats Grid */}
-            <div>
-                <motion.div 
-                    className="flex items-center gap-2 mb-4"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.3 }}
-                >
-                    <Zap className="h-5 w-5 text-primary" />
-                    <h2 className="text-xl font-semibold">Overview</h2>
-                </motion.div>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                    {stats.map((stat, index) => (
-                        <motion.div
-                            key={stat.title}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.1 * index + 0.4, duration: 0.3 }}
-                            whileHover={{ scale: 1.02, y: -2 }}
-                        >
-                            <Card className="hover-lift">
-                                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                    <CardTitle className="text-sm font-medium text-muted-foreground">
-                                        {stat.title}
-                                    </CardTitle>
-                                    <motion.div
-                                        whileHover={{ rotate: 15, scale: 1.1 }}
-                                        transition={{ type: "spring", stiffness: 300 }}
-                                    >
-                                        <stat.icon className="h-4 w-4 text-muted-foreground" />
-                                    </motion.div>
-                                </CardHeader>
-                                <CardContent>
-                                    <motion.div 
-                                        className="text-2xl font-bold"
-                                        initial={{ scale: 0.8 }}
-                                        animate={{ scale: 1 }}
-                                        transition={{ delay: 0.5, type: "spring" }}
-                                    >
-                                        {stat.value}
-                                    </motion.div>
-                                    <motion.p 
-                                        className="text-xs text-muted-foreground flex items-center gap-1 mt-1"
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        transition={{ delay: 0.6 }}
-                                    >
-                                        <TrendingUp className={cn("h-3 w-3", stat.changeType === `positive` ? `text-green-500` : `text-red-500`)} />
-                                        <span className={stat.changeType === `positive` ? `text-green-600` : `text-red-600`}>
-                                            {stat.change}
-                                        </span>
-                                        <span className="text-muted-foreground">from last month</span>
-                                    </motion.p>
-                                </CardContent>
-                            </Card>
-                        </motion.div>
-                    ))}
-                </div>
-            </div>
-
             {/* Quick Actions */}
             <div>
                 <motion.div 
                     className="flex items-center gap-2 mb-4"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    transition={{ delay: 0.6 }}
+                    transition={{ delay: 0.9 }}
                 >
                     <Keyboard className="h-5 w-5 text-primary" />
                     <h2 className="text-xl font-semibold">Quick Actions</h2>
@@ -446,7 +446,7 @@ export default function DashboardPage() {
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.7 }}
+                        transition={{ delay: 1.0 }}
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                     >
