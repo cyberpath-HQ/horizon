@@ -1,3 +1,5 @@
+import { ApiError } from "./api-error";
+
 // API Configuration
 const API_BASE_URL = import.meta.env.VITE_API_URL || `http://localhost:3000`;
 
@@ -42,15 +44,31 @@ export interface SuccessResponse {
     message: string
 }
 
-// API Error handling
-export class ApiError extends Error {
-    constructor(
-        public status: number,
-        public code: string,
-        message: string
-    ) {
-        super(message);
-        this.name = `ApiError`;
+export interface ApiKey {
+    id:          string
+    name:        string
+    key?:        string
+    key_prefix:  string
+    created_at:  string
+    expires_at?: string
+    last_used?:  string
+}
+
+export interface Session {
+    id:          string
+    user_agent:  string
+    ip_address:  string
+    created_at:  string
+    expires_at?: string
+}
+
+export interface PaginatedResponse<T> {
+    items:      Array<T>
+    pagination: {
+        page:        number
+        per_page:    number
+        total:       number
+        total_pages: number
     }
 }
 
@@ -410,10 +428,10 @@ class ApiClient {
     }
 
     // API Key endpoints
-    async getApiKeys(): Promise<any> {
+    async getApiKeys(): Promise<PaginatedResponse<ApiKey>> {
         const response = await this.request<{ success: boolean
-            api_keys:                                  Array<any>
-            pagination:                                any }>(`/api/v1/auth/api-keys`, {
+            api_keys:                                  Array<ApiKey>
+            pagination:                                PaginatedResponse<ApiKey>[`pagination`] }>(`/api/v1/auth/api-keys`, {
             method: `GET`,
         });
         return {
@@ -424,7 +442,7 @@ class ApiClient {
 
     async createApiKey(data: { name: string
         permissions?:                Array<string>
-        expires_at?:                 string }): Promise<any> {
+        expires_at?:                 string }): Promise<ApiKey> {
         return this.request<any>(`/api/v1/auth/api-keys`, {
             method: `POST`,
             body:   JSON.stringify(data),
@@ -443,10 +461,16 @@ class ApiClient {
     }
 
     // Session management
-    async getSessions(): Promise<any> {
-        return this.request<any>(`/api/v1/auth/sessions`, {
+    async getSessions(): Promise<PaginatedResponse<Session>> {
+        const response = await this.request<{ success: boolean
+            sessions:                                  Array<Session>
+            pagination:                                PaginatedResponse<Session>[`pagination`] }>(`/api/v1/auth/sessions`, {
             method: `GET`,
         });
+        return {
+            items:      response.sessions,
+            pagination: response.pagination,
+        };
     }
 
     async deleteSession(sessionId: string): Promise<SuccessResponse> {
@@ -517,9 +541,15 @@ class ApiClient {
         };
     }
 
+    async getUser(userId: string): Promise<any> {
+        return this.request<any>(`/api/v1/users/${ userId }`, {
+            method: `GET`,
+        });
+    }
+
     async updateUser(userId: string, data: { role?: string
-        first_name?:                  string
-        last_name?:                   string }): Promise<any> {
+        first_name?:                                string
+        last_name?:                                 string }): Promise<any> {
         return this.request<any>(`/api/v1/users/${ userId }`, {
             method: `PUT`,
             body:   JSON.stringify(data),
@@ -604,43 +634,43 @@ class ApiClient {
 
     // Settings endpoints
     async getSettings(): Promise<{ settings: Array<{ id: string
-        key:          string
-        value:        string
-        description?: string
-        updated_at:   string }> }> {
+        key:                                             string
+        value:                                           string
+        description?:                                    string
+        updated_at:                                      string }> }> {
         return this.request<{ settings: Array<{ id: string
-            key:           string
-            value:         string
-            description?:  string
-            updated_at:    string }> }>(`/api/v1/settings`, {
+            key:                                    string
+            value:                                  string
+            description?:                           string
+            updated_at:                             string }> }>(`/api/v1/settings`, {
             method: `GET`,
         });
     }
 
     async getSetting(key: string): Promise<{ id: string
-        key:         string
-        value:       string
-        description?: string
-        updated_at:  string }> {
+        key:                                     string
+        value:                                   string
+        description?:                            string
+        updated_at:                              string }> {
         return this.request<{ id: string
-            key:          string
-            value:        string
-            description?: string
-            updated_at:   string }>(`/api/v1/settings/${ key }`, {
+            key:                  string
+            value:                string
+            description?:         string
+            updated_at:           string }>(`/api/v1/settings/${ key }`, {
             method: `GET`,
         });
     }
 
     async updateSetting(key: string, value: string): Promise<{ id: string
-        key:         string
-        value:       string
-        description?: string
-        updated_at:  string }> {
+        key:                                                       string
+        value:                                                     string
+        description?:                                              string
+        updated_at:                                                string }> {
         return this.request<{ id: string
-            key:          string
-            value:        string
-            description?: string
-            updated_at:   string }>(`/api/v1/settings/${ key }`, {
+            key:                  string
+            value:                string
+            description?:         string
+            updated_at:           string }>(`/api/v1/settings/${ key }`, {
             method: `PUT`,
             body:   JSON.stringify({
                 value,
@@ -650,12 +680,12 @@ class ApiClient {
 }
 
 export const api = new ApiClient();
+export { ApiError } from "./api-error";
 
 // Check if system needs setup
 export async function checkSystemSetup(): Promise<boolean> {
     try {
-        const response = await fetch(`${ API_BASE_URL }/health`);
-        const data = await response.json();
+        const data = await api.healthCheck();
         return data.needs_setup === true;
     }
     catch {
