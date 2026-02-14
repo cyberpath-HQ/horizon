@@ -1,14 +1,21 @@
-import { useState, useEffect } from "react";
+import {
+    useState, useEffect
+} from "react";
 import { useForm } from "@tanstack/react-form";
-import { createFileRoute, redirect } from "@tanstack/react-router";
-import { getAccessToken, getStoredUser } from "@/lib/api";
+import {
+    createFileRoute, redirect
+} from "@tanstack/react-router";
+import {
+    getAccessToken, getStoredUser
+} from "@/lib/api";
 import {
     useUsers,
     useCreateUser,
     useUpdateUser,
     useDeleteUser,
-    useBulkDeleteUsers,
+    useBulkDeleteUsers
 } from "@/hooks/useApi";
+import { motion, AnimatePresence } from "motion/react";
 import {
     Card, CardContent, CardDescription, CardHeader, CardTitle
 } from "@/components/ui/card";
@@ -16,15 +23,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-export const Route = createFileRoute("/dashboard/settings/users")({
+export const Route = createFileRoute(`/dashboard/settings/users`)({
     beforeLoad: () => {
         // Check if user is authenticated
         const token = getAccessToken();
         const user = getStoredUser();
-        
+
         if (!token || !user) {
             throw redirect({
-                to: '/login',
+                to:      `/login`,
                 replace: true,
             });
         }
@@ -83,61 +90,68 @@ import {
     DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import {
-    Loader2, UserPlus, Users, AlertCircle, CheckCircle, MoreHorizontal, Trash2, RefreshCw, Search
+    Loader2, UserPlus, Users, AlertCircle, CheckCircle, MoreHorizontal, Trash2, RefreshCw, Search,
+    Eye, UserCog, Shield, Crown, ArrowUpDown, ArrowUp, ArrowDown
 } from "lucide-react";
 
 // User type
 interface User {
-    id: string
-    email: string
+    id:         string
+    email:      string
     full_name?: string
-    role: string
+    role:       string
     created_at: string
 }
 
 interface CreateUserFormValues {
-    email: string
-    password: string
+    email:     string
+    password:  string
     full_name: string
-    role: string
+    role:      string
 }
 
 function CreateUserForm({
     onSuccess,
     onCancel,
 }: {
-    onSuccess: () => void;
-    onCancel: () => void;
+    onSuccess: () => void
+    onCancel:  () => void
 }) {
     const createUser = useCreateUser();
-    const [password, setPassword] = useState("");
+    const [
+        password,
+        setPassword,
+    ] = useState(``);
 
     const form = useForm<CreateUserFormValues>({
         defaultValues: {
-            email: "",
-            password: "",
-            full_name: "",
-            role: "viewer",
+            email:     ``,
+            password:  ``,
+            full_name: ``,
+            role:      `viewer`,
         },
-        onSubmit: async ({ value }) => {
+        onSubmit: async({
+            value,
+        }) => {
             try {
                 await createUser.mutateAsync({
-                    email: value.email,
-                    password: value.password,
+                    email:     value.email,
+                    password:  value.password,
                     full_name: value.full_name,
-                    role: value.role || "viewer",
+                    role:      value.role || `viewer`,
                 });
                 onSuccess();
-            } catch (err: unknown) {
+            }
+            catch (err: unknown) {
                 const error = err as { message?: string };
-                throw new Error(error.message || "Failed to create user");
+                throw new Error(error.message || `Failed to create user`);
             }
         },
     });
 
     const handlePasswordChange = (value: string) => {
         setPassword(value);
-        form.setFieldValue("password", value);
+        form.setFieldValue(`password`, value);
     };
 
     return (
@@ -164,9 +178,11 @@ function CreateUserForm({
                             <p className="text-xs text-muted-foreground">
                                 The user's full name as it will appear in the system
                             </p>
-                            {field.state.meta.errors ? (
-                                <p className="text-sm text-destructive">{field.state.meta.errors.join(", ")}</p>
-                            ) : null}
+                            {field.state.meta.errors
+? (
+                                <p className="text-sm text-destructive">{field.state.meta.errors.join(`, `)}</p>
+                            )
+: null}
                         </div>
                     )}
                 />
@@ -189,9 +205,11 @@ function CreateUserForm({
                             <p className="text-xs text-muted-foreground">
                                 The user's email address for login and notifications
                             </p>
-                            {field.state.meta.errors ? (
-                                <p className="text-sm text-destructive">{field.state.meta.errors.join(", ")}</p>
-                            ) : null}
+                            {field.state.meta.errors
+? (
+                                <p className="text-sm text-destructive">{field.state.meta.errors.join(`, `)}</p>
+                            )
+: null}
                         </>
                     )}
                 />
@@ -215,9 +233,11 @@ function CreateUserForm({
                             <p className="text-xs text-muted-foreground mt-2">
                                 Must be at least 12 characters with uppercase, lowercase, numbers, and special characters
                             </p>
-                            {field.state.meta.errors ? (
-                                <p className="text-sm text-destructive">{field.state.meta.errors.join(", ")}</p>
-                            ) : null}
+                            {field.state.meta.errors
+? (
+                                <p className="text-sm text-destructive">{field.state.meta.errors.join(`, `)}</p>
+                            )
+: null}
                         </>
                     )}
                 />
@@ -236,18 +256,20 @@ function CreateUserForm({
                                     <SelectValue placeholder="Select role" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="viewer">Viewer</SelectItem>
-                                    <SelectItem value="manager">Manager</SelectItem>
-                                    <SelectItem value="admin">Admin</SelectItem>
-                                    <SelectItem value="super_admin">Super Admin</SelectItem>
+                                    <SelectItem value="viewer" description="Read-only access to platform data">Viewer</SelectItem>
+                                    <SelectItem value="manager" description="Can manage assets and users">Manager</SelectItem>
+                                    <SelectItem value="admin" description="Full administrative access">Admin</SelectItem>
+                                    <SelectItem value="super_admin" description="Super administrator with all permissions">Super Admin</SelectItem>
                                 </SelectContent>
                             </Select>
                             <p className="text-xs text-muted-foreground">
                                 The role determines the user's permissions in the system
                             </p>
-                            {field.state.meta.errors ? (
-                                <p className="text-sm text-destructive">{field.state.meta.errors.join(", ")}</p>
-                            ) : null}
+                            {field.state.meta.errors
+? (
+                                <p className="text-sm text-destructive">{field.state.meta.errors.join(`, `)}</p>
+                            )
+: null}
                         </>
                     )}
                 />
@@ -267,18 +289,42 @@ function CreateUserForm({
 
 export default function UsersPage() {
     // State
-    const [page, setPage] = useState(1);
-    const [search, setSearch] = useState("");
-    const [debouncedSearch, setDebouncedSearch] = useState("");
-    const [sortBy, setSortBy] = useState<"created_at" | "email" | "full_name">("created_at");
-    const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
-    const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
+    const [
+        page,
+        setPage,
+    ] = useState(1);
+    const [
+        search,
+        setSearch,
+    ] = useState(``);
+    const [
+        debouncedSearch,
+        setDebouncedSearch,
+    ] = useState(``);
+    const [
+        sortBy,
+        setSortBy,
+    ] = useState<`created_at` | `email` | `full_name`>(`created_at`);
+    const [
+        sortOrder,
+        setSortOrder,
+    ] = useState<`asc` | `desc`>(`desc`);
+    const [
+        selectedUsers,
+        setSelectedUsers,
+    ] = useState<Set<string>>(new Set());
 
     // Dialog state
-    const [isCreateOpen, setIsCreateOpen] = useState(false);
+    const [
+        isCreateOpen,
+        setIsCreateOpen,
+    ] = useState(false);
 
     // Alert state
-    const [alert, setAlert] = useState<{ type: `success` | `error`
+    const [
+        alert,
+        setAlert,
+    ] = useState<{ type: `success` | `error`
         title:           string
         message:         string } | null>(null);
 
@@ -293,16 +339,18 @@ export default function UsersPage() {
             setDebouncedSearch(search);
         }, 300);
         return () => clearTimeout(timer);
-    }, [search]);
+    }, [ search ]);
 
     // Query
-    const { data, isLoading, refetch } = useUsers({
+    const {
+        data, isLoading, refetch,
+    } = useUsers({
         page,
         per_page: 10,
-        search: debouncedSearch || undefined,
+        search:   debouncedSearch || undefined,
     });
 
-    const users: User[] = data?.items || [];
+    const users: Array<User> = data?.items || [];
     const pagination = data?.pagination;
 
     // Alert auto-dismiss
@@ -311,7 +359,7 @@ export default function UsersPage() {
             const timer = setTimeout(() => setAlert(null), 5000);
             return () => clearTimeout(timer);
         }
-    }, [alert]);
+    }, [ alert ]);
 
     // Handlers
     const handleSearch = (value: string) => {
@@ -321,17 +369,19 @@ export default function UsersPage() {
 
     const handleSort = (column: typeof sortBy) => {
         if (sortBy === column) {
-            setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-        } else {
+            setSortOrder(sortOrder === `asc` ? `desc` : `asc`);
+        }
+        else {
             setSortBy(column);
-            setSortOrder("asc");
+            setSortOrder(`asc`);
         }
     };
 
     const handleSelectAll = (checked: boolean) => {
         if (checked) {
-            setSelectedUsers(new Set(users.map(u => u.id)));
-        } else {
+            setSelectedUsers(new Set(users.map((u) => u.id)));
+        }
+        else {
             setSelectedUsers(new Set());
         }
     };
@@ -340,7 +390,8 @@ export default function UsersPage() {
         const newSelected = new Set(selectedUsers);
         if (checked) {
             newSelected.add(userId);
-        } else {
+        }
+        else {
             newSelected.delete(userId);
         }
         setSelectedUsers(newSelected);
@@ -359,7 +410,9 @@ export default function UsersPage() {
         try {
             await updateUser.mutateAsync({
                 id:   userId,
-                data: { role: newRole },
+                data: {
+                    role: newRole,
+                },
             });
 
             setAlert({
@@ -435,9 +488,9 @@ export default function UsersPage() {
 
     const getInitials = (email: string, fullName?: string) => {
         if (fullName) {
-            const parts = fullName.split(" ");
+            const parts = fullName.split(` `);
             if (parts.length >= 2) {
-                return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+                return `${ parts[0][0] }${ parts[parts.length - 1][0] }`.toUpperCase();
             }
             return fullName[0].toUpperCase();
         }
@@ -483,7 +536,7 @@ export default function UsersPage() {
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-2">
+                    <Button variant="outline" size="sm" onClick={async() => refetch()} className="gap-2">
                         <RefreshCw className="w-4 h-4" />
                         Refresh
                     </Button>
@@ -510,13 +563,22 @@ export default function UsersPage() {
                 </div>
             </div>
 
-            {alert && (
-                <Alert variant={alert.type === `error` ? `destructive` : `default`} className={alert.type === `success` ? `border-green-500 dark:border-green-600 bg-green-50 dark:bg-green-950/30` : ``}>
-                    {alert.type === `success` ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
-                    <AlertTitle>{alert.title}</AlertTitle>
-                    <AlertDescription>{alert.message}</AlertDescription>
-                </Alert>
-            )}
+            <AnimatePresence mode="wait">
+                {alert && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                        transition={{ duration: 0.2 }}
+                    >
+                        <Alert variant={alert.type === `error` ? `destructive` : `default`} className={alert.type === `success` ? `border-green-500 dark:border-green-600 bg-green-50 dark:bg-green-950/30` : ``}>
+                            {alert.type === `success` ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+                            <AlertTitle>{alert.title}</AlertTitle>
+                            <AlertDescription>{alert.message}</AlertDescription>
+                        </Alert>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             <Card>
                 <CardHeader className="pb-3">
@@ -582,19 +644,30 @@ export default function UsersPage() {
                                 />
                             </TableHead>
                             <TableHead>User</TableHead>
-                            <TableHead>Email</TableHead>
                             <TableHead
                                 className="cursor-pointer hover:text-foreground"
-                                onClick={() => handleSort("email")}
+                                onClick={() => handleSort(`email`)}
                             >
-                                Email {sortBy === "email" && (sortOrder === "asc" ? "↑" : "↓")}
+                                <span className="flex items-center gap-1">
+                                    Email 
+                                    {sortBy === `email` 
+                                        ? (sortOrder === `asc` ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />)
+                                        : <ArrowUpDown className="w-3 h-3 opacity-50" />
+                                    }
+                                </span>
                             </TableHead>
                             <TableHead>Role</TableHead>
                             <TableHead
                                 className="cursor-pointer hover:text-foreground"
-                                onClick={() => handleSort("created_at")}
+                                onClick={() => handleSort(`created_at`)}
                             >
-                                Created {sortBy === "created_at" && (sortOrder === "asc" ? "↑" : "↓")}
+                                <span className="flex items-center gap-1">
+                                    Created 
+                                    {sortBy === `created_at` 
+                                        ? (sortOrder === `asc` ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />)
+                                        : <ArrowUpDown className="w-3 h-3 opacity-50" />
+                                    }
+                                </span>
                             </TableHead>
                             <TableHead className="max-w-5"></TableHead>
                         </TableRow>
@@ -637,15 +710,30 @@ export default function UsersPage() {
                                             </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end" className="max-w-[240px]">
-                                            <DropdownMenuItem onClick={async() => handleUpdateUserRole(user.id, `user`)} disabled={updateUser.isPending}>
-                                                Set as User
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={async() => handleUpdateUserRole(user.id, `admin`)} disabled={updateUser.isPending}>
-                                                Set as Admin
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={async() => handleUpdateUserRole(user.id, `super_admin`)} disabled={updateUser.isPending}>
-                                                Set as Super Admin
-                                            </DropdownMenuItem>
+                                            {user.role !== `viewer` && (
+                                                <DropdownMenuItem onClick={async() => handleUpdateUserRole(user.id, `viewer`)} disabled={updateUser.isPending}>
+                                                    <Eye className="h-4 w-4 mr-2" />
+                                                    Set as Viewer
+                                                </DropdownMenuItem>
+                                            )}
+                                            {user.role !== `manager` && (
+                                                <DropdownMenuItem onClick={async() => handleUpdateUserRole(user.id, `manager`)} disabled={updateUser.isPending}>
+                                                    <UserCog className="h-4 w-4 mr-2" />
+                                                    Set as Manager
+                                                </DropdownMenuItem>
+                                            )}
+                                            {user.role !== `admin` && (
+                                                <DropdownMenuItem onClick={async() => handleUpdateUserRole(user.id, `admin`)} disabled={updateUser.isPending}>
+                                                    <Shield className="h-4 w-4 mr-2" />
+                                                    Set as Admin
+                                                </DropdownMenuItem>
+                                            )}
+                                            {user.role !== `super_admin` && (
+                                                <DropdownMenuItem onClick={async() => handleUpdateUserRole(user.id, `super_admin`)} disabled={updateUser.isPending}>
+                                                    <Crown className="h-4 w-4 mr-2" />
+                                                    Set as Super Admin
+                                                </DropdownMenuItem>
+                                            )}
                                             <DropdownMenuSeparator />
                                             <DropdownMenuItem onClick={async() => handleDeleteUser(user.id)} disabled={deleteUser.isPending} className="text-destructive focus:text-destructive">
                                                 <Trash2 className="h-4 w-4 mr-2" />

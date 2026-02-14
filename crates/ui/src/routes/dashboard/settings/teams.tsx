@@ -13,6 +13,7 @@ import {
     useRemoveTeamMember,
     useSearchUsers,
 } from "@/hooks/useApi";
+import { motion, AnimatePresence } from "motion/react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -89,10 +90,10 @@ interface Team {
 interface Member {
     id: string;
     role: string;
-    user?: {
-        email: string;
-        full_name?: string;
-    };
+    user_id?: string;
+    email?: string;
+    display_name?: string;
+    joined_at?: string;
 }
 
 interface UserSearchResult {
@@ -442,8 +443,8 @@ function AddMemberForm({
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="member">Member</SelectItem>
-                                <SelectItem value="admin">Admin</SelectItem>
+                                <SelectItem value="member" description="Can view team content and participate">Member</SelectItem>
+                                <SelectItem value="admin" description="Can manage team members and settings">Admin</SelectItem>
                             </SelectContent>
                         </Select>
                         <p className="text-xs text-muted-foreground">
@@ -556,20 +557,17 @@ export default function TeamsPage() {
         setShowAddMember(false);
     };
 
-    const getInitials = (email: string, fullName?: string) => {
-        if (fullName) {
-            const parts = fullName.split(" ");
-            if (parts.length >= 2) {
-                return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
-            }
-            return fullName[0].toUpperCase();
-        }
-        return email?.[0]?.toUpperCase() || `?`;
+    const getDisplayName = (member: Member) => {
+        if (!member) return "Unknown";
+        return member.display_name || member.email || "Unknown";
     };
 
-    const getDisplayName = (user?: { email: string; full_name?: string }) => {
-        if (!user) return "Unknown";
-        return user.full_name || user.email;
+    const getInitials = (member: Member) => {
+        const name = member.display_name || member.email || "?";
+        if (name.length >= 2) {
+            return `${name[0]}${name[1]}`.toUpperCase();
+        }
+        return name[0]?.toUpperCase() || "?";
     };
 
     const selectedTeam = teams.find(t => t.id === selectedTeamId);
@@ -583,13 +581,22 @@ export default function TeamsPage() {
                 </p>
             </div>
 
-            {alert && (
-                <Alert variant={alert.type === "error" ? "destructive" : "default"} className={alert.type === "success" ? "border-green-500 dark:border-green-600 bg-green-50 dark:bg-green-950/30" : ""}>
-                    {alert.type === "success" ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
-                    <AlertTitle>{alert.title}</AlertTitle>
-                    <AlertDescription>{alert.message}</AlertDescription>
-                </Alert>
-            )}
+            <AnimatePresence mode="wait">
+                {alert && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                        transition={{ duration: 0.2 }}
+                    >
+                        <Alert variant={alert.type === "error" ? "destructive" : "default"} className={alert.type === "success" ? "border-green-500 dark:border-green-600 bg-green-50 dark:bg-green-950/30" : ""}>
+                            {alert.type === "success" ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+                            <AlertTitle>{alert.title}</AlertTitle>
+                            <AlertDescription>{alert.message}</AlertDescription>
+                        </Alert>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             <div className="grid gap-6 lg:grid-cols-2">
                 {/* Teams List */}
@@ -753,11 +760,11 @@ export default function TeamsPage() {
                                                 <div className="flex items-center gap-3">
                                                     <Avatar className="h-9 w-9">
                                                         <AvatarFallback className="text-sm">
-                                                            {getInitials(member.user?.email || "", member.user?.full_name)}
+                                                            {getInitials(member)}
                                                         </AvatarFallback>
                                                     </Avatar>
                                                     <div>
-                                                        <p className="font-medium text-sm">{getDisplayName(member.user)}</p>
+                                                        <p className="font-medium text-sm">{getDisplayName(member)}</p>
                                                         <p className="text-xs text-muted-foreground capitalize">{member.role}</p>
                                                     </div>
                                                 </div>

@@ -56,9 +56,10 @@ export interface ApiKey {
 
 export interface Session {
     id:          string
-    user_agent:  string
-    ip_address:  string
+    user_agent?: string
+    ip_address?: string
     created_at:  string
+    last_used_at?: string
     expires_at?: string
 }
 
@@ -330,8 +331,8 @@ class ApiClient {
         return response;
     }
 
-    async getMfaStatus(): Promise<{ enabled: boolean }> {
-        return this.request<{ enabled: boolean }>(`/api/v1/auth/mfa/status`, {
+    async getMfaStatus(): Promise<{ mfa_enabled: boolean; backup_codes_remaining?: number }> {
+        return this.request<{ mfa_enabled: boolean; backup_codes_remaining?: number }>(`/api/v1/auth/mfa/status`, {
             method: `GET`,
         });
     }
@@ -460,15 +461,14 @@ class ApiClient {
     }
 
     // Session management
-    async getSessions(): Promise<PaginatedResponse<Session>> {
+    async getSessions(): Promise<{ items: Array<Session>; pagination?: any }> {
         const response = await this.request<{ success: boolean
-            sessions:                                  Array<Session>
-            pagination:                                PaginatedResponse<Session>[`pagination`] }>(`/api/v1/auth/sessions`, {
+            sessions:                                  Array<Session> }>(`/api/v1/auth/sessions`, {
             method: `GET`,
         });
         return {
             items:      response.sessions,
-            pagination: response.pagination,
+            pagination: { page: 1, per_page: response.sessions.length, total: response.sessions.length, total_pages: 1 },
         };
     }
 
@@ -637,6 +637,26 @@ class ApiClient {
             updated_at:                             string }> }>(`/api/v1/settings`, {
             method: `GET`,
         });
+    }
+
+    // Notifications endpoints
+    async getNotifications(params?: { page?: number
+        per_page?:                            number
+        unread_only?:                         boolean }): Promise<any> {
+        const queryParams = new URLSearchParams();
+        if (params?.page) queryParams.append(`page`, String(params.page));
+        if (params?.per_page) queryParams.append(`per_page`, String(params.per_page));
+        if (params?.unread_only) queryParams.append(`unread_only`, String(params.unread_only));
+        
+        const response = await this.request<{ success: boolean
+            notifications:                               Array<any>
+            pagination:                                 any }>(`/api/v1/notifications?${ queryParams }`, {
+            method: `GET`,
+        });
+        return {
+            items:      response.notifications,
+            pagination: response.pagination,
+        };
     }
 
     async getSetting(key: string): Promise<{ id: string

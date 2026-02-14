@@ -18,6 +18,7 @@ import {
 import {
     Leaf, Loader2, ShieldCheck
 } from "lucide-react";
+import { motion } from "motion/react";
 
 export const Route = createFileRoute(`/setup`)({
     component: SetupPage,
@@ -129,24 +130,57 @@ export default function SetupPage() {
         <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-hidden auth-gradient">
             {/* Amber glow decoration */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute -top-40 -right-40 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
-                <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-secondary/10 rounded-full blur-3xl" />
+                <motion.div 
+                    className="absolute -top-40 -right-40 w-96 h-96 bg-primary/10 rounded-full blur-3xl"
+                    animate={{
+                        scale: [1, 1.1, 1],
+                        opacity: [0.3, 0.5, 0.3],
+                    }}
+                    transition={{
+                        duration: 8,
+                        repeat: Infinity,
+                        ease: "easeInOut"
+                    }}
+                />
+                <motion.div 
+                    className="absolute -bottom-40 -left-40 w-96 h-96 bg-secondary/10 rounded-full blur-3xl"
+                    animate={{
+                        scale: [1, 1.2, 1],
+                        opacity: [0.2, 0.4, 0.2],
+                    }}
+                    transition={{
+                        duration: 10,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                        delay: 1
+                    }}
+                />
             </div>
 
-            <Card className="w-full max-w-md relative z-10 border-border/50 shadow-xl">
-                <CardHeader className="space-y-4 text-center pb-2">
-                    <div className="mx-auto w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center">
-                        <ShieldCheck className="w-7 h-7 text-primary" />
-                    </div>
-                    <div>
-                        <CardTitle className="text-2xl font-semibold tracking-tight">
-                            Initialize Horizon
-                        </CardTitle>
-                        <CardDescription className="mt-2">
-                            Create your administrator account to get started
-                        </CardDescription>
-                    </div>
-                </CardHeader>
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, ease: "easeOut" }}
+            >
+                <Card className="w-full max-w-md relative z-10 border-border/50 shadow-xl">
+                    <CardHeader className="space-y-4 text-center pb-2">
+                        <motion.div 
+                            className="mx-auto w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center"
+                            initial={{ scale: 0.8 }}
+                            animate={{ scale: 1 }}
+                            transition={{ duration: 0.3, delay: 0.2 }}
+                        >
+                            <ShieldCheck className="w-7 h-7 text-primary" />
+                        </motion.div>
+                        <div>
+                            <CardTitle className="text-2xl font-semibold tracking-tight">
+                                Initialize Horizon
+                            </CardTitle>
+                            <CardDescription className="mt-2">
+                                Create your administrator account to get started
+                            </CardDescription>
+                        </div>
+                    </CardHeader>
                 <form
                     onSubmit={(e) => {
                         e.preventDefault();
@@ -288,6 +322,7 @@ export default function SetupPage() {
                     </CardFooter>
                 </form>
             </Card>
+            </motion.div>
         </div>
     );
 }

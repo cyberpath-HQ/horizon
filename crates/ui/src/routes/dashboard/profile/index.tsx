@@ -11,8 +11,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import {
-    User, Shield, Key, Loader2, AlertCircle, CheckCircle, Monitor, Trash2, Bell
+    User, Shield, Key, Loader2, AlertCircle, CheckCircle, Monitor, Trash2, Bell,
+    Copy, RefreshCw, Smartphone, ShieldAlert, ShieldCheck, Eye, EyeOff, LogOut, X
 } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
 import {
     useProfile,
     useUpdateProfile,
@@ -28,6 +30,7 @@ import {
     useEnableMfa,
     useVerifyMfaSetup,
     useDisableMfa,
+    useRegenerateBackupCodes,
 } from "@/hooks/useApi";
 
 // Type for tab search params
@@ -405,6 +408,7 @@ export default function ProfilePage() {
     // Mutations
     const enableMfa = useEnableMfa();
     const disableMfa = useDisableMfa();
+    const regenerateBackupCodes = useRegenerateBackupCodes();
     const deleteApiKey = useDeleteApiKey();
     const rotateApiKey = useRotateApiKey();
     const deleteSession = useDeleteSession();
@@ -419,7 +423,9 @@ export default function ProfilePage() {
     const [mfaSecret, setMfaSecret] = useState(``);
     const [mfaQrCode, setMfaQrCode] = useState(``);
     const [mfaPassword, setMfaPassword] = useState(``);
-    const [mfaStep, setMfaStep] = useState<`none` | `enabling` | `verify`>(`none`);
+    const [mfaStep, setMfaStep] = useState<`none` | `enabling` | `verify` | `show_codes`>(`none`);
+    const [backupCodes, setBackupCodes] = useState<string[]>([]);
+    const [showCodes, setShowCodes] = useState(false);
 
     // API Keys
     const [newApiKey, setNewApiKey] = useState(``);
@@ -436,7 +442,7 @@ export default function ProfilePage() {
     // Initialize MFA status
     useEffect(() => {
         if (mfaStatus) {
-            setMfaEnabled(mfaStatus.enabled);
+            setMfaEnabled(mfaStatus.mfa_enabled ?? false);
         }
     }, [mfaStatus]);
 
@@ -470,6 +476,7 @@ export default function ProfilePage() {
             const result = await enableMfa.mutateAsync(mfaPassword);
             setMfaSecret(result.secret);
             setMfaQrCode(`data:image/png;base64,${result.qr_code_base64}`);
+            setBackupCodes(result.backup_codes || []);
             setMfaStep(`enabling`);
             setMfaPassword(``);
         }
@@ -484,8 +491,34 @@ export default function ProfilePage() {
 
     const handleMfaVerifySuccess = () => {
         setMfaEnabled(true);
-        setMfaStep(`none`);
+        setMfaStep(`show_codes`);
         setMessage({ type: `success`, text: `MFA enabled successfully` });
+    };
+
+    const handleShowBackupCodes = () => {
+        setShowCodes(!showCodes);
+    };
+
+    const handleCopyBackupCodes = () => {
+        navigator.clipboard.writeText(backupCodes.join(`\n`));
+        setMessage({ type: `success`, text: `Backup codes copied to clipboard` });
+    };
+
+    const handleRegenerateBackupCodes = async() => {
+        if (!mfaPassword) {
+            setMessage({ type: `error`, text: `Password is required to regenerate backup codes` });
+            return;
+        }
+        try {
+            const result = await regenerateBackupCodes.mutateAsync(mfaPassword);
+            setBackupCodes(result.backup_codes || []);
+            setMessage({ type: `success`, text: `Backup codes regenerated` });
+            setMfaPassword(``);
+        }
+        catch (err: unknown) {
+            const error = err as { message?: string };
+            setMessage({ type: `error`, text: error.message || `Failed to regenerate backup codes` });
+        }
     };
 
     const handleDisableMfa = async() => {
@@ -572,12 +605,20 @@ export default function ProfilePage() {
                 </p>
             </div>
 
-            {message && (
-                <div className={`p-4 rounded-lg flex items-center gap-2 ${ message.type === `success` ? `bg-green-500/10 dark:bg-green-950/30 text-green-600 dark:text-green-400` : `bg-red-500/10 dark:bg-red-950/30 text-red-600 dark:text-red-400` }`}>
-                    {message.type === `success` ? <CheckCircle className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-                    {message.text}
-                </div>
-            )}
+            <AnimatePresence mode="wait">
+                {message && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                        transition={{ duration: 0.2 }}
+                        className={`p-4 rounded-lg flex items-center gap-2 ${ message.type === `success` ? `bg-green-500/10 dark:bg-green-950/30 text-green-600 dark:text-green-400 border border-green-500/20` : `bg-red-500/10 dark:bg-red-950/30 text-red-600 dark:text-red-400 border border-red-500/20` }`}
+                    >
+                        {message.type === `success` ? <CheckCircle className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                        {message.text}
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Tab Navigation using search params */}
             <div className="flex gap-1 border-b">
@@ -664,7 +705,10 @@ export default function ProfilePage() {
 
                     <Card>
                         <CardHeader>
-                            <CardTitle>Two-Factor Authentication</CardTitle>
+                            <CardTitle className="flex items-center gap-2">
+                                <Smartphone className="w-5 h-5" />
+                                Two-Factor Authentication
+                            </CardTitle>
                             <CardDescription>
                                 Add an extra layer of security to your account.
                             </CardDescription>
@@ -674,10 +718,68 @@ export default function ProfilePage() {
 ? (
                                 <div className="space-y-4">
                                     <div className="flex items-center gap-2 text-green-500">
-                                        <CheckCircle className="w-5 h-5" />
-                                        <span>2FA is enabled on your account</span>
+                                        <ShieldCheck className="w-5 h-5" />
+                                        <span className="font-medium">2FA is enabled on your account</span>
                                     </div>
-                                    <div className="space-y-2">
+                                    
+                                    {/* Backup Codes Section */}
+                                    <div className="border rounded-lg p-4 space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <Key className="w-4 h-4 text-muted-foreground" />
+                                                <span className="font-medium text-sm">Backup Codes</span>
+                                            </div>
+                                            <Button variant="outline" size="sm" onClick={handleShowBackupCodes}>
+                                                {showCodes ? <EyeOff className="w-4 h-4 mr-1" /> : <Eye className="w-4 h-4 mr-1" />}
+                                                {showCodes ? `Hide` : `Show`}
+                                            </Button>
+                                        </div>
+                                        
+                                        {showCodes && backupCodes.length > 0 && (
+                                            <div className="space-y-2">
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    {backupCodes.map((code, index) => (
+                                                        <code key={index} className="text-xs bg-muted px-2 py-1 rounded font-mono">
+                                                            {code}
+                                                        </code>
+                                                    ))}
+                                                </div>
+                                                <div className="flex gap-2 pt-2">
+                                                    <Button size="sm" variant="outline" onClick={handleCopyBackupCodes}>
+                                                        <Copy className="w-4 h-4 mr-1" />
+                                                        Copy All
+                                                    </Button>
+                                                    <Button size="sm" variant="outline" onClick={handleRegenerateBackupCodes} disabled={regenerateBackupCodes.isPending}>
+                                                        {regenerateBackupCodes.isPending 
+                                                            ? <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                                                            : <RefreshCw className="w-4 h-4 mr-1" />
+                                                        }
+                                                        Regenerate
+                                                    </Button>
+                                                </div>
+                                                <p className="text-xs text-muted-foreground">
+                                                    Store these codes in a safe place. You can use them to access your account if you lose your authenticator.
+                                                </p>
+                                            </div>
+                                        )}
+                                        
+                                        {showCodes && backupCodes.length === 0 && (
+                                            <div className="text-sm text-muted-foreground">
+                                                <p>No backup codes available.</p>
+                                                <Button 
+                                                    variant="link" 
+                                                    size="sm" 
+                                                    onClick={handleRegenerateBackupCodes} 
+                                                    disabled={regenerateBackupCodes.isPending}
+                                                    className="p-0 h-auto"
+                                                >
+                                                    Generate backup codes
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </div>
+                                    
+                                    <div className="space-y-2 pt-2 border-t">
                                         <Label htmlFor="disablePassword">Password to disable</Label>
                                         <Input
                                             id="disablePassword"
@@ -696,6 +798,10 @@ export default function ProfilePage() {
 : mfaStep === `none`
 ? (
                                 <div className="space-y-4">
+                                    <div className="flex items-center gap-2 text-muted-foreground">
+                                        <ShieldAlert className="w-5 h-5" />
+                                        <span className="text-sm">Add an extra layer of security to your account</span>
+                                    </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="mfaPassword">Enter your password to enable 2FA</Label>
                                         <Input
@@ -735,6 +841,41 @@ export default function ProfilePage() {
                                     <MfaVerifyForm onSuccess={handleMfaVerifySuccess} />
                                 </div>
                             )
+: mfaStep === `show_codes` && backupCodes.length > 0
+? (
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-2 text-green-500">
+                                        <CheckCircle className="w-5 h-5" />
+                                        <span className="font-medium">2FA enabled successfully!</span>
+                                    </div>
+                                    
+                                    <div className="border border-yellow-500/20 bg-yellow-500/10 rounded-lg p-4 space-y-3">
+                                        <div className="flex items-center gap-2">
+                                            <Key className="w-5 h-5 text-yellow-500" />
+                                            <span className="font-medium text-yellow-500">Save your backup codes</span>
+                                        </div>
+                                        <p className="text-sm text-muted-foreground">
+                                            Store these codes in a safe place. You can use them to access your account if you lose your authenticator device.
+                                        </p>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {backupCodes.map((code, index) => (
+                                                <code key={index} className="text-xs bg-background px-2 py-1 rounded font-mono">
+                                                    {code}
+                                                </code>
+                                            ))}
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <Button size="sm" onClick={handleCopyBackupCodes}>
+                                                <Copy className="w-4 h-4 mr-1" />
+                                                Copy All Codes
+                                            </Button>
+                                            <Button size="sm" variant="outline" onClick={() => setMfaStep(`none`)}>
+                                                Done
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )
 : null}
                         </CardContent>
                     </Card>
@@ -742,10 +883,13 @@ export default function ProfilePage() {
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center justify-between">
-                                Active Sessions
-                                {sessions.length > 0 && (
+                                <span className="flex items-center gap-2">
+                                    <Monitor className="w-5 h-5" />
+                                    Active Sessions
+                                </span>
+                                {(sessions?.length ?? 0) > 0 && (
                                     <Button variant="outline" size="sm" onClick={handleDeleteAllSessions}>
-                                        <Trash2 className="w-4 h-4 mr-1" />
+                                        <LogOut className="w-4 h-4 mr-1" />
                                         Logout Everywhere
                                     </Button>
                                 )}
@@ -761,27 +905,61 @@ export default function ProfilePage() {
                                     <Loader2 className="w-6 h-6 animate-spin" />
                                 </div>
                             )
-: sessions.length === 0
+: (!sessions || sessions.length === 0)
 ? (
-                                <p className="text-muted-foreground text-sm">No active sessions.</p>
+                                <div className="text-center py-6">
+                                    <Monitor className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
+                                    <p className="text-muted-foreground text-sm">No active sessions found.</p>
+                                    <p className="text-xs text-muted-foreground mt-1">Your current session will appear here.</p>
+                                </div>
                             )
 : (
                                 <div className="space-y-2">
-                                    {sessions.map((session) => (
-                                        <div key={session.id} className="flex items-center justify-between p-3 border rounded-lg">
+                                    {/* Current Session (first one) */}
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <span className="text-xs bg-green-500/10 text-green-500 px-2 py-1 rounded-full flex items-center gap-1">
+                                            <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+                                            Current Session
+                                        </span>
+                                    </div>
+                                    {sessions.map((session, index) => (
+                                        <motion.div 
+                                            key={session.id}
+                                            initial={{ opacity: 0, x: -10 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            transition={{ delay: index * 0.05 }}
+                                            className="flex items-center justify-between p-3 border rounded-lg bg-card hover:bg-accent/50 transition-colors"
+                                        >
                                             <div className="flex items-center gap-3">
-                                                <Monitor className="w-4 w-4 text-muted-foreground" />
+                                                {index === 0 ? (
+                                                    <Monitor className="w-4 h-4 text-green-500" />
+                                                ) : (
+                                                    <Monitor className="w-4 h-4 text-muted-foreground" />
+                                                )}
                                                 <div>
-                                                    <p className="text-sm font-medium">{session.user_agent || `Unknown device`}</p>
+                                                    <p className="text-sm font-medium flex items-center gap-2">
+                                                        {session.user_agent || `Unknown device`}
+                                                        {index === 0 && (
+                                                            <span className="text-xs bg-green-500/10 text-green-500 px-1.5 py-0.5 rounded">
+                                                                Current
+                                                            </span>
+                                                        )}
+                                                    </p>
                                                     <p className="text-xs text-muted-foreground">
-                                                        {session.ip_address || `Unknown IP`} • Created {new Date(session.created_at).toLocaleDateString()}
+                                                        {session.ip_address || `Unknown IP`} • Started {new Date(session.created_at).toLocaleDateString()}
                                                     </p>
                                                 </div>
                                             </div>
-                                            <Button variant="ghost" size="sm" onClick={() => handleDeleteSession(session.id)}>
+                                            <Button 
+                                                variant="ghost" 
+                                                size="sm" 
+                                                onClick={() => handleDeleteSession(session.id)}
+                                                title="Revoke this session"
+                                                className={index === 0 ? `text-destructive hover:text-destructive` : ``}
+                                            >
                                                 <Trash2 className="w-4 h-4" />
                                             </Button>
-                                        </div>
+                                        </motion.div>
                                     ))}
                                 </div>
                             )}
@@ -872,15 +1050,32 @@ export default function ProfilePage() {
                         </CardHeader>
                         <CardContent className="space-y-4">
                             {showApiKey && newApiKey && (
-                                <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg space-y-2">
-                                    <p className="font-medium text-yellow-500">Your new API key</p>
-                                    <code className="block p-2 bg-background rounded text-xs break-all">{newApiKey}</code>
+                                <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg space-y-3">
+                                    <div className="flex items-center gap-2">
+                                        <Key className="w-5 h-5 text-yellow-500" />
+                                        <p className="font-medium text-yellow-500">Your new API key</p>
+                                    </div>
+                                    <code className="block p-3 bg-background rounded text-xs break-all font-mono">{newApiKey}</code>
                                     <p className="text-xs text-muted-foreground">
                                         Make sure to copy it now. You won&apos;t be able to see it again!
                                     </p>
-                                    <Button variant="outline" size="sm" onClick={() => { setShowApiKey(false); setNewApiKey(``); }}>
-                                        I&apos;ve copied it
-                                    </Button>
+                                    <div className="flex gap-2">
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm" 
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(newApiKey);
+                                                setMessage({ type: `success`, text: `API key copied to clipboard` });
+                                            }}
+                                        >
+                                            <Copy className="w-4 h-4 mr-1" />
+                                            Copy
+                                        </Button>
+                                        <Button variant="outline" size="sm" onClick={() => { setShowApiKey(false); setNewApiKey(``); }}>
+                                            <X className="w-4 h-4 mr-1" />
+                                            Done
+                                        </Button>
+                                    </div>
                                 </div>
                             )}
 
@@ -889,17 +1084,27 @@ export default function ProfilePage() {
                             <div className="space-y-2">
                                 {apiKeys.length === 0
 ? (
-                                    <p className="text-muted-foreground text-sm">No API keys yet.</p>
+                                    <div className="text-center py-6">
+                                        <Key className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
+                                        <p className="text-muted-foreground text-sm">No API keys yet.</p>
+                                        <p className="text-xs text-muted-foreground mt-1">Create an API key to access the platform programmatically.</p>
+                                    </div>
                                 )
 : (
                                     apiKeys.map((key) => (
-                                        <div key={key.id} className="flex items-center justify-between p-3 border rounded-lg">
-                                            <div>
-                                                <p className="font-medium">{key.name}</p>
-                                                <p className="text-xs text-muted-foreground">
-                                                    Created {new Date(key.created_at).toLocaleDateString()}
-                                                    {key.expires_at && ` • Expires ${ new Date(key.expires_at).toLocaleDateString() }`}
-                                                </p>
+                                        <div key={key.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/50 transition-colors">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                                                    <Key className="w-5 h-5 text-primary" />
+                                                </div>
+                                                <div>
+                                                    <p className="font-medium">{key.name}</p>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">{key.key_prefix}...</span>
+                                                        {` • Created ${ new Date(key.created_at).toLocaleDateString() }`}
+                                                        {key.expires_at && ` • Expires ${ new Date(key.expires_at).toLocaleDateString() }`}
+                                                    </p>
+                                                </div>
                                             </div>
                                             <div className="flex gap-1">
                                                 <Button
@@ -907,16 +1112,23 @@ export default function ProfilePage() {
                                                     size="sm"
                                                     onClick={() => handleRotateApiKey(key.id)}
                                                     disabled={rotateApiKey.isPending}
+                                                    title="Rotate API key"
                                                 >
                                                     {rotateApiKey.isPending
 ? (
                                                         <Loader2 className="w-4 h-4 animate-spin" />
                                                     )
 : (
-                                                        <Trash2 className="w-4 h-4" />
+                                                        <RefreshCw className="w-4 h-4" />
                                                     )}
                                                 </Button>
-                                                <Button variant="ghost" size="sm" onClick={() => handleDeleteApiKey(key.id)}>
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="sm" 
+                                                    onClick={() => handleDeleteApiKey(key.id)}
+                                                    title="Delete API key"
+                                                    className="text-destructive hover:text-destructive"
+                                                >
                                                     <Trash2 className="w-4 h-4" />
                                                 </Button>
                                             </div>

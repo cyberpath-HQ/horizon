@@ -17,18 +17,25 @@ import {
   Menu,
   Search,
   Bell,
+  BellDot,
   LogOut,
   User,
   Settings,
   Moon,
   Sun,
 } from "lucide-react";
+import { useNotifications } from "@/hooks/useApi";
+import { motion, AnimatePresence } from "motion/react";
 
 export function MainLayout() {
   const { user, logout } = useAuth();
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  
+  // Fetch notifications to check for unread
+  const { data: notificationsData } = useNotifications();
+  const hasUnreadNotifications = (notificationsData?.items?.length ?? 0) > 0;
 
   const handleLogout = async () => {
     await logout();
@@ -40,9 +47,53 @@ export function MainLayout() {
   };
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen bg-background relative overflow-hidden">
+      {/* Dynamic Background */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <motion.div 
+          className="absolute -top-1/4 -right-1/4 w-1/2 h-1/2 bg-primary/5 rounded-full blur-3xl"
+          animate={{
+            scale: [1, 1.2, 1],
+            x: [0, 30, 0],
+            y: [0, -20, 0],
+          }}
+          transition={{
+            duration: 15,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+        />
+        <motion.div 
+          className="absolute -bottom-1/4 -left-1/4 w-1/2 h-1/2 bg-secondary/5 rounded-full blur-3xl"
+          animate={{
+            scale: [1, 1.3, 1],
+            x: [0, -30, 0],
+            y: [0, 30, 0],
+          }}
+          transition={{
+            duration: 18,
+            repeat: Infinity,
+            ease: "easeInOut",
+            delay: 3
+          }}
+        />
+        <motion.div 
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-gradient-to-br from-primary/3 via-transparent to-secondary/3 rounded-full blur-3xl"
+          animate={{
+            scale: [1, 1.1, 1],
+            opacity: [0.3, 0.5, 0.3],
+          }}
+          transition={{
+            duration: 12,
+            repeat: Infinity,
+            ease: "easeInOut",
+            delay: 5
+          }}
+        />
+      </div>
+
       {/* Sidebar - Desktop */}
-      <div className="hidden md:flex">
+      <div className="hidden md:flex relative z-10">
         <Sidebar />
       </div>
 
@@ -60,7 +111,7 @@ export function MainLayout() {
       )}
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 relative z-10">
         {/* Header */}
         <header className="h-14 border-b bg-card/50 backdrop-blur-sm sticky top-0 z-40">
           <div className="h-full px-4 flex items-center justify-between gap-4">
@@ -100,8 +151,13 @@ export function MainLayout() {
 
               {/* Notifications */}
               <Button variant="ghost" size="icon" className="relative" onClick={() => navigate({ to: "/dashboard/settings/notifications" })}>
-                <Bell className="w-4 h-4" />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-destructive rounded-full" />
+                {hasUnreadNotifications 
+                  ? <BellDot className="w-4 h-4 text-destructive" />
+                  : <Bell className="w-4 h-4" />
+                }
+                {hasUnreadNotifications && (
+                  <span className="absolute top-1 right-1 w-2 h-2 bg-destructive rounded-full" />
+                )}
               </Button>
 
               {/* User Menu */}
@@ -147,8 +203,18 @@ export function MainLayout() {
 
         {/* Page Content */}
         <main className="flex-1 overflow-auto">
-          <div className="container mx-auto p-6 max-w-7xl animate-fade-in">
-            <Outlet />
+          <div className="container mx-auto p-6 max-w-7xl">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={window.location.pathname}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                <Outlet />
+              </motion.div>
+            </AnimatePresence>
           </div>
         </main>
       </div>

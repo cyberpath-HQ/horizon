@@ -457,6 +457,19 @@ export function useDisableMfa() {
     });
 }
 
+export function useRegenerateBackupCodes() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async(password: string) => api.regenerateBackupCodes(password),
+        onSuccess:  () => {
+            queryClient.invalidateQueries({
+                queryKey: queryKeys.mfaStatus,
+            });
+        },
+    });
+}
+
 // User search hook for autocomplete
 export function useSearchUsers(search: string, enabled = true) {
     return useQuery({
@@ -471,5 +484,18 @@ export function useSearchUsers(search: string, enabled = true) {
             per_page: 20,
         }),
         enabled:  enabled && search.length >= 2,
+    });
+}
+
+// Notifications Hooks
+export function useNotifications(params?: { page?: number
+    per_page?:                          number
+    unread_only?:                       boolean }) {
+    return useQuery({
+        queryKey: [
+            ...queryKeys.notifications,
+            params,
+        ],
+        queryFn: async() => api.getNotifications(params),
     });
 }
