@@ -63,6 +63,18 @@ pub struct UpdateUserProfileRequest {
     pub avatar_url: Option<String>,
 }
 
+/// Request to update a user (admin operation)
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Validate)]
+pub struct UpdateUserRequest {
+    /// New full name
+    #[validate(length(max = 255, message = "Full name must not exceed 255 characters"))]
+    pub full_name: Option<String>,
+    /// New role to assign
+    pub role:      Option<String>,
+    /// User status
+    pub status:    Option<String>,
+}
+
 /// Response for user list
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct UserListResponse {

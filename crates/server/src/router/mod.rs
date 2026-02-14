@@ -16,6 +16,7 @@ use sea_orm::{EntityTrait, PaginatorTrait};
 use tracing::error;
 
 use crate::{
+    dto::auth::SuccessResponse,
     middleware::{auth::AuthenticatedUser, security_headers::CorsConfig},
     AppState,
 };
@@ -48,6 +49,9 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/v1/users/me", put(update_my_profile_handler))
         .route("/api/v1/users", post(create_user_handler))
         .route("/api/v1/users", get(list_users_handler))
+        .route("/api/v1/users/{id}", get(get_user_handler))
+        .route("/api/v1/users/{id}", put(update_user_handler))
+        .route("/api/v1/users/{id}", delete(delete_user_handler))
         // Team endpoints
         .route("/api/v1/teams", post(create_team_handler))
         .route("/api/v1/teams", get(list_teams_handler))
@@ -335,6 +339,34 @@ async fn list_users_handler(
     Query(query): Query<crate::dto::users::UserListQuery>,
 ) -> Result<Json<crate::dto::users::UserListResponse>> {
     crate::auth::users::list_users_handler(&state, user, query).await
+}
+
+/// Get a user by ID
+async fn get_user_handler(
+    State(state): State<AppState>,
+    user: crate::middleware::auth::AuthenticatedUser,
+    Path(id): Path<String>,
+) -> Result<Json<crate::dto::users::UserProfileResponse>> {
+    crate::auth::users::get_user_handler(&state, user, &id).await
+}
+
+/// Update a user (admin only)
+async fn update_user_handler(
+    State(state): State<AppState>,
+    user: crate::middleware::auth::AuthenticatedUser,
+    Path(id): Path<String>,
+    Json(req): Json<crate::dto::users::UpdateUserRequest>,
+) -> Result<Json<crate::dto::users::UserProfileResponse>> {
+    crate::auth::users::update_user_handler(&state, user, id, req).await
+}
+
+/// Delete a user (admin only)
+async fn delete_user_handler(
+    State(state): State<AppState>,
+    user: crate::middleware::auth::AuthenticatedUser,
+    Path(id): Path<String>,
+) -> Result<Json<SuccessResponse>> {
+    crate::auth::users::delete_user_handler(&state, user, &id).await
 }
 
 // ==================== TEAM HANDLERS ====================

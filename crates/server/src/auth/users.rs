@@ -20,7 +20,17 @@ use permissions_macro::with_permission;
 use validator::Validate;
 
 use crate::{
-    dto::users::{PaginationInfo, UpdateUserProfileRequest, UserListQuery, UserListResponse, UserProfileResponse},
+    dto::{
+        auth::SuccessResponse,
+        users::{
+            PaginationInfo,
+            UpdateUserProfileRequest,
+            UpdateUserRequest,
+            UserListQuery,
+            UserListResponse,
+            UserProfileResponse,
+        },
+    },
     middleware::auth::AuthenticatedUser,
     AppState,
 };
@@ -280,6 +290,172 @@ pub async fn list_users_handler(
             total,
             total_pages,
         },
+    }))
+}
+
+/// Update a user by ID (admin only)
+///
+/// # Arguments
+///
+/// * `state` - Application state
+/// * `user` - Authenticated user from middleware
+/// * `user_id` - ID of the user to update
+/// * `req` - Update request with optional fields
+///
+/// # Returns
+///
+/// Updated user profile response
+#[with_permission(Permission::Users(UserAction::Update))]
+pub async fn update_user_handler(
+    state: &AppState,
+    user: AuthenticatedUser,
+    user_id: String,
+    req: UpdateUserRequest,
+) -> Result<Json<UserProfileResponse>> {
+    // Validate request
+    req.validate().map_err(|e| {
+        AppError::Validation {
+            message: e.to_string(),
+        }
+    })?;
+
+    // Find the user to update
+    let db_user = UsersEntity::find_by_id(&user_id)
+        .one(&state.db)
+        .await?
+        .ok_or_else(|| AppError::not_found("User not found"))?;
+
+    let mut active_model: entity::users::ActiveModel = db_user.into();
+
+    // Update full_name if provided
+    if let Some(full_name) = req.full_name {
+        active_model.full_name = Set(full_name);
+    }
+
+    // Update status if provided
+    if let Some(ref status) = req.status {
+        let user_status = match status.as_str() {
+            "active" => UserStatus::Active,
+            "inactive" => UserStatus::Inactive,
+            "suspended" => UserStatus::Suspended,
+            "pending_verification" => UserStatus::PendingVerification,
+            _ => {
+                return Err(AppError::Validation {
+                    message: format!("Invalid status: {}", status),
+                });
+            },
+        };
+        active_model.status = Set(user_status);
+    }
+
+    active_model.updated_at = Set(Utc::now().naive_utc());
+
+    let updated_user = active_model
+        .update(&state.db)
+        .await
+        .map_err(|e| AppError::database(format!("Failed to update user: {}", e)))?;
+
+    // Update role if provided
+    if let Some(ref role) = req.role {
+        // Delete all existing roles for this user
+        entity::user_roles::Entity::delete_many()
+            .filter(entity::user_roles::Column::UserId.eq(&updated_user.id))
+            .exec(&state.db)
+            .await
+            .map_err(|e| AppError::database(format!("Failed to remove existing roles: {}", e)))?;
+
+        // Assign new role
+        auth::roles::assign_role_to_user(
+            &state.db,
+            &updated_user.id,
+            role,
+            RoleScopeType::Global,
+            None,
+            None,
+        )
+        .await
+        .map_err(|e| AppError::database(format!("Failed to assign role: {}", e)))?;
+    }
+
+    let roles = get_user_roles(&state.db, &updated_user.id).await?;
+    let profile = user_model_to_response(&updated_user, roles);
+
+    debug!(user_id = %user_id, "User updated by admin");
+
+    Ok(Json(profile))
+}
+
+/// Get a user by ID (admin only)
+///
+/// # Arguments
+///
+/// * `state` - Application state
+/// * `user` - Authenticated user from middleware
+/// * `user_id` - ID of the user to retrieve
+///
+/// # Returns
+///
+/// User profile response
+#[with_permission(Permission::Users(UserAction::Read))]
+pub async fn get_user_handler(
+    state: &AppState,
+    user: AuthenticatedUser,
+    user_id: &str,
+) -> Result<Json<UserProfileResponse>> {
+    let db_user = UsersEntity::find_by_id(user_id)
+        .one(&state.db)
+        .await?
+        .ok_or_else(|| AppError::not_found("User not found"))?;
+
+    let roles = get_user_roles(&state.db, &db_user.id).await?;
+    let profile = user_model_to_response(&db_user, roles);
+
+    Ok(Json(profile))
+}
+
+/// Delete a user by ID (admin only)
+///
+/// # Arguments
+///
+/// * `state` - Application state
+/// * `user` - Authenticated user from middleware
+/// * `user_id` - ID of the user to delete
+///
+/// # Returns
+///
+/// Success response
+#[with_permission(Permission::Users(UserAction::Delete))]
+pub async fn delete_user_handler(
+    state: &AppState,
+    user: AuthenticatedUser,
+    user_id: &str,
+) -> Result<Json<SuccessResponse>> {
+    // Find the user to delete
+    let db_user = UsersEntity::find_by_id(user_id)
+        .one(&state.db)
+        .await?
+        .ok_or_else(|| AppError::not_found("User not found"))?;
+
+    // Prevent deleting yourself
+    if db_user.id == user.id {
+        return Err(AppError::Validation {
+            message: "Cannot delete your own account".to_string(),
+        });
+    }
+
+    // Soft delete - set deleted_at timestamp
+    let mut active_model: entity::users::ActiveModel = db_user.into();
+    active_model.deleted_at = Set(Some(Utc::now().naive_utc()));
+    active_model
+        .update(&state.db)
+        .await
+        .map_err(|e| AppError::database(format!("Failed to delete user: {}", e)))?;
+
+    debug!(user_id = %user_id, "User deleted by admin");
+
+    Ok(Json(SuccessResponse {
+        success: true,
+        message: "User deleted successfully".to_string(),
     }))
 }
 
