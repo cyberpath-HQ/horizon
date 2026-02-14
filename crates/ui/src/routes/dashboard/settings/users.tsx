@@ -8,6 +8,7 @@ import {
 import {
     getAccessToken, getStoredUser
 } from "@/lib/api";
+import { toastSuccess, toastError } from "@/lib/toast";
 import {
     useUsers,
     useCreateUser,
@@ -15,7 +16,7 @@ import {
     useDeleteUser,
     useBulkDeleteUsers
 } from "@/hooks/useApi";
-import { motion, AnimatePresence } from "motion/react";
+import { motion } from "motion/react";
 import {
     Card, CardContent, CardDescription, CardHeader, CardTitle
 } from "@/components/ui/card";
@@ -78,11 +79,6 @@ import {
     PaginationPrevious
 } from "@/components/ui/pagination";
 import {
-    Alert,
-    AlertDescription,
-    AlertTitle
-} from "@/components/ui/alert";
-import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
@@ -90,7 +86,7 @@ import {
     DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import {
-    Loader2, UserPlus, Users, AlertCircle, CheckCircle, MoreHorizontal, Trash2, RefreshCw, Search,
+    Loader2, UserPlus, Users, MoreHorizontal, Trash2, RefreshCw, Search,
     Eye, UserCog, Shield, Crown, ArrowUpDown, ArrowUp, ArrowDown
 } from "lucide-react";
 
@@ -320,14 +316,6 @@ export default function UsersPage() {
         setIsCreateOpen,
     ] = useState(false);
 
-    // Alert state
-    const [
-        alert,
-        setAlert,
-    ] = useState<{ type: `success` | `error`
-        title:           string
-        message:         string } | null>(null);
-
     // Mutations
     const updateUser = useUpdateUser();
     const deleteUser = useDeleteUser();
@@ -352,14 +340,6 @@ export default function UsersPage() {
 
     const users: Array<User> = data?.items || [];
     const pagination = data?.pagination;
-
-    // Alert auto-dismiss
-    useEffect(() => {
-        if (alert) {
-            const timer = setTimeout(() => setAlert(null), 5000);
-            return () => clearTimeout(timer);
-        }
-    }, [ alert ]);
 
     // Handlers
     const handleSearch = (value: string) => {
@@ -399,11 +379,7 @@ export default function UsersPage() {
 
     const handleCreateSuccess = () => {
         setIsCreateOpen(false);
-        setAlert({
-            type:    `success`,
-            title:   `Success`,
-            message: `User created successfully`,
-        });
+        toastSuccess("User created successfully");
     };
 
     const handleUpdateUserRole = async(userId: string, newRole: string) => {
@@ -415,19 +391,11 @@ export default function UsersPage() {
                 },
             });
 
-            setAlert({
-                type:    `success`,
-                title:   `Success`,
-                message: `User role updated successfully`,
-            });
+            toastSuccess("User role updated successfully");
         }
         catch (err: unknown) {
             const error = err as { message?: string };
-            setAlert({
-                type:    `error`,
-                title:   `Error`,
-                message: error.message || `Failed to update user role`,
-            });
+            toastError(error.message || "Failed to update user role");
         }
     };
 
@@ -439,24 +407,15 @@ export default function UsersPage() {
         try {
             await deleteUser.mutateAsync(userId);
 
-            setAlert({
-                type:    `success`,
-                title:   `Success`,
-                message: `User deleted successfully`,
-            });
-
             // Clear selection if deleted user was selected
             const newSelected = new Set(selectedUsers);
             newSelected.delete(userId);
             setSelectedUsers(newSelected);
+            toastSuccess("User deleted successfully");
         }
         catch (err: unknown) {
             const error = err as { message?: string };
-            setAlert({
-                type:    `error`,
-                title:   `Error`,
-                message: error.message || `Failed to delete user`,
-            });
+            toastError(error.message || "Failed to delete user");
         }
     };
 
@@ -468,21 +427,13 @@ export default function UsersPage() {
         try {
             await bulkDeleteUsers.mutateAsync(Array.from(selectedUsers));
 
-            setAlert({
-                type:    `success`,
-                title:   `Success`,
-                message: `${ selectedUsers.size } users deleted successfully`,
-            });
+            toastSuccess(`${ selectedUsers.size } users deleted successfully`);
 
             setSelectedUsers(new Set());
         }
         catch (err: unknown) {
             const error = err as { message?: string };
-            setAlert({
-                type:    `error`,
-                title:   `Error`,
-                message: error.message || `Failed to delete users`,
-            });
+            toastError(error.message || "Failed to delete users");
         }
     };
 
@@ -527,8 +478,35 @@ export default function UsersPage() {
     };
 
     return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
+        <div className="space-y-6 relative z-10">
+            {/* Animated Background */}
+            <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
+                <motion.div
+                    className="absolute -top-40 -right-40 w-[600px] h-[600px] bg-gradient-to-br from-primary/10 via-primary/5 to-transparent rounded-full blur-3xl"
+                    animate={{
+                        scale: [1, 1.3, 1],
+                        x: [0, 50, 0],
+                        opacity: [0.3, 0.5, 0.3],
+                    }}
+                    transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+                />
+                <motion.div
+                    className="absolute -bottom-40 -left-40 w-[500px] h-[500px] bg-gradient-to-tr from-violet-500/10 via-purple-500/5 to-transparent rounded-full blur-3xl"
+                    animate={{
+                        scale: [1, 1.4, 1],
+                        x: [0, -40, 0],
+                        opacity: [0.2, 0.4, 0.2],
+                    }}
+                    transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+                />
+            </div>
+
+            <motion.div 
+                className="flex items-center justify-between"
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+            >
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Users</h1>
                     <p className="text-muted-foreground mt-1">
@@ -561,24 +539,7 @@ export default function UsersPage() {
                         </DialogContent>
                     </Dialog>
                 </div>
-            </div>
-
-            <AnimatePresence mode="wait">
-                {alert && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                        transition={{ duration: 0.2 }}
-                    >
-                        <Alert variant={alert.type === `error` ? `destructive` : `default`} className={alert.type === `success` ? `border-green-500 dark:border-green-600 bg-green-50 dark:bg-green-950/30` : ``}>
-                            {alert.type === `success` ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
-                            <AlertTitle>{alert.title}</AlertTitle>
-                            <AlertDescription>{alert.message}</AlertDescription>
-                        </Alert>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            </motion.div>
 
             <Card>
                 <CardHeader className="pb-3">
@@ -673,8 +634,14 @@ export default function UsersPage() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {users.map((user) => (
-                            <TableRow key={user.id}>
+                        {users.map((user, index) => (
+                            <motion.tr
+                                key={user.id}
+                                initial={{ opacity: 0, x: -10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: index * 0.03 }}
+                                className="hover:bg-muted/50 transition-colors"
+                            >
                                 <TableCell>
                                     <Checkbox
                                         checked={selectedUsers.has(user.id)}
@@ -742,7 +709,7 @@ export default function UsersPage() {
                                         </DropdownMenuContent>
                                     </DropdownMenu>
                                 </TableCell>
-                            </TableRow>
+                            </motion.tr>
                         ))}
                     </TableBody>
                 </Table>

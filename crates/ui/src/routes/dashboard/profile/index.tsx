@@ -3,6 +3,7 @@ import { useForm } from "@tanstack/react-form";
 import { createFileRoute, redirect, useSearch, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/context/AuthContext";
 import { setStoredUser, getAccessToken, getStoredUser } from "@/lib/api";
+import { toastSuccess, toastError } from "@/lib/toast";
 import {
     Card, CardContent, CardDescription, CardHeader, CardTitle
 } from "@/components/ui/card";
@@ -11,11 +12,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import {
-    User, Shield, Key, Loader2, AlertCircle, CheckCircle, Monitor, Trash2, Bell,
+    User, Shield, Key, Loader2, Monitor, Trash2, Bell,
     Copy, RefreshCw, Smartphone, ShieldAlert, ShieldCheck, Eye, EyeOff, LogOut, X,
-    Clock, Globe, Settings
+    Clock, Globe, Settings, CheckCircle, AlertCircle
 } from "lucide-react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion } from "motion/react";
 import { Badge } from "@/components/ui/badge";
 import {
     Dialog,
@@ -486,22 +487,83 @@ function ApiKeyDetailsDialog({ keyId, onClose }: { keyId: string; onClose: () =>
                     )}
                 </div>
                 {editingPermissions ? (
-                    <div className="space-y-2">
-                        <div className="flex flex-wrap gap-2">
-                            {[`read:assets`, `write:assets`, `read:users`, `write:users`, `admin`].map((perm) => (
-                                <Badge
-                                    key={perm}
-                                    variant={permissions.includes(perm) ? `default` : `outline`}
-                                    className="cursor-pointer"
-                                    onClick={() => {
-                                        setPermissions((prev) => prev.includes(perm) ? prev.filter((p) => p !== perm) : [...prev, perm]);
-                                    }}
-                                >
-                                    {perm}
-                                </Badge>
-                            ))}
+                    <div className="space-y-3">
+                        {/* User Permissions */}
+                        <div>
+                            <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Users</p>
+                            <div className="flex flex-wrap gap-2">
+                                {[
+                                    { value: `users:create`, label: `Create` },
+                                    { value: `users:read`, label: `Read` },
+                                    { value: `users:update`, label: `Update` },
+                                    { value: `users:delete`, label: `Delete` },
+                                ].map((perm) => (
+                                    <Badge
+                                        key={perm.value}
+                                        variant={permissions.includes(perm.value) ? `default` : `outline`}
+                                        className="cursor-pointer transition-all hover:scale-105"
+                                        onClick={() => {
+                                            setPermissions((prev) => prev.includes(perm.value) ? prev.filter((p) => p !== perm.value) : [...prev, perm.value]);
+                                        }}
+                                    >
+                                        {perm.label}
+                                    </Badge>
+                                ))}
+                            </div>
                         </div>
-                        <div className="flex gap-2">
+                        {/* Team Permissions */}
+                        <div>
+                            <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Teams</p>
+                            <div className="flex flex-wrap gap-2">
+                                {[
+                                    { value: `teams:create`, label: `Create` },
+                                    { value: `teams:read`, label: `Read` },
+                                    { value: `teams:update`, label: `Update` },
+                                    { value: `teams:delete`, label: `Delete` },
+                                    { value: `teams:members_read`, label: `Members Read` },
+                                    { value: `teams:members_add`, label: `Members Add` },
+                                    { value: `teams:members_update`, label: `Members Update` },
+                                    { value: `teams:members_remove`, label: `Members Remove` },
+                                ].map((perm) => (
+                                    <Badge
+                                        key={perm.value}
+                                        variant={permissions.includes(perm.value) ? `default` : `outline`}
+                                        className="cursor-pointer transition-all hover:scale-105"
+                                        onClick={() => {
+                                            setPermissions((prev) => prev.includes(perm.value) ? prev.filter((p) => p !== perm.value) : [...prev, perm.value]);
+                                        }}
+                                    >
+                                        {perm.label}
+                                    </Badge>
+                                ))}
+                            </div>
+                        </div>
+                        {/* API Keys Permissions */}
+                        <div>
+                            <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">API Keys</p>
+                            <div className="flex flex-wrap gap-2">
+                                {[
+                                    { value: `api_keys:create`, label: `Create` },
+                                    { value: `api_keys:read`, label: `Read` },
+                                    { value: `api_keys:update`, label: `Update` },
+                                    { value: `api_keys:delete`, label: `Delete` },
+                                    { value: `api_keys:rotate`, label: `Rotate` },
+                                    { value: `api_keys:usage_read`, label: `Usage Read` },
+                                ].map((perm) => (
+                                    <Badge
+                                        key={perm.value}
+                                        variant={permissions.includes(perm.value) ? `default` : `outline`}
+                                        className="cursor-pointer transition-all hover:scale-105"
+                                        onClick={() => {
+                                            setPermissions((prev) => prev.includes(perm.value) ? prev.filter((p) => p !== perm.value) : [...prev, perm.value]);
+                                        }}
+                                    >
+                                        {perm.label}
+                                    </Badge>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="flex gap-2 pt-2">
                             <Button size="sm" onClick={handleSavePermissions} disabled={updatePermissions.isPending}>
                                 {updatePermissions.isPending && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
                                 Save
@@ -516,7 +578,7 @@ function ApiKeyDetailsDialog({ keyId, onClose }: { keyId: string; onClose: () =>
                         {permissions.length > 0 ? (
                             permissions.map((perm) => (
                                 <Badge key={perm} variant="secondary">
-                                    {perm}
+                                    {perm.replace(`:`, ` - `)}
                                 </Badge>
                             ))
                         ) : (
@@ -589,9 +651,6 @@ export default function ProfilePage() {
     const deleteSession = useDeleteSession();
     const deleteAllSessions = useDeleteAllSessions();
 
-    // State
-    const [message, setMessage] = useState<{ type: `success` | `error`; text: string } | null>(null);
-
     // MFA
     const [mfaEnabled, setMfaEnabled] = useState(false);
     const [mfaLoading, setMfaLoading] = useState(false);
@@ -623,34 +682,23 @@ export default function ProfilePage() {
         }
     }, [mfaStatus]);
 
-    // Auto-dismiss messages
-    useEffect(() => {
-        if (message) {
-            const timer = setTimeout(() => setMessage(null), 5000);
-            return () => clearTimeout(timer);
-        }
-    }, [message]);
-
     const apiKeys = apiKeysData?.items || [];
-    // Sort sessions by last_used_at to find the most recent (current) session
-    const sessions = (sessionsData?.items || []).sort((a, b) => {
-        const dateA = new Date(a.last_used_at || a.created_at).getTime();
-        const dateB = new Date(b.last_used_at || b.created_at).getTime();
-        return dateB - dateA; // Most recent first
-    });
+    // Sessions are already sorted by last_used_at DESC from backend
+    const sessions = sessionsData?.items || [];
+    const currentSessionId = sessionsData?.current_session;
 
     // Handlers
     const handleProfileSuccess = () => {
-        setMessage({ type: `success`, text: `Profile updated successfully` });
+        toastSuccess(`Profile updated successfully`);
     };
 
     const handlePasswordSuccess = () => {
-        setMessage({ type: `success`, text: `Password changed successfully` });
+        toastSuccess(`Password changed successfully`);
     };
 
     const handleEnableMfa = async() => {
         if (!mfaPassword) {
-            setMessage({ type: `error`, text: `Password is required to enable MFA` });
+            toastError(`Password is required to enable MFA`);
             return;
         }
         setMfaLoading(true);
@@ -664,7 +712,7 @@ export default function ProfilePage() {
         }
         catch (err: unknown) {
             const error = err as { message?: string };
-            setMessage({ type: `error`, text: error.message || `Failed to enable MFA` });
+            toastError(error.message || `Failed to enable MFA`);
         }
         finally {
             setMfaLoading(false);
@@ -674,7 +722,7 @@ export default function ProfilePage() {
     const handleMfaVerifySuccess = () => {
         setMfaEnabled(true);
         setMfaStep(`show_codes`);
-        setMessage({ type: `success`, text: `MFA enabled successfully` });
+        toastSuccess(`MFA enabled successfully`);
     };
 
     const handleShowBackupCodes = () => {
@@ -683,23 +731,23 @@ export default function ProfilePage() {
 
     const handleCopyBackupCodes = () => {
         navigator.clipboard.writeText(backupCodes.join(`\n`));
-        setMessage({ type: `success`, text: `Backup codes copied to clipboard` });
+        toastSuccess(`Backup codes copied to clipboard`);
     };
 
     const handleRegenerateBackupCodes = async() => {
         if (!mfaPassword) {
-            setMessage({ type: `error`, text: `Password is required to regenerate backup codes` });
+            toastError(`Password is required to regenerate backup codes`);
             return;
         }
         try {
             const result = await regenerateBackupCodes.mutateAsync(mfaPassword);
             setBackupCodes(result.backup_codes || []);
-            setMessage({ type: `success`, text: `Backup codes regenerated` });
+            toastSuccess(`Backup codes regenerated`);
             setMfaPassword(``);
         }
         catch (err: unknown) {
             const error = err as { message?: string };
-            setMessage({ type: `error`, text: error.message || `Failed to regenerate backup codes` });
+            toastError(error.message || `Failed to regenerate backup codes`);
         }
     };
 
@@ -708,11 +756,11 @@ export default function ProfilePage() {
         try {
             await disableMfa.mutateAsync(mfaPassword);
             setMfaEnabled(false);
-            setMessage({ type: `success`, text: `MFA disabled successfully` });
+            toastSuccess(`MFA disabled successfully`);
         }
         catch (err: unknown) {
             const error = err as { message?: string };
-            setMessage({ type: `error`, text: error.message || `Failed to disable MFA` });
+            toastError(error.message || `Failed to disable MFA`);
         }
         finally {
             setMfaLoading(false);
@@ -722,17 +770,17 @@ export default function ProfilePage() {
     const handleCreateApiKeySuccess = (key: string) => {
         setNewApiKey(key);
         setShowApiKey(true);
-        setMessage({ type: `success`, text: `API key created` });
+        toastSuccess(`API key created`);
     };
 
     const handleDeleteApiKey = async(id: string) => {
         try {
             await deleteApiKey.mutateAsync(id);
-            setMessage({ type: `success`, text: `API key deleted` });
+            toastSuccess(`API key deleted`);
         }
         catch (err: unknown) {
             const error = err as { message?: string };
-            setMessage({ type: `error`, text: error.message || `Failed to delete API key` });
+            toastError(error.message || `Failed to delete API key`);
         }
     };
 
@@ -744,7 +792,7 @@ export default function ProfilePage() {
         }
         catch (err: unknown) {
             const error = err as { message?: string };
-            setMessage({ type: `error`, text: error.message || `Failed to rotate API key` });
+            toastError(error.message || `Failed to rotate API key`);
         }
     };
 
@@ -756,22 +804,22 @@ export default function ProfilePage() {
     const handleDeleteSession = async(sessionId: string) => {
         try {
             await deleteSession.mutateAsync(sessionId);
-            setMessage({ type: `success`, text: `Session deleted` });
+            toastSuccess(`Session deleted`);
         }
         catch (err: unknown) {
             const error = err as { message?: string };
-            setMessage({ type: `error`, text: error.message || `Failed to delete session` });
+            toastError(error.message || `Failed to delete session`);
         }
     };
 
     const handleDeleteAllSessions = async() => {
         try {
             await deleteAllSessions.mutateAsync();
-            setMessage({ type: `success`, text: `All sessions deleted` });
+            toastSuccess(`All sessions deleted`);
         }
         catch (err: unknown) {
             const error = err as { message?: string };
-            setMessage({ type: `error`, text: error.message || `Failed to delete sessions` });
+            toastError(error.message || `Failed to delete sessions`);
         }
     };
 
@@ -780,35 +828,53 @@ export default function ProfilePage() {
             ...prev,
             [key]: !prev[key],
         }));
-        setMessage({ type: `success`, text: `Notification settings updated` });
+        toastSuccess(`Notification settings updated`);
     };
 
     return (
-        <div className="space-y-6">
-            <div>
-                <h1 className="text-2xl font-semibold tracking-tight">Profile</h1>
-                <p className="text-muted-foreground">
-                    Manage your personal information and security settings.
-                </p>
+        <div className="space-y-6 relative z-10">
+            {/* Animated Background Orbs */}
+            <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
+                <motion.div 
+                    className="absolute -top-40 -right-40 w-[600px] h-[600px] bg-gradient-to-br from-amber-400/20 via-orange-500/10 to-transparent rounded-full blur-3xl"
+                    animate={{
+                        scale: [1, 1.3, 1],
+                        x: [0, 50, 0],
+                        y: [0, -30, 0],
+                        opacity: [0.4, 0.7, 0.4],
+                    }}
+                    transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+                />
+                <motion.div 
+                    className="absolute -bottom-40 -left-40 w-[500px] h-[500px] bg-gradient-to-tr from-violet-500/15 via-purple-500/10 to-transparent rounded-full blur-3xl"
+                    animate={{
+                        scale: [1, 1.4, 1],
+                        x: [0, -40, 0],
+                        y: [0, 40, 0],
+                        opacity: [0.3, 0.6, 0.3],
+                    }}
+                    transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+                />
             </div>
 
-            <AnimatePresence mode="wait">
-                {message && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                        transition={{ duration: 0.2 }}
-                        className={`p-4 rounded-lg flex items-center gap-2 ${ message.type === `success` ? `bg-green-500/10 dark:bg-green-950/30 text-green-600 dark:text-green-400 border border-green-500/20` : `bg-red-500/10 dark:bg-red-950/30 text-red-600 dark:text-red-400 border border-red-500/20` }`}
-                    >
-                        {message.type === `success` ? <CheckCircle className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-                        {message.text}
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+            >
+                <h1 className="text-3xl font-bold tracking-tight">Profile</h1>
+                <p className="text-muted-foreground mt-1">
+                    Manage your personal information and security settings.
+                </p>
+            </motion.div>
 
             {/* Tab Navigation using search params */}
-            <div className="flex gap-1 border-b">
+            <motion.div 
+                className="flex gap-1 border-b"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.1 }}
+            >
                 <button
                     onClick={() => setTab("profile")}
                     className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
@@ -853,7 +919,7 @@ export default function ProfilePage() {
                     <Key className="w-4 h-4" />
                     API Keys
                 </button>
-            </div>
+            </motion.div>
 
             {/* Tab Content */}
             {activeTab === "profile" && (
@@ -1123,7 +1189,9 @@ export default function ProfilePage() {
                                             Current Session
                                         </span>
                                     </div>
-                                    {sessions.map((session, index) => (
+                                    {sessions.map((session, index) => {
+                                        const isCurrentSession = session.id === currentSessionId;
+                                        return (
                                         <motion.div 
                                             key={session.id}
                                             initial={{ opacity: 0, x: -10 }}
@@ -1132,7 +1200,7 @@ export default function ProfilePage() {
                                             className="flex items-center justify-between p-3 border rounded-lg bg-card hover:bg-accent/50 transition-colors"
                                         >
                                             <div className="flex items-center gap-3">
-                                                {index === 0 ? (
+                                                {isCurrentSession ? (
                                                     <Monitor className="w-4 h-4 text-green-500" />
                                                 ) : (
                                                     <Monitor className="w-4 h-4 text-muted-foreground" />
@@ -1140,7 +1208,7 @@ export default function ProfilePage() {
                                                 <div>
                                                     <p className="text-sm font-medium flex items-center gap-2">
                                                         {session.user_agent || `Unknown device`}
-                                                        {index === 0 && (
+                                                        {isCurrentSession && (
                                                             <span className="text-xs bg-green-500/10 text-green-500 px-1.5 py-0.5 rounded">
                                                                 Current
                                                             </span>
@@ -1156,12 +1224,12 @@ export default function ProfilePage() {
                                                 size="sm" 
                                                 onClick={() => handleDeleteSession(session.id)}
                                                 title="Revoke this session"
-                                                className={index === 0 ? `text-destructive hover:text-destructive` : ``}
+                                                className={isCurrentSession ? `text-destructive hover:text-destructive` : ``}
                                             >
                                                 <Trash2 className="w-4 h-4" />
                                             </Button>
                                         </motion.div>
-                                    ))}
+                                    );})}
                                 </div>
                             )}
                         </CardContent>
@@ -1266,7 +1334,7 @@ export default function ProfilePage() {
                                             size="sm" 
                                             onClick={() => {
                                                 navigator.clipboard.writeText(newApiKey);
-                                                setMessage({ type: `success`, text: `API key copied to clipboard` });
+                                                toastSuccess(`API key copied to clipboard`);
                                             }}
                                         >
                                             <Copy className="w-4 h-4 mr-1" />

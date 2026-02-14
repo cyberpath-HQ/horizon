@@ -24,7 +24,8 @@ import {
     Building2,
     Bug,
     Briefcase,
-    ArrowRight
+    ArrowRight,
+    Settings2
 } from "lucide-react";
 import {
     useNavigate, createFileRoute, redirect
@@ -351,13 +352,26 @@ export default function DashboardPage() {
             {/* Your Modules */}
             <div>
                 <motion.div 
-                    className="flex items-center gap-2 mb-4"
+                    className="flex items-center justify-between mb-4"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.5 }}
                 >
-                    <Layers className="h-5 w-5 text-primary" />
-                    <h2 className="text-xl font-semibold">Your Modules</h2>
+                    <div className="flex items-center gap-2">
+                        <Layers className="h-5 w-5 text-primary" />
+                        <h2 className="text-xl font-semibold">Your Modules</h2>
+                    </div>
+                    {enabledModules.length > 0 && (
+                        <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => navigate({ to: `/dashboard/settings`, search: { tab: `modules` } })}
+                            className="text-xs text-muted-foreground hover:text-foreground"
+                        >
+                            <Settings2 className="w-3 h-3 mr-1" />
+                            Configure
+                        </Button>
+                    )}
                 </motion.div>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                     {enabledModules.length > 0 ? (

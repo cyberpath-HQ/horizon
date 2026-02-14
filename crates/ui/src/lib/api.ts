@@ -464,14 +464,16 @@ class ApiClient {
     }
 
     // Session management
-    async getSessions(): Promise<{ items: Array<Session>; pagination?: any }> {
+    async getSessions(): Promise<{ items: Array<Session>; pagination?: any; current_session?: string }> {
         const response = await this.request<{ success: boolean
-            sessions:                                  Array<Session> }>(`/api/v1/auth/sessions`, {
+            sessions:                                  Array<Session>
+            current_session?:                         string }>(`/api/v1/auth/sessions`, {
             method: `GET`,
         });
         return {
-            items:      response.sessions,
-            pagination: { page: 1, per_page: response.sessions.length, total: response.sessions.length, total_pages: 1 },
+            items:           response.sessions,
+            pagination:      { page: 1, per_page: response.sessions.length, total: response.sessions.length, total_pages: 1 },
+            current_session: response.current_session,
         };
     }
 

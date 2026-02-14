@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useForm } from "@tanstack/react-form";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { getAccessToken, getStoredUser } from "@/lib/api";
+import { toastSuccess, toastError } from "@/lib/toast";
 import {
     useTeams,
     useTeamMembers,
@@ -40,11 +41,6 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle
-} from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -82,8 +78,6 @@ import {
   X,
   Users,
   Shield,
-  AlertCircle,
-  CheckCircle,
   MoreHorizontal,
   Search,
   Settings2
@@ -399,9 +393,6 @@ export default function TeamsPage() {
     const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
     const [showAddMember, setShowAddMember] = useState(false);
 
-    // Alert state
-    const [alert, setAlert] = useState<{ type: "success" | "error"; title: string; message: string } | null>(null);
-
     // Queries
     const { data: teamsData, isLoading: teamsLoading } = useTeams();
     const teams: Team[] = teamsData?.items || [];
@@ -414,14 +405,6 @@ export default function TeamsPage() {
     const updateTeamMember = useUpdateTeamMember();
     const removeTeamMember = useRemoveTeamMember();
 
-    // Auto-dismiss alert
-    useEffect(() => {
-        if (alert) {
-            const timer = setTimeout(() => setAlert(null), 5000);
-            return () => clearTimeout(timer);
-        }
-    }, [alert]);
-
     // Handle team selection
     const handleSelectTeam = (team: Team) => {
         setSelectedTeamId(team.id);
@@ -433,10 +416,10 @@ export default function TeamsPage() {
         try {
             await deleteTeam.mutateAsync(selectedTeamId);
             setSelectedTeamId(null);
-            setAlert({ type: "success", title: "Success", message: "Team deleted" });
+            toastSuccess("Team deleted");
         } catch (err: unknown) {
             const error = err as { message?: string };
-            setAlert({ type: "error", title: "Error", message: error.message || "Failed to delete team" });
+            toastError(error.message || "Failed to delete team");
         }
     };
 
@@ -447,11 +430,11 @@ export default function TeamsPage() {
                 teamId: selectedTeamId,
                 memberId,
             });
-            setAlert({ type: "success", title: "Success", message: "Member removed" });
+            toastSuccess("Member removed");
             refetchMembers();
         } catch (err: unknown) {
             const error = err as { message?: string };
-            setAlert({ type: "error", title: "Error", message: error.message || "Failed to remove member" });
+            toastError(error.message || "Failed to remove member");
         }
     };
 
@@ -463,11 +446,11 @@ export default function TeamsPage() {
                 memberId,
                 data: { role: newRole },
             });
-            setAlert({ type: "success", title: "Success", message: "Member role updated" });
+            toastSuccess("Member role updated");
             refetchMembers();
         } catch (err: unknown) {
             const error = err as { message?: string };
-            setAlert({ type: "error", title: "Error", message: error.message || "Failed to update member role" });
+            toastError(error.message || "Failed to update member role");
         }
     };
 
@@ -519,23 +502,6 @@ export default function TeamsPage() {
                     Manage teams and team members
                 </p>
             </motion.div>
-
-            <AnimatePresence mode="wait">
-                {alert && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                        transition={{ duration: 0.2 }}
-                    >
-                        <Alert variant={alert.type === "error" ? "destructive" : "default"} className={alert.type === "success" ? "border-green-500 dark:border-green-600 bg-green-50 dark:bg-green-950/30" : ""}>
-                            {alert.type === "success" ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
-                            <AlertTitle>{alert.title}</AlertTitle>
-                            <AlertDescription>{alert.message}</AlertDescription>
-                        </Alert>
-                    </motion.div>
-                )}
-            </AnimatePresence>
 
             {/* Top Section: Teams Cards + Create Team */}
             <div className="grid gap-6 lg:grid-cols-3">
@@ -634,7 +600,7 @@ export default function TeamsPage() {
                         <CardContent>
                             <CreateTeamForm
                                 onSuccess={() => {
-                                    setAlert({ type: "success", title: "Success", message: "Team created successfully" });
+                                    toastSuccess("Team created successfully");
                                 }}
                             />
                         </CardContent>
@@ -706,7 +672,7 @@ export default function TeamsPage() {
                                             teamId={selectedTeamId || ""}
                                             onSuccess={() => {
                                                 setShowAddMember(false);
-                                                setAlert({ type: "success", title: "Success", message: "Member added successfully" });
+                                                toastSuccess("Member added successfully");
                                                 refetchMembers();
                                             }}
                                             onCancel={() => setShowAddMember(false)}

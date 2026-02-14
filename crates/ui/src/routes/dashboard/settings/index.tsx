@@ -1,48 +1,52 @@
-import { useState } from "react";
-import { createFileRoute, redirect, useSearch, useNavigate } from "@tanstack/react-router";
-import { getAccessToken, getStoredUser } from "@/lib/api";
+import {
+    createFileRoute, redirect, useSearch, useNavigate
+} from "@tanstack/react-router";
+import {
+    getAccessToken, getStoredUser
+} from "@/lib/api";
+import { toastSuccess, toastError } from "@/lib/toast";
 import {
     Card, CardContent, CardDescription, CardHeader, CardTitle
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-    Database, Shield as ShieldIcon, Settings2, Zap, Activity
+    Database, Shield as ShieldIcon, Settings2,
+    FolderKanban, Package, Shield, Network, Bug, Building2, Briefcase
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Switch } from "@/components/ui/switch";
-import { 
-    useSettings, 
-    useUpdateSetting 
+import {
+    useSettings,
+    useUpdateSetting
 } from "@/hooks/useApi";
-import { Loader2, AlertCircle, CheckCircle } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+    Loader2, AlertCircle
+} from "lucide-react";
 import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
 
 // Type for tab search params
 interface SettingsSearchParams {
-    tab?: "modules" | "security" | "database";
+    tab?: `modules` | `security` | `database`
 }
 
-export const Route = createFileRoute("/dashboard/settings/")({
+export const Route = createFileRoute(`/dashboard/settings/`)({
     beforeLoad: () => {
         // Check if user is authenticated
         const token = getAccessToken();
         const user = getStoredUser();
-        
+
         if (!token || !user) {
             throw redirect({
-                to: '/login',
+                to:      `/login`,
                 replace: true,
             });
         }
     },
-    validateSearch: (search: SettingsSearchParams) => {
-        return {
-            tab: search.tab || "modules",
-        };
-    },
+    validateSearch: (search: SettingsSearchParams) => ({
+        tab: search.tab || `modules`,
+    }),
     component: SettingsPage,
 });
 
@@ -57,89 +61,140 @@ interface SystemSetting {
 // Module definitions with rich metadata
 const MODULE_CONFIG = [
     {
-        key: `module_assets`,
-        name: `Assets`,
-        description: `Track and manage your IT infrastructure assets`,
+        key:             `module_assets`,
+        name:            `Assets`,
+        description:     `Track and manage your IT infrastructure assets`,
         longDescription: `Comprehensive asset management module for tracking hardware, software, and cloud resources.`,
-        color: `from-blue-500 to-cyan-500`,
-        features: [`Hardware Inventory`, `Software Tracking`, `Asset Lifecycle`, `Depreciation`],
+        color:           `from-blue-500 to-cyan-500`,
+        icon:            FolderKanban,
+        features:        [
+            `Hardware Inventory`,
+            `Software Tracking`,
+            `Asset Lifecycle`,
+            `Depreciation`,
+        ],
     },
     {
-        key: `module_software`,
-        name: `Software`,
-        description: `Manage software inventory and licenses`,
+        key:             `module_software`,
+        name:            `Software`,
+        description:     `Manage software inventory and licenses`,
         longDescription: `Complete software license management with usage tracking and compliance monitoring.`,
-        color: `from-purple-500 to-pink-500`,
-        features: [`License Management`, `Usage Analytics`, `Compliance`, `Cost Tracking`],
+        color:           `from-purple-500 to-pink-500`,
+        icon:            Package,
+        features:        [
+            `License Management`,
+            `Usage Analytics`,
+            `Compliance`,
+            `Cost Tracking`,
+        ],
     },
     {
-        key: `module_security`,
-        name: `Security`,
-        description: `Security policies and compliance`,
+        key:             `module_security`,
+        name:            `Security`,
+        description:     `Security policies and compliance`,
         longDescription: `Enterprise security configuration management with compliance frameworks.`,
-        color: `from-green-500 to-emerald-500`,
-        features: [`Policy Management`, `Compliance Reports`, `Security Score`, `Audit Logs`],
+        color:           `from-green-500 to-emerald-500`,
+        icon:            Shield,
+        features:        [
+            `Policy Management`,
+            `Compliance Reports`,
+            `Security Score`,
+            `Audit Logs`,
+        ],
     },
     {
-        key: `module_network`,
-        name: `Network`,
-        description: `Network infrastructure mapping`,
+        key:             `module_network`,
+        name:            `Network`,
+        description:     `Network infrastructure mapping`,
         longDescription: `Visual network topology mapping and monitoring with real-time status.`,
-        color: `from-orange-500 to-amber-500`,
-        features: [`Topology Maps`, `Device Status`, `Connection Tracking`, `Monitoring`],
+        color:           `from-orange-500 to-amber-500`,
+        icon:            Network,
+        features:        [
+            `Topology Maps`,
+            `Device Status`,
+            `Connection Tracking`,
+            `Monitoring`,
+        ],
     },
     {
-        key: `module_vulnerabilities`,
-        name: `Vulnerabilities`,
-        description: `Track and remediate security vulnerabilities`,
+        key:             `module_vulnerabilities`,
+        name:            `Vulnerabilities`,
+        description:     `Track and remediate security vulnerabilities`,
         longDescription: `Vulnerability management with risk scoring and remediation tracking.`,
-        color: `from-red-500 to-rose-500`,
-        features: [`Vulnerability Scan`, `Risk Scoring`, `Remediation`, `Threat Intel`],
+        color:           `from-red-500 to-rose-500`,
+        icon:            Bug,
+        features:        [
+            `Vulnerability Scan`,
+            `Risk Scoring`,
+            `Remediation`,
+            `Threat Intel`,
+        ],
     },
     {
-        key: `module_bia`,
-        name: `Business Impact`,
-        description: `Business impact analysis and continuity`,
+        key:             `module_bia`,
+        name:            `Business Impact`,
+        description:     `Business impact analysis and continuity`,
         longDescription: `Business continuity planning with impact analysis and recovery procedures.`,
-        color: `from-indigo-500 to-violet-500`,
-        features: [`Impact Analysis`, `Recovery Plans`, `Risk Assessment`, `Reporting`],
+        color:           `from-indigo-500 to-violet-500`,
+        icon:            Building2,
+        features:        [
+            `Impact Analysis`,
+            `Recovery Plans`,
+            `Risk Assessment`,
+            `Reporting`,
+        ],
     },
     {
-        key: `module_vendors`,
-        name: `Vendors`,
-        description: `Third-party vendor management`,
+        key:             `module_vendors`,
+        name:            `Vendors`,
+        description:     `Third-party vendor management`,
         longDescription: `Comprehensive vendor risk management with contract tracking.`,
-        color: `from-teal-500 to-green-500`,
-        features: [`Vendor Directory`, `Risk Assessment`, `Contract Management`, `Performance`],
+        color:           `from-teal-500 to-green-500`,
+        icon:            Briefcase,
+        features:        [
+            `Vendor Directory`,
+            `Risk Assessment`,
+            `Contract Management`,
+            `Performance`,
+        ],
     },
 ];
 
 export default function SettingsPage() {
     // Get tab from search params
-    const search = useSearch({ from: "/dashboard/settings/" });
-    const activeTab = search.tab || "modules";
-    const navigate = useNavigate({ from: "/dashboard/settings/" });
+    const search = useSearch({
+        from: `/dashboard/settings/`,
+    });
+    const activeTab = search.tab || `modules`;
+    const navigate = useNavigate({
+        from: `/dashboard/settings/`,
+    });
 
     // Function to change tab via URL
     const setTab = (tab: string) => {
-        navigate({ search: { tab: tab as any } });
+        navigate({
+            search: {
+                tab: tab as any,
+            },
+        });
     };
 
-    const { user } = useAuth();
-    const { data: settingsData, isLoading } = useSettings();
+    const {
+        user,
+    } = useAuth();
+    const {
+        data: settingsData, isLoading,
+    } = useSettings();
     const updateSetting = useUpdateSetting();
-    
-    const settings: SystemSetting[] = settingsData?.settings || [];
-    
-    // Alert state
-    const [alert, setAlert] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+    const settings: Array<SystemSetting> = settingsData?.settings || [];
 
     // Check if user is super admin
     const isSuperAdmin = user?.roles?.includes(`super_admin`) ?? false;
 
     // Parse settings into a map
     const settingsMap = new Map<string, SystemSetting>();
-    settings.forEach(s => settingsMap.set(s.key, s));
+    settings.forEach((s) => settingsMap.set(s.key, s));
 
     // Get module settings
     const getModuleValue = (key: string) => {
@@ -149,85 +204,130 @@ export default function SettingsPage() {
 
     // Handle module toggle with animation
     const handleModuleToggle = async(moduleKey: string, enabled: boolean) => {
-        if (!isSuperAdmin) return;
-        
+        if (!isSuperAdmin) {
+            return;
+        }
+
         try {
-            await updateSetting.mutateAsync({ key: moduleKey, value: enabled.toString() });
-            setAlert({ type: "success", message: `${moduleKey.replace('module_', '')} module ${enabled ? 'enabled' : 'disabled'}` });
-            setTimeout(() => setAlert(null), 3000);
+            await updateSetting.mutateAsync({
+                key:   moduleKey,
+                value: enabled.toString(),
+            });
+            toastSuccess(`${ moduleKey.replace(`module_`, ``) } module ${ enabled ? `enabled` : `disabled` }`);
         }
         catch (err: any) {
-            setAlert({ type: "error", message: err.message || `Failed to update ${moduleKey}` });
+            toastError(err.message || `Failed to update ${ moduleKey }`);
         }
     };
 
     // Handle require MFA toggle
     const handleRequireMfaChange = async(enabled: boolean) => {
-        if (!isSuperAdmin) return;
-        
+        if (!isSuperAdmin) {
+            return;
+        }
+
         try {
-            await updateSetting.mutateAsync({ key: `require_mfa`, value: enabled.toString() });
-            setAlert({ type: "success", message: `MFA requirement ${enabled ? 'enabled' : 'disabled'}` });
-            setTimeout(() => setAlert(null), 3000);
+            await updateSetting.mutateAsync({
+                key:   `require_mfa`,
+                value: enabled.toString(),
+            });
+            toastSuccess(`MFA requirement ${ enabled ? `enabled` : `disabled` }`);
         }
         catch (err: any) {
-            setAlert({ type: "error", message: err.message || `Failed to update MFA requirement` });
+            toastError(err.message || `Failed to update MFA requirement`);
         }
     };
 
     const tabs = [
-        { id: "modules", label: "Modules", icon: Settings2 },
-        { id: "security", label: "Security", icon: ShieldIcon },
-        { id: "database", label: "Database", icon: Database },
+        {
+            id:    `modules`,
+            label: `Modules`,
+            icon:  Settings2,
+        },
+        {
+            id:    `security`,
+            label: `Security`,
+            icon:  ShieldIcon,
+        },
+        {
+            id:    `database`,
+            label: `Database`,
+            icon:  Database,
+        },
     ];
 
     return (
         <div className="space-y-6 relative z-10">
             {/* Animated Background */}
             <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
-                <motion.div 
+                <motion.div
                     className="absolute -top-40 -right-40 w-[600px] h-[600px] bg-gradient-to-br from-primary/10 via-primary/5 to-transparent rounded-full blur-3xl"
                     animate={{
-                        scale: [1, 1.3, 1],
-                        x: [0, 50, 0],
-                        opacity: [0.3, 0.5, 0.3],
+                        scale:   [
+                            1,
+                            1.3,
+                            1,
+                        ],
+                        x:       [
+                            0,
+                            50,
+                            0,
+                        ],
+                        opacity: [
+                            0.3,
+                            0.5,
+                            0.3,
+                        ],
                     }}
-                    transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+                    transition={{
+                        duration: 8,
+                        repeat:   Infinity,
+                        ease:     `easeInOut`,
+                    }}
                 />
-                <motion.div 
+                <motion.div
                     className="absolute -bottom-40 -left-40 w-[500px] h-[500px] bg-gradient-to-tr from-violet-500/10 via-purple-500/5 to-transparent rounded-full blur-3xl"
                     animate={{
-                        scale: [1, 1.4, 1],
-                        x: [0, -40, 0],
-                        opacity: [0.2, 0.4, 0.2],
+                        scale:   [
+                            1,
+                            1.4,
+                            1,
+                        ],
+                        x:       [
+                            0,
+                            -40,
+                            0,
+                        ],
+                        opacity: [
+                            0.2,
+                            0.4,
+                            0.2,
+                        ],
                     }}
-                    transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+                    transition={{
+                        duration: 10,
+                        repeat:   Infinity,
+                        ease:     `easeInOut`,
+                        delay:    2,
+                    }}
                 />
             </div>
 
             <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
+                initial={{
+                    opacity: 0,
+                    y:       -10,
+                }}
+                animate={{
+                    opacity: 1,
+                    y:       0,
+                }}
             >
                 <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
                 <p className="text-muted-foreground mt-1">
                     Configure application settings and manage system modules.
                 </p>
             </motion.div>
-
-            {alert && (
-                <motion.div
-                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                >
-                    <Alert variant={alert.type === "error" ? "destructive" : "default"} className={alert.type === "success" ? "border-green-500 dark:border-green-600 bg-green-50 dark:bg-green-950/30" : ""}>
-                        {alert.type === "success" ? <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" /> : <AlertCircle className="h-4 w-4" />}
-                        <AlertTitle>{alert.type === "success" ? "Success" : "Error"}</AlertTitle>
-                        <AlertDescription>{alert.message}</AlertDescription>
-                    </Alert>
-                </motion.div>
-            )}
 
             {/* Tab Navigation with animations */}
             <div className="flex gap-1 overflow-x-auto border-b">
@@ -236,16 +336,28 @@ export default function SettingsPage() {
                         key={tab.id}
                         onClick={() => setTab(tab.id)}
                         className={cn(
-                            "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
+                            `flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap`,
                             activeTab === tab.id
-                                ? "border-primary text-primary"
-                                : "border-transparent text-muted-foreground hover:text-foreground"
+                                ? `border-primary text-primary`
+                                : `border-transparent text-muted-foreground hover:text-foreground`
                         )}
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.05 }}
-                        whileHover={{ y: -2 }}
-                        whileTap={{ scale: 0.98 }}
+                        initial={{
+                            opacity: 0,
+                            y:       -10,
+                        }}
+                        animate={{
+                            opacity: 1,
+                            y:       0,
+                        }}
+                        transition={{
+                            delay: index * 0.05,
+                        }}
+                        whileHover={{
+                            y: -2,
+                        }}
+                        whileTap={{
+                            scale: 0.98,
+                        }}
                     >
                         <tab.icon className="w-4 h-4" />
                         {tab.label}
@@ -253,11 +365,19 @@ export default function SettingsPage() {
                 ))}
             </div>
 
-            {activeTab === "modules" && (
+            {activeTab === `modules` && (
                 <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3 }}
+                    initial={{
+                        opacity: 0,
+                        y:       10,
+                    }}
+                    animate={{
+                        opacity: 1,
+                        y:       0,
+                    }}
+                    transition={{
+                        duration: 0.3,
+                    }}
                 >
                     {isSuperAdmin ? (
                         <>
@@ -276,42 +396,68 @@ export default function SettingsPage() {
                                     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                                         {MODULE_CONFIG.map((module, index) => {
                                             const isEnabled = getModuleValue(module.key);
-                                            
+
                                             return (
                                                 <motion.div
                                                     key={module.key}
-                                                    initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                                                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                                                    transition={{ delay: index * 0.1, duration: 0.3 }}
-                                                    whileHover={{ scale: 1.02, y: -4 }}
-                                                    whileTap={{ scale: 0.98 }}
+                                                    initial={{
+                                                        opacity: 0,
+                                                        y:       20,
+                                                        scale:   0.95,
+                                                    }}
+                                                    animate={{
+                                                        opacity: 1,
+                                                        y:       0,
+                                                        scale:   1,
+                                                    }}
+                                                    transition={{
+                                                        delay:    index * 0.1,
+                                                        duration: 0.3,
+                                                    }}
+                                                    whileHover={{
+                                                        scale: 1.02,
+                                                        y:     -4,
+                                                    }}
+                                                    whileTap={{
+                                                        scale: 0.98,
+                                                    }}
                                                 >
                                                     <Card className={cn(
-                                                        "relative overflow-hidden transition-all duration-300 h-full",
-                                                        isEnabled 
-                                                            ? "border-primary/50 shadow-lg shadow-primary/10" 
-                                                            : "border-border"
+                                                        `relative overflow-hidden transition-all duration-300 h-full hover-lift`,
+                                                        isEnabled
+                                                            ? `border-primary/50 shadow-lg shadow-primary/10`
+                                                            : `border-border`
                                                     )}>
                                                         <CardHeader className="relative pb-2">
                                                             <div className="flex items-start justify-between">
-                                                                <motion.div 
+                                                                <motion.div
                                                                     className={cn(
-                                                                        "p-3 rounded-xl bg-gradient-to-br shadow-lg",
+                                                                        `p-3 rounded-xl bg-gradient-to-br shadow-lg`,
                                                                         module.color
                                                                     )}
-                                                                    whileHover={{ rotate: 5, scale: 1.1 }}
-                                                                    transition={{ type: "spring", stiffness: 300 }}
+                                                                    whileHover={{
+                                                                        rotate: 5,
+                                                                        scale:  1.1,
+                                                                    }}
+                                                                    transition={{
+                                                                        type:      `spring`,
+                                                                        stiffness: 300,
+                                                                    }}
                                                                 >
-                                                                    <Settings2 className="h-6 w-6 text-white" />
+                                                                    {module.icon && <module.icon className="h-6 w-6 text-white" />}
                                                                 </motion.div>
                                                                 <motion.div
-                                                                    whileHover={{ scale: 1.1 }}
-                                                                    whileTap={{ scale: 0.9 }}
+                                                                    whileHover={{
+                                                                        scale: 1.1,
+                                                                    }}
+                                                                    whileTap={{
+                                                                        scale: 0.9,
+                                                                    }}
                                                                 >
                                                                     <Switch
                                                                         id={module.key}
                                                                         checked={isEnabled}
-                                                                        onCheckedChange={(checked) => handleModuleToggle(module.key, checked)}
+                                                                        onCheckedChange={async(checked) => handleModuleToggle(module.key, checked)}
                                                                         disabled={updateSetting.isPending}
                                                                         className="data-[state=checked]:bg-primary"
                                                                     />
@@ -321,17 +467,17 @@ export default function SettingsPage() {
                                                         <CardContent className="relative">
                                                             <CardTitle className="text-lg mb-1">{module.name}</CardTitle>
                                                             <p className="text-sm text-muted-foreground mb-4">{module.description}</p>
-                                                            
+
                                                             {/* Features list */}
                                                             <div className="flex flex-wrap gap-1.5">
                                                                 {module.features.map((feature, i) => (
-                                                                    <span 
+                                                                    <span
                                                                         key={i}
                                                                         className={cn(
-                                                                            "text-xs px-2 py-0.5 rounded-full",
-                                                                            isEnabled 
-                                                                                ? "bg-primary/10 text-primary" 
-                                                                                : "bg-muted text-muted-foreground"
+                                                                            `text-xs px-2 py-0.5 rounded-full`,
+                                                                            isEnabled
+                                                                                ? `bg-primary/10 text-primary`
+                                                                                : `bg-muted text-muted-foreground`
                                                                         )}
                                                                     >
                                                                         {feature}
@@ -339,15 +485,21 @@ export default function SettingsPage() {
                                                                 ))}
                                                             </div>
                                                         </CardContent>
-                                                        
+
                                                         {/* Status indicator */}
-                                                        <motion.div 
+                                                        <motion.div
                                                             className="absolute bottom-0 left-0 right-0 h-1"
-                                                            initial={{ scaleX: 0 }}
-                                                            animate={{ scaleX: isEnabled ? 1 : 0 }}
-                                                            transition={{ duration: 0.3 }}
-                                                            style={{ 
-                                                                background: `linear-gradient(90deg, ${module.color.replace('from-', '').split(' ')[0]}, ${module.color.replace('to-', '').split(' ')[1]})` 
+                                                            initial={{
+                                                                scaleX: 0,
+                                                            }}
+                                                            animate={{
+                                                                scaleX: isEnabled ? 1 : 0,
+                                                            }}
+                                                            transition={{
+                                                                duration: 0.3,
+                                                            }}
+                                                            style={{
+                                                                background: `linear-gradient(90deg, ${ module.color.replace(`from-`, ``).split(` `)[0] }, ${ module.color.replace(`to-`, ``).split(` `)[1] })`,
                                                             }}
                                                         />
                                                     </Card>
@@ -355,35 +507,6 @@ export default function SettingsPage() {
                                             );
                                         })}
                                     </div>
-
-                                    {/* Quick Stats */}
-                                    <motion.div
-                                        initial={{ opacity: 0, y: 20 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: 0.5 }}
-                                    >
-                                        <Card className="bg-gradient-to-r from-primary/5 to-transparent border-primary/20">
-                                            <CardContent className="pt-6">
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="p-2 rounded-lg bg-primary/10">
-                                                            <Zap className="h-5 w-5 text-primary" />
-                                                        </div>
-                                                        <div>
-                                                            <p className="font-medium">Module Status</p>
-                                                            <p className="text-sm text-muted-foreground">
-                                                                {MODULE_CONFIG.filter(m => getModuleValue(m.key)).length} of {MODULE_CONFIG.length} modules enabled
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                                        <Activity className="h-4 w-4" />
-                                                        <span>Changes apply immediately</span>
-                                                    </div>
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-                                    </motion.div>
                                 </div>
                             )}
                         </>
@@ -400,11 +523,19 @@ export default function SettingsPage() {
                 </motion.div>
             )}
 
-            {activeTab === "security" && (
+            {activeTab === `security` && (
                 <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3 }}
+                    initial={{
+                        opacity: 0,
+                        y:       10,
+                    }}
+                    animate={{
+                        opacity: 1,
+                        y:       0,
+                    }}
+                    transition={{
+                        duration: 0.3,
+                    }}
                 >
                     {isSuperAdmin ? (
                         <>
@@ -421,16 +552,26 @@ export default function SettingsPage() {
                                 <div className="space-y-6">
                                     {/* MFA Enforcement Card */}
                                     <motion.div
-                                        initial={{ opacity: 0, y: 20 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: 0.1 }}
+                                        initial={{
+                                            opacity: 0,
+                                            y:       20,
+                                        }}
+                                        animate={{
+                                            opacity: 1,
+                                            y:       0,
+                                        }}
+                                        transition={{
+                                            delay: 0.1,
+                                        }}
                                     >
                                         <Card className="border-primary/20">
                                             <CardHeader>
                                                 <div className="flex items-center gap-3">
-                                                    <motion.div 
+                                                    <motion.div
                                                         className="p-2 rounded-lg bg-gradient-to-br from-green-500 to-emerald-500"
-                                                        whileHover={{ scale: 1.1 }}
+                                                        whileHover={{
+                                                            scale: 1.1,
+                                                        }}
                                                     >
                                                         <ShieldIcon className="h-5 w-5 text-white" />
                                                     </motion.div>
@@ -443,9 +584,11 @@ export default function SettingsPage() {
                                                 </div>
                                             </CardHeader>
                                             <CardContent className="space-y-4">
-                                                <motion.div 
+                                                <motion.div
                                                     className="flex items-center justify-between p-4 rounded-lg bg-muted/50"
-                                                    whileHover={{ scale: 1.01 }}
+                                                    whileHover={{
+                                                        scale: 1.01,
+                                                    }}
                                                 >
                                                     <div className="space-y-1">
                                                         <Label htmlFor="require-mfa" className="text-base">
@@ -457,8 +600,12 @@ export default function SettingsPage() {
                                                         </p>
                                                     </div>
                                                     <motion.div
-                                                        whileHover={{ scale: 1.05 }}
-                                                        whileTap={{ scale: 0.95 }}
+                                                        whileHover={{
+                                                            scale: 1.05,
+                                                        }}
+                                                        whileTap={{
+                                                            scale: 0.95,
+                                                        }}
                                                     >
                                                         <Switch
                                                             id="require-mfa"
@@ -469,7 +616,7 @@ export default function SettingsPage() {
                                                         />
                                                     </motion.div>
                                                 </motion.div>
-                                                
+
                                                 {/* Info box */}
                                                 <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
                                                     <div className="flex items-start gap-3">
@@ -477,7 +624,7 @@ export default function SettingsPage() {
                                                         <div className="text-sm">
                                                             <p className="font-medium text-amber-500">Security Notice</p>
                                                             <p className="text-muted-foreground">
-                                                                Enabling MFA enforcement will require all existing users to set up two-factor authentication 
+                                                                Enabling MFA enforcement will require all existing users to set up two-factor authentication
                                                                 on their next login. Make sure to notify users before enabling this setting.
                                                             </p>
                                                         </div>
@@ -502,18 +649,29 @@ export default function SettingsPage() {
                 </motion.div>
             )}
 
-            {activeTab === "database" && (
+            {activeTab === `database` && (
                 <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3 }}
+                    initial={{
+                        opacity: 0,
+                        y:       10,
+                    }}
+                    animate={{
+                        opacity: 1,
+                        y:       0,
+                    }}
+                    transition={{
+                        duration: 0.3,
+                    }}
                 >
                     <Card>
                         <CardHeader>
                             <div className="flex items-center gap-3">
-                                <motion.div 
+                                <motion.div
                                     className="p-2 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500"
-                                    whileHover={{ rotate: 5, scale: 1.1 }}
+                                    whileHover={{
+                                        rotate: 5,
+                                        scale:  1.1,
+                                    }}
                                 >
                                     <Database className="h-5 w-5 text-white" />
                                 </motion.div>
@@ -534,21 +692,40 @@ export default function SettingsPage() {
                                     Contact your administrator to change database settings.
                                 </p>
                             </div>
-                            
+
                             {/* Database Stats */}
                             <div className="grid gap-4 md:grid-cols-3">
                                 {[
-                                    { label: "Connection Pool", value: "10/100" },
-                                    { label: "Query Time", value: "12ms avg" },
-                                    { label: "Uptime", value: "99.9%" },
+                                    {
+                                        label: `Connection Pool`,
+                                        value: `10/100`,
+                                    },
+                                    {
+                                        label: `Query Time`,
+                                        value: `12ms avg`,
+                                    },
+                                    {
+                                        label: `Uptime`,
+                                        value: `99.9%`,
+                                    },
                                 ].map((stat, index) => (
                                     <motion.div
                                         key={stat.label}
                                         className="p-4 rounded-lg bg-muted/50"
-                                        initial={{ opacity: 0, y: 10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: index * 0.1 }}
-                                        whileHover={{ scale: 1.02 }}
+                                        initial={{
+                                            opacity: 0,
+                                            y:       10,
+                                        }}
+                                        animate={{
+                                            opacity: 1,
+                                            y:       0,
+                                        }}
+                                        transition={{
+                                            delay: index * 0.1,
+                                        }}
+                                        whileHover={{
+                                            scale: 1.02,
+                                        }}
                                     >
                                         <p className="text-sm text-muted-foreground">{stat.label}</p>
                                         <p className="text-2xl font-bold">{stat.value}</p>

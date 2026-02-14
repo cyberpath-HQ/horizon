@@ -9,6 +9,7 @@ import {
 } from "@tanstack/react-query";
 import { useState } from "react";
 import { checkSystemSetup } from "@/lib/api";
+import { Toaster } from "@/components/ui/sonner";
 
 let setupCheckDone = false;
 let cachedNeedsSetup: boolean | null = null;
@@ -78,6 +79,7 @@ function RootComponent() {
                 <AuthProvider>
                     <div className="min-h-screen">
                         <Outlet />
+                        <Toaster position="bottom-right" richColors />
                         {import.meta.env.DEV && <TanStackRouterDevtools />}
                     </div>
                 </AuthProvider>

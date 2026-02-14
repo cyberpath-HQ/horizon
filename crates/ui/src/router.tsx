@@ -4,10 +4,14 @@ import {
 
 // Import routes
 import { routeTree } from './routeTree.gen';
+import { Route as R404Route } from './routes/404';
 
 // Create the router
 export const router = createRouter({
     routeTree,
+    defaultPreload: 'intent',
+    // Handle 404 - redirect unknown routes to the 404 page
+    notFoundRoute: R404Route,
 });
 
 // Re-export hooks
