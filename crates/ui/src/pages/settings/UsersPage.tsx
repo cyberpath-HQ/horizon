@@ -58,7 +58,7 @@ import {
     DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import {
-    Loader2, UserPlus, Users, AlertCircle, CheckCircle, MoreHorizontal, Trash2
+    Loader2, UserPlus, Users, AlertCircle, CheckCircle, MoreHorizontal, Trash2, RefreshCw
 } from "lucide-react";
 
 export default function UsersPage() {
@@ -127,6 +127,12 @@ export default function UsersPage() {
     useEffect(() => {
         loadUsers();
     }, [ page ]);
+
+    // Auto-refresh every 30 seconds
+    useEffect(() => {
+        const interval = setInterval(loadUsers, 30000);
+        return () => clearInterval(interval);
+    }, []);
 
     useEffect(() => {
         if (alert) {
@@ -293,6 +299,10 @@ export default function UsersPage() {
                         Manage system users and their permissions
                     </p>
                 </div>
+                <Button variant="outline" size="sm" onClick={() => loadUsers()} className="gap-2">
+                    <RefreshCw className="w-4 h-4" />
+                    Refresh
+                </Button>
                 <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                     <DialogTrigger asChild>
                         <Button className="gap-2">

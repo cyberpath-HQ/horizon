@@ -29,7 +29,7 @@ export default function SettingsPage() {
         user,
     } = useAuth();
     const [
-        settings,
+        _settings,
         setSettings,
     ] = useState<Array<SystemSetting>>([]);
     const [
@@ -262,6 +262,8 @@ export default function SettingsPage() {
                                                         <p className="text-sm text-muted-foreground">
                                                             {key === `module_assets` && `Enable or disable the Assets management module`}
                                                             {key === `module_agents` && `Enable or disable the Agents module`}
+                                                            {key === `module_software` && `Enable or disable the Software module`}
+                                                            {key === `module_vulnerabilities` && `Enable or disable Vulnerabilities tracking`}
                                                             {key === `module_automation` && `Enable or disable Automation features`}
                                                             {key === `module_notifications` && `Enable or disable Notifications`}
                                                         </p>
