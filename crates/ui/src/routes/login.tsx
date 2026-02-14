@@ -2,7 +2,7 @@ import {
     useState, useEffect
 } from "react";
 import {
-    useNavigate, createFileRoute
+    useNavigate, createFileRoute, redirect
 } from "@tanstack/react-router";
 import { useForm } from "@tanstack/react-form";
 import { useAuth } from "@/context/AuthContext";
@@ -13,13 +13,21 @@ import {
     Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle
 } from "@/components/ui/card";
 import {
-    checkSystemSetup, ApiError
+    checkSystemSetup, ApiError, getStoredUser
 } from "@/lib/api";
 import {
     Leaf, Loader2
 } from "lucide-react";
 
 export const Route = createFileRoute(`/login`)({
+    beforeLoad: () => {
+        const user = getStoredUser();
+        if (user) {
+            throw redirect({
+                to: `/dashboard`,
+            });
+        }
+    },
     component: LoginPage,
 });
 
