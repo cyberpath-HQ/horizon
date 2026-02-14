@@ -3,7 +3,7 @@
 //! Multi-Factor Authentication utility functions using TOTP.
 
 use error::Result;
-use totp_rs::{Algorithm, Secret, TOTP};
+use totp_rs::{Algorithm, TOTP};
 
 /// MFA setup data
 #[derive(Debug, Clone)]
@@ -132,11 +132,21 @@ pub fn verify_totp_code(secret: &str, code: &str, issuer: &str, account_name: &s
         ));
     }
 
-    // Try to decode the base32 secret
-    let secret_bytes = Secret::Encoded(cleaned_secret)
-        .to_bytes()
-        .map_err(|e| error::AppError::internal(format!("Failed to decode base32 secret: {}", e)))?;
+    // Decode the base32 secret directly using the base32 crate
+    let secret_bytes = base32::decode(
+        base32::Alphabet::Rfc4648 {
+            padding: false,
+        },
+        &cleaned_secret,
+    )
+    .ok_or_else(|| error::AppError::internal("Failed to decode base32 secret: Could not decode base32 secret"))?;
 
+    // Ensure we got valid bytes
+    if secret_bytes.is_empty() {
+        return Err(error::AppError::internal("Decoded secret is empty"));
+    }
+
+    // Create TOTP instance
     let totp = TOTP::new(
         Algorithm::SHA1,
         6,
