@@ -33,6 +33,7 @@ use crate::{
             MfaBackupCodesResponse,
             MfaDisableRequest,
             MfaEnableRequest,
+            MfaRegenerateBackupCodesRequest,
             MfaSetupResponse,
             MfaStatusResponse,
             MfaVerifyRequest,
@@ -467,11 +468,14 @@ pub async fn mfa_disable_handler(
 
 /// Regenerate backup codes for the authenticated user
 ///
+/// This endpoint requires the user's password for authentication before
+/// generating new backup codes.
+///
 /// # Arguments
 ///
 /// * `state` - Application state
 /// * `user` - Authenticated user from middleware
-/// * `req` - MFA verify request (current TOTP code required for security)
+/// * `req` - Request with user's password for verification
 ///
 /// # Returns
 ///
@@ -479,7 +483,7 @@ pub async fn mfa_disable_handler(
 pub async fn mfa_regenerate_backup_codes_handler(
     state: &AppState,
     user: MiddlewareUser,
-    req: MfaVerifyRequest,
+    req: MfaRegenerateBackupCodesRequest,
 ) -> Result<Json<MfaBackupCodesResponse>> {
     // Validate request
     req.validate().map_err(|e| {
@@ -499,18 +503,10 @@ pub async fn mfa_regenerate_backup_codes_handler(
         return Err(AppError::bad_request("MFA is not enabled"));
     }
 
-    // Verify the TOTP code
-    let totp_secret = db_user
-        .totp_secret
-        .as_ref()
-        .ok_or_else(|| AppError::internal("MFA enabled but no TOTP secret"))?;
-
-    let is_valid = verify_totp_code(totp_secret, &req.code, MFA_ISSUER, &db_user.email)
-        .map_err(|e| AppError::internal(format!("TOTP verification error: {}", e)))?;
-
-    if !is_valid {
-        return Err(AppError::unauthorized("Invalid TOTP code"));
-    }
+    // Verify the password
+    let password_secret = auth::secrecy::SecretString::from(req.password);
+    verify_password(&password_secret, &db_user.password_hash)
+        .map_err(|_| AppError::unauthorized("Invalid password"))?;
 
     // Generate new backup codes
     let new_codes = generate_backup_codes();
