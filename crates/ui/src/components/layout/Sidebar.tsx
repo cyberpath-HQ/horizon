@@ -1,18 +1,11 @@
-import { Link, useRouter } from "@tanstack/react-router";
+import { Link, useLocation } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/hooks/useTheme";
+import { useSettings } from "@/hooks/useApi";
 import {
-    LayoutDashboard,
-    FolderKanban,
-    Shield,
-    Network,
-    Building2,
     Users,
     Settings,
-    Database,
-    Bot,
-    Workflow,
     User
 } from "lucide-react";
 
@@ -20,54 +13,16 @@ interface NavItem {
     title:  string
     href:   string
     icon:   React.ElementType
+    moduleKey?: string
     roles?: Array<string>
+    search?: Record<string, string>
 }
 
 const mainNavItems: Array<NavItem> = [
     {
         title: `Dashboard`,
         href:  `/dashboard`,
-        icon:  LayoutDashboard,
-    },
-    {
-        title: `Assets`,
-        href:  `/dashboard/assets`,
-        icon:  FolderKanban,
-    },
-    {
-        title: `Software`,
-        href:  `/dashboard/software`,
-        icon:  Database,
-    },
-    {
-        title: `Security`,
-        href:  `/dashboard/security`,
-        icon:  Shield,
-    },
-    {
-        title: `Network`,
-        href:  `/dashboard/network`,
-        icon:  Network,
-    },
-    {
-        title: `Vulnerabilities`,
-        href:  `/dashboard/vulnerabilities`,
-        icon:  Shield,
-    },
-    {
-        title: ` BIA`,
-        href:  `/dashboard/bia`,
-        icon:  Workflow,
-    },
-    {
-        title: `Vendors`,
-        href:  `/dashboard/vendors`,
-        icon:  Building2,
-    },
-    {
-        title: `Agents`,
-        href:  `/dashboard/agents`,
-        icon:  Bot,
+        icon:  () => <span className="w-4 h-4 flex items-center justify-center">D</span>,
     },
 ];
 
@@ -86,28 +41,37 @@ const settingsNavItems: Array<NavItem> = [
         title: `Application`,
         href:  `/dashboard/settings`,
         icon:  Settings,
+        search: { tab: "modules" },
     },
 ];
 
 export function Sidebar() {
-    const router = useRouter();
+    const location = useLocation();
+    const pathname = location.pathname;
     const { user } = useAuth();
     const { resolvedTheme } = useTheme();
+    const { data: settingsData } = useSettings();
 
     const isActive = (href: string) => {
-        const pathname = router.state.location.pathname;
         // Exact match for dashboard root
         if (href === `/dashboard`) {
             return pathname === `/dashboard`;
         }
-        // For settings, use exact match or check if it's a sub-path
-        // /dashboard/settings should only match exactly, not /dashboard/settings/users or /dashboard/settings/teams
+        // For settings, check if it's the settings index
         if (href === `/dashboard/settings`) {
-            return pathname === `/dashboard/settings`;
+            return pathname === `/dashboard/settings` || pathname === `/dashboard/settings/`;
         }
         // For other paths, use startsWith
         return pathname.startsWith(href);
     };
+
+    const isModuleEnabled = (moduleKey?: string) => {
+        if (!moduleKey || !settingsData?.settings) return true;
+        const setting = settingsData.settings.find((s: { key: string }) => s.key === moduleKey);
+        return setting?.value === `true`;
+    };
+
+    const filteredMainNavItems = mainNavItems.filter(item => isModuleEnabled(item.moduleKey));
 
     const logoSrc = resolvedTheme === "dark" ? "/logo-white.svg" : "/logo.svg";
 
@@ -121,15 +85,15 @@ export function Sidebar() {
             {/* Main Navigation */}
             <nav className="flex-1 overflow-y-auto py-4 px-3">
                 <div className="space-y-1">
-                    {mainNavItems.map((item) => (
+                    {filteredMainNavItems.map((item) => (
                         <Link
                             key={item.href}
                             to={item.href}
                             className={cn(
                                 `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200`,
-                isActive(item.href)
-                  ? `bg-primary/10 text-primary`
-                  : `text-muted-foreground hover:bg-accent hover:text-foreground`
+                                isActive(item.href)
+                                  ? `bg-primary/10 text-primary`
+                                  : `text-muted-foreground hover:bg-accent hover:text-foreground`
                             )}
                         >
                             <item.icon className={cn(`w-4 h-4`, isActive(item.href) && `text-primary`)} />
@@ -150,6 +114,7 @@ export function Sidebar() {
                             <Link
                                 key={item.href}
                                 to={item.href}
+                                search={item.search}
                                 className={cn(
                                     `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200`,
                   isActive(item.href)
@@ -169,6 +134,7 @@ export function Sidebar() {
             <div className="px-4 py-3 border-t">
                 <Link
                     to="/dashboard/profile"
+                    search={{ tab: "profile" }}
                     className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-accent transition-colors"
                 >
                     <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">

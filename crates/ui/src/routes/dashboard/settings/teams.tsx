@@ -91,16 +91,14 @@ interface Member {
     role: string;
     user?: {
         email: string;
-        first_name?: string;
-        last_name?: string;
+        full_name?: string;
     };
 }
 
 interface UserSearchResult {
     id: string;
     email: string;
-    first_name?: string;
-    last_name?: string;
+    full_name?: string;
 }
 
 interface CreateTeamFormValues {
@@ -337,11 +335,15 @@ function AddMemberForm({
         form.setFieldValue("user_id", "");
     };
 
-    const getInitials = (email: string, firstName?: string, lastName?: string) => {
-        if (firstName || lastName) {
-            return `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase();
+    const getInitials = (email: string, fullName?: string) => {
+        if (fullName) {
+            const parts = fullName.split(" ");
+            if (parts.length >= 2) {
+                return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+            }
+            return fullName[0].toUpperCase();
         }
-        return email?.[0]?.toUpperCase() || "?";
+        return email?.[0]?.toUpperCase() || `?`;
     };
 
     return (
@@ -388,14 +390,14 @@ function AddMemberForm({
                                 >
                                     <Avatar className="h-6 w-6">
                                         <AvatarFallback className="text-xs">
-                                            {getInitials(user.email, user.first_name, user.last_name)}
+                                            {getInitials(user.email, user.full_name)}
                                         </AvatarFallback>
                                     </Avatar>
                                     <div>
                                         <p className="text-sm font-medium">{user.email}</p>
-                                        {(user.first_name || user.last_name) && (
+                                        {user.full_name && (
                                             <p className="text-xs text-muted-foreground">
-                                                {[user.first_name, user.last_name].filter(Boolean).join(" ")}
+                                                {user.full_name}
                                             </p>
                                         )}
                                     </div>
@@ -410,7 +412,7 @@ function AddMemberForm({
                         <div className="flex items-center gap-2">
                             <Avatar className="h-6 w-6">
                                 <AvatarFallback className="text-xs">
-                                    {getInitials(selectedUser.email, selectedUser.first_name, selectedUser.last_name)}
+                                    {getInitials(selectedUser.email, selectedUser.full_name)}
                                 </AvatarFallback>
                             </Avatar>
                             <span className="text-sm">{selectedUser.email}</span>
@@ -554,17 +556,20 @@ export default function TeamsPage() {
         setShowAddMember(false);
     };
 
-    const getInitials = (email: string, firstName?: string, lastName?: string) => {
-        if (firstName || lastName) {
-            return `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase();
+    const getInitials = (email: string, fullName?: string) => {
+        if (fullName) {
+            const parts = fullName.split(" ");
+            if (parts.length >= 2) {
+                return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+            }
+            return fullName[0].toUpperCase();
         }
-        return email?.[0]?.toUpperCase() || "?";
+        return email?.[0]?.toUpperCase() || `?`;
     };
 
-    const getDisplayName = (user?: { email: string; first_name?: string; last_name?: string }) => {
+    const getDisplayName = (user?: { email: string; full_name?: string }) => {
         if (!user) return "Unknown";
-        const name = [user.first_name, user.last_name].filter(Boolean).join(" ");
-        return name || user.email;
+        return user.full_name || user.email;
     };
 
     const selectedTeam = teams.find(t => t.id === selectedTeamId);
@@ -579,7 +584,7 @@ export default function TeamsPage() {
             </div>
 
             {alert && (
-                <Alert variant={alert.type === "error" ? "destructive" : "default"} className={alert.type === "success" ? "border-green-500 bg-green-50" : ""}>
+                <Alert variant={alert.type === "error" ? "destructive" : "default"} className={alert.type === "success" ? "border-green-500 dark:border-green-600 bg-green-50 dark:bg-green-950/30" : ""}>
                     {alert.type === "success" ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
                     <AlertTitle>{alert.title}</AlertTitle>
                     <AlertDescription>{alert.message}</AlertDescription>
@@ -748,7 +753,7 @@ export default function TeamsPage() {
                                                 <div className="flex items-center gap-3">
                                                     <Avatar className="h-9 w-9">
                                                         <AvatarFallback className="text-sm">
-                                                            {getInitials(member.user?.email || "", member.user?.first_name, member.user?.last_name)}
+                                                            {getInitials(member.user?.email || "", member.user?.full_name)}
                                                         </AvatarFallback>
                                                     </Avatar>
                                                     <div>

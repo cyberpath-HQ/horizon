@@ -1,14 +1,11 @@
 import { useState } from "react";
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect, useSearch, useNavigate } from "@tanstack/react-router";
 import { getAccessToken, getStoredUser } from "@/lib/api";
 import {
     Card, CardContent, CardDescription, CardHeader, CardTitle
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-    Tabs, TabsContent, TabsList, TabsTrigger
-} from "@/components/ui/tabs";
 import {
     Database, Shield, MonitorCheck
 } from "lucide-react";
@@ -20,6 +17,11 @@ import {
 } from "@/hooks/useApi";
 import { Loader2, AlertCircle, CheckCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
+// Type for tab search params
+interface SettingsSearchParams {
+    tab?: "modules" | "security" | "database";
+}
 
 export const Route = createFileRoute("/dashboard/settings/")({
     beforeLoad: () => {
@@ -33,6 +35,11 @@ export const Route = createFileRoute("/dashboard/settings/")({
                 replace: true,
             });
         }
+    },
+    validateSearch: (search: SettingsSearchParams) => {
+        return {
+            tab: search.tab || "modules",
+        };
     },
     component: SettingsPage,
 });
@@ -85,6 +92,16 @@ const MODULE_CONFIG = [
 ];
 
 export default function SettingsPage() {
+    // Get tab from search params
+    const search = useSearch({ from: "/dashboard/settings/" });
+    const activeTab = search.tab || "modules";
+    const navigate = useNavigate({ from: "/dashboard/settings/" });
+
+    // Function to change tab via URL
+    const setTab = (tab: string) => {
+        navigate({ search: { tab: tab as any } });
+    };
+
     const { user } = useAuth();
     const { data: settingsData, isLoading } = useSettings();
     const updateSetting = useUpdateSetting();
@@ -145,30 +162,52 @@ export default function SettingsPage() {
             </div>
 
             {alert && (
-                <Alert variant={alert.type === "error" ? "destructive" : "default"} className={alert.type === "success" ? "border-green-500 bg-green-50" : ""}>
-                    {alert.type === "success" ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+                <Alert variant={alert.type === "error" ? "destructive" : alert.type === "success" ? "default" : "default"} className={alert.type === "success" ? "border-green-500 dark:border-green-600 bg-green-50 dark:bg-green-950/30" : ""}>
+                    {alert.type === "success" ? <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" /> : <AlertCircle className="h-4 w-4" />}
                     <AlertTitle>{alert.type === "success" ? "Success" : "Error"}</AlertTitle>
                     <AlertDescription>{alert.message}</AlertDescription>
                 </Alert>
             )}
 
-            <Tabs defaultValue="modules" className="space-y-4">
-                <TabsList>
-                    <TabsTrigger value="modules" className="gap-2">
-                        <MonitorCheck className="w-4 h-4" />
-                        Modules
-                    </TabsTrigger>
-                    <TabsTrigger value="security" className="gap-2">
-                        <Shield className="w-4 h-4" />
-                        Security
-                    </TabsTrigger>
-                    <TabsTrigger value="database" className="gap-2">
-                        <Database className="w-4 h-4" />
-                        Database
-                    </TabsTrigger>
-                </TabsList>
+            {/* Tab Navigation using search params */}
+            <div className="flex gap-1 border-b">
+                <button
+                    onClick={() => setTab("modules")}
+                    className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                        activeTab === "modules"
+                            ? "border-primary text-primary"
+                            : "border-transparent text-muted-foreground hover:text-foreground"
+                    }`}
+                >
+                    <MonitorCheck className="w-4 h-4" />
+                    Modules
+                </button>
+                <button
+                    onClick={() => setTab("security")}
+                    className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                        activeTab === "security"
+                            ? "border-primary text-primary"
+                            : "border-transparent text-muted-foreground hover:text-foreground"
+                    }`}
+                >
+                    <Shield className="w-4 h-4" />
+                    Security
+                </button>
+                <button
+                    onClick={() => setTab("database")}
+                    className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                        activeTab === "database"
+                            ? "border-primary text-primary"
+                            : "border-transparent text-muted-foreground hover:text-foreground"
+                    }`}
+                >
+                    <Database className="w-4 h-4" />
+                    Database
+                </button>
+            </div>
 
-                <TabsContent value="modules" className="space-y-4">
+            {activeTab === "modules" && (
+                <div className="space-y-4">
                     {isSuperAdmin
 ? (
                             <>
@@ -224,9 +263,11 @@ export default function SettingsPage() {
                                     </CardContent>
                                 </Card>
                             )}
-                </TabsContent>
+                </div>
+            )}
 
-                <TabsContent value="security" className="space-y-4">
+            {activeTab === "security" && (
+                <div className="space-y-4">
                     {isSuperAdmin
 ? (
                             <>
@@ -280,9 +321,11 @@ export default function SettingsPage() {
                                     </CardContent>
                                 </Card>
                             )}
-                </TabsContent>
+                </div>
+            )}
 
-                <TabsContent value="database" className="space-y-4">
+            {activeTab === "database" && (
+                <div className="space-y-4">
                     <Card>
                         <CardHeader>
                             <CardTitle>Database Connection</CardTitle>
@@ -301,8 +344,8 @@ export default function SettingsPage() {
                             </div>
                         </CardContent>
                     </Card>
-                </TabsContent>
-            </Tabs>
+                </div>
+            )}
         </div>
     );
 }

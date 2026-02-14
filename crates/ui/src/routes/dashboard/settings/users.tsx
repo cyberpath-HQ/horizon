@@ -56,6 +56,8 @@ import {
     DialogTrigger
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { PasswordStrength } from "@/components/ui/password-strength";
 import {
     Avatar, AvatarFallback
 } from "@/components/ui/avatar";
@@ -88,8 +90,7 @@ import {
 interface User {
     id: string
     email: string
-    first_name?: string
-    last_name?: string
+    full_name?: string
     role: string
     created_at: string
 }
@@ -97,8 +98,7 @@ interface User {
 interface CreateUserFormValues {
     email: string
     password: string
-    first_name: string
-    last_name: string
+    full_name: string
     role: string
 }
 
@@ -110,13 +110,13 @@ function CreateUserForm({
     onCancel: () => void;
 }) {
     const createUser = useCreateUser();
+    const [password, setPassword] = useState("");
 
     const form = useForm<CreateUserFormValues>({
         defaultValues: {
             email: "",
             password: "",
-            first_name: "",
-            last_name: "",
+            full_name: "",
             role: "viewer",
         },
         onSubmit: async ({ value }) => {
@@ -124,8 +124,7 @@ function CreateUserForm({
                 await createUser.mutateAsync({
                     email: value.email,
                     password: value.password,
-                    first_name: value.first_name,
-                    last_name: value.last_name,
+                    full_name: value.full_name,
                     role: value.role || "viewer",
                 });
                 onSuccess();
@@ -136,6 +135,11 @@ function CreateUserForm({
         },
     });
 
+    const handlePasswordChange = (value: string) => {
+        setPassword(value);
+        form.setFieldValue("password", value);
+    };
+
     return (
         <form
             onSubmit={(e) => {
@@ -143,37 +147,23 @@ function CreateUserForm({
                 form.handleSubmit();
             }}
         >
-            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
                 <form.Field
-                    name="first_name"
+                    name="full_name"
                     children={(field) => (
                         <div className="space-y-2">
-                            <Label htmlFor={field.name}>First Name</Label>
+                            <Label htmlFor={field.name}>Full Name</Label>
                             <Input
                                 id={field.name}
-                                placeholder="John"
+                                placeholder="John Doe"
                                 value={field.state.value}
                                 onChange={(e) => field.handleChange(e.target.value)}
                                 onBlur={field.handleBlur}
+                                required
                             />
-                            {field.state.meta.errors ? (
-                                <p className="text-sm text-destructive">{field.state.meta.errors.join(", ")}</p>
-                            ) : null}
-                        </div>
-                    )}
-                />
-                <form.Field
-                    name="last_name"
-                    children={(field) => (
-                        <div className="space-y-2">
-                            <Label htmlFor={field.name}>Last Name</Label>
-                            <Input
-                                id={field.name}
-                                placeholder="Doe"
-                                value={field.state.value}
-                                onChange={(e) => field.handleChange(e.target.value)}
-                                onBlur={field.handleBlur}
-                            />
+                            <p className="text-xs text-muted-foreground">
+                                The user's full name as it will appear in the system
+                            </p>
                             {field.state.meta.errors ? (
                                 <p className="text-sm text-destructive">{field.state.meta.errors.join(", ")}</p>
                             ) : null}
@@ -196,6 +186,9 @@ function CreateUserForm({
                                 onBlur={field.handleBlur}
                                 required
                             />
+                            <p className="text-xs text-muted-foreground">
+                                The user's email address for login and notifications
+                            </p>
                             {field.state.meta.errors ? (
                                 <p className="text-sm text-destructive">{field.state.meta.errors.join(", ")}</p>
                             ) : null}
@@ -213,13 +206,14 @@ function CreateUserForm({
                                 id={field.name}
                                 type="password"
                                 placeholder="••••••••"
-                                value={field.state.value}
-                                onChange={(e) => field.handleChange(e.target.value)}
+                                value={password}
+                                onChange={(e) => handlePasswordChange(e.target.value)}
                                 onBlur={field.handleBlur}
                                 required
                             />
-                            <p className="text-xs text-muted-foreground">
-                                Must be at least 8 characters
+                            {password && <PasswordStrength password={password} className="mt-2" />}
+                            <p className="text-xs text-muted-foreground mt-2">
+                                Must be at least 12 characters with uppercase, lowercase, numbers, and special characters
                             </p>
                             {field.state.meta.errors ? (
                                 <p className="text-sm text-destructive">{field.state.meta.errors.join(", ")}</p>
@@ -248,6 +242,9 @@ function CreateUserForm({
                                     <SelectItem value="super_admin">Super Admin</SelectItem>
                                 </SelectContent>
                             </Select>
+                            <p className="text-xs text-muted-foreground">
+                                The role determines the user's permissions in the system
+                            </p>
                             {field.state.meta.errors ? (
                                 <p className="text-sm text-destructive">{field.state.meta.errors.join(", ")}</p>
                             ) : null}
@@ -273,7 +270,7 @@ export default function UsersPage() {
     const [page, setPage] = useState(1);
     const [search, setSearch] = useState("");
     const [debouncedSearch, setDebouncedSearch] = useState("");
-    const [sortBy, setSortBy] = useState<"created_at" | "email" | "first_name">("created_at");
+    const [sortBy, setSortBy] = useState<"created_at" | "email" | "full_name">("created_at");
     const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
     const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
 
@@ -331,20 +328,20 @@ export default function UsersPage() {
         }
     };
 
-    const handleSelectAll = () => {
-        if (selectedUsers.size === users.length) {
-            setSelectedUsers(new Set());
-        } else {
+    const handleSelectAll = (checked: boolean) => {
+        if (checked) {
             setSelectedUsers(new Set(users.map(u => u.id)));
+        } else {
+            setSelectedUsers(new Set());
         }
     };
 
-    const handleSelectUser = (userId: string) => {
+    const handleSelectUser = (userId: string, checked: boolean) => {
         const newSelected = new Set(selectedUsers);
-        if (newSelected.has(userId)) {
-            newSelected.delete(userId);
-        } else {
+        if (checked) {
             newSelected.add(userId);
+        } else {
+            newSelected.delete(userId);
         }
         setSelectedUsers(newSelected);
     };
@@ -436,9 +433,13 @@ export default function UsersPage() {
         }
     };
 
-    const getInitials = (email: string, firstName?: string, lastName?: string) => {
-        if (firstName || lastName) {
-            return `${ firstName?.[0] || `` }${ lastName?.[0] || `` }`.toUpperCase();
+    const getInitials = (email: string, fullName?: string) => {
+        if (fullName) {
+            const parts = fullName.split(" ");
+            if (parts.length >= 2) {
+                return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+            }
+            return fullName[0].toUpperCase();
         }
         return email?.[0]?.toUpperCase() || `?`;
     };
@@ -510,7 +511,7 @@ export default function UsersPage() {
             </div>
 
             {alert && (
-                <Alert variant={alert.type === `error` ? `destructive` : `default`} className={alert.type === `success` ? `border-green-500 bg-green-50` : ``}>
+                <Alert variant={alert.type === `error` ? `destructive` : `default`} className={alert.type === `success` ? `border-green-500 dark:border-green-600 bg-green-50 dark:bg-green-950/30` : ``}>
                     {alert.type === `success` ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
                     <AlertTitle>{alert.title}</AlertTitle>
                     <AlertDescription>{alert.message}</AlertDescription>
@@ -575,11 +576,9 @@ export default function UsersPage() {
                     <TableHeader>
                         <TableRow>
                             <TableHead className="w-12">
-                                <input
-                                    type="checkbox"
+                                <Checkbox
                                     checked={selectedUsers.size === users.length && users.length > 0}
-                                    onChange={handleSelectAll}
-                                    className="h-4 w-4 rounded border-gray-300"
+                                    onCheckedChange={handleSelectAll}
                                 />
                             </TableHead>
                             <TableHead>User</TableHead>
@@ -604,24 +603,19 @@ export default function UsersPage() {
                         {users.map((user) => (
                             <TableRow key={user.id}>
                                 <TableCell>
-                                    <input
-                                        type="checkbox"
+                                    <Checkbox
                                         checked={selectedUsers.has(user.id)}
-                                        onChange={() => handleSelectUser(user.id)}
-                                        className="h-4 w-4 rounded border-gray-300"
+                                        onCheckedChange={(checked) => handleSelectUser(user.id, checked as boolean)}
                                     />
                                 </TableCell>
                                 <TableCell className="flex items-center gap-3">
                                     <Avatar className="h-8 w-8">
                                         <AvatarFallback className="text-xs">
-                                            {getInitials(user.email, user.first_name, user.last_name)}
+                                            {getInitials(user.email, user.full_name)}
                                         </AvatarFallback>
                                     </Avatar>
                                     <span className="font-medium">
-                                        {[
-                                            user.first_name,
-                                            user.last_name,
-                                        ].filter(Boolean).join(` `) || `—`}
+                                        {user.full_name || `—`}
                                     </span>
                                 </TableCell>
                                 <TableCell className="text-muted-foreground">

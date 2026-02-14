@@ -376,8 +376,7 @@ class ApiClient {
         });
     }
 
-    async updateProfile(data: { first_name?: string
-        last_name?:                          string }): Promise<any> {
+    async updateProfile(data: { full_name?: string }): Promise<any> {
         return this.request<any>(`/api/v1/users/me`, {
             method: `PUT`,
             body:   JSON.stringify(data),
@@ -497,21 +496,15 @@ class ApiClient {
 
     // User management
     async createUser(data: { email: string
-        username?:                  string
-        password?:                  string
-        first_name?:                string
-        last_name?:                 string
-        role?:                      string }): Promise<any> {
-        // Generate username from email if not provided
-        const username = data.username || data.email.split(`@`)[0];
+        full_name:                string
+        password?:                 string
+        role?:                    string }): Promise<any> {
         return this.request<any>(`/api/v1/users`, {
             method: `POST`,
             body:   JSON.stringify({
                 email:      data.email,
-                username,
+                full_name:  data.full_name,
                 password:   data.password,
-                first_name: data.first_name,
-                last_name:  data.last_name,
                 role:       data.role || `viewer`,
             }),
         });
@@ -548,8 +541,7 @@ class ApiClient {
     }
 
     async updateUser(userId: string, data: { role?: string
-        first_name?:                                string
-        last_name?:                                 string }): Promise<any> {
+        full_name?:                              string }): Promise<any> {
         return this.request<any>(`/api/v1/users/${ userId }`, {
             method: `PUT`,
             body:   JSON.stringify(data),

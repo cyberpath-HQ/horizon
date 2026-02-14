@@ -126,11 +126,11 @@ export function MainLayout() {
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => navigate({ to: "/dashboard/profile" })}>
+                  <DropdownMenuItem onClick={() => navigate({ to: "/dashboard/profile", search: { tab: "profile" } })}>
                     <User className="mr-2 w-4 h-4" />
                     Profile
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate({ to: "/dashboard/settings" })}>
+                  <DropdownMenuItem onClick={() => navigate({ to: "/dashboard/settings", search: { tab: "modules" } })}>
                     <Settings className="mr-2 w-4 h-4" />
                     Settings
                   </DropdownMenuItem>

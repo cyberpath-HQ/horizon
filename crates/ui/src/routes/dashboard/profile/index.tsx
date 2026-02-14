@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useForm } from "@tanstack/react-form";
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect, useSearch, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/context/AuthContext";
 import { setStoredUser, getAccessToken, getStoredUser } from "@/lib/api";
 import {
@@ -9,9 +9,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-    Tabs, TabsContent, TabsList, TabsTrigger
-} from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import {
     User, Shield, Key, Loader2, AlertCircle, CheckCircle, Monitor, Trash2, Bell
@@ -33,10 +30,14 @@ import {
     useDisableMfa,
 } from "@/hooks/useApi";
 
+// Type for tab search params
+interface ProfileSearchParams {
+    tab?: "profile" | "security" | "notifications" | "apikeys" | "sessions";
+}
+
 // Form value interfaces
 interface ProfileFormValues {
-    first_name: string;
-    last_name: string;
+    full_name: string;
 }
 
 interface PasswordFormValues {
@@ -62,6 +63,11 @@ export const Route = createFileRoute("/dashboard/profile/")({
             });
         }
     },
+    validateSearch: (search: ProfileSearchParams) => {
+        return {
+            tab: search.tab || "profile",
+        };
+    },
     component: ProfilePage,
 });
 
@@ -71,12 +77,10 @@ interface ApiKeyFormValues {
 
 // Profile Update Form Component
 function ProfileUpdateForm({
-    initialFirstName,
-    initialLastName,
+    initialFullName,
     onSuccess,
 }: {
-    initialFirstName: string;
-    initialLastName: string;
+    initialFullName: string;
     onSuccess: () => void;
 }) {
     const updateProfile = useUpdateProfile();
@@ -84,21 +88,19 @@ function ProfileUpdateForm({
 
     const form = useForm<ProfileFormValues>({
         defaultValues: {
-            first_name: initialFirstName,
-            last_name: initialLastName,
+            full_name: initialFullName,
         },
         onSubmit: async ({ value }) => {
             try {
                 await updateProfile.mutateAsync({
-                    first_name: value.first_name,
-                    last_name: value.last_name,
+                    full_name: value.full_name,
                 });
 
                 // Update stored user
                 const updatedUser = {
                     id: user?.id || "",
                     email: user?.email || "",
-                    displayName: `${value.first_name} ${value.last_name}`.trim(),
+                    displayName: value.full_name,
                     roles: user?.roles || [],
                 };
                 setStoredUser(updatedUser);
@@ -119,48 +121,26 @@ function ProfileUpdateForm({
             }}
             className="space-y-4"
         >
-            <div className="grid gap-4 md:grid-cols-2">
-                <form.Field
-                    name="first_name"
-                    children={(field) => (
-                        <div className="space-y-2">
-                            <Label htmlFor={field.name}>First Name</Label>
-                            <Input
-                                id={field.name}
-                                value={field.state.value}
-                                onChange={(e) => field.handleChange(e.target.value)}
-                                onBlur={field.handleBlur}
-                            />
-                            <p className="text-xs text-muted-foreground">
-                                Your first name as it will appear in the system
-                            </p>
-                            {field.state.meta.errors ? (
-                                <p className="text-sm text-destructive">{field.state.meta.errors.join(", ")}</p>
-                            ) : null}
-                        </div>
-                    )}
-                />
-                <form.Field
-                    name="last_name"
-                    children={(field) => (
-                        <div className="space-y-2">
-                            <Label htmlFor={field.name}>Last Name</Label>
-                            <Input
-                                id={field.name}
-                                value={field.state.value}
-                                onChange={(e) => field.handleChange(e.target.value)}
-                                onBlur={field.handleBlur}
-                            />
-                            <p className="text-xs text-muted-foreground">
-                                Your last name as it will appear in the system
-                            </p>
-                            {field.state.meta.errors ? (
-                                <p className="text-sm text-destructive">{field.state.meta.errors.join(", ")}</p>
-                            ) : null}
-                        </div>
-                    )}
-                />
-            </div>
+            <form.Field
+                name="full_name"
+                children={(field) => (
+                    <div className="space-y-2">
+                        <Label htmlFor={field.name}>Full Name</Label>
+                        <Input
+                            id={field.name}
+                            value={field.state.value}
+                            onChange={(e) => field.handleChange(e.target.value)}
+                            onBlur={field.handleBlur}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Your full name as it will appear in the system
+                        </p>
+                        {field.state.meta.errors ? (
+                            <p className="text-sm text-destructive">{field.state.meta.errors.join(", ")}</p>
+                        ) : null}
+                    </div>
+                )}
+            />
             <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input id="email" value={user?.email || ""} disabled />
@@ -406,6 +386,16 @@ function CreateApiKeyForm({ onSuccess }: { onSuccess: (key: string) => void }) {
 }
 
 export default function ProfilePage() {
+    // Get tab from search params
+    const search = useSearch({ from: "/dashboard/profile/" });
+    const activeTab = search.tab || "profile";
+    const navigate = useNavigate({ from: "/dashboard/profile/" });
+
+    // Function to change tab via URL
+    const setTab = (tab: string) => {
+        navigate({ search: { tab: tab as any } });
+    };
+
     // Queries
     const { data: profileData } = useProfile();
     const { data: mfaStatus } = useMfaStatus();
@@ -422,7 +412,6 @@ export default function ProfilePage() {
 
     // State
     const [message, setMessage] = useState<{ type: `success` | `error`; text: string } | null>(null);
-    const [activeTab, setActiveTab] = useState(`profile`);
 
     // MFA
     const [mfaEnabled, setMfaEnabled] = useState(false);
@@ -443,20 +432,6 @@ export default function ProfilePage() {
         team_updates: true,
         weekly_digest: true,
     });
-
-    // Initialize active tab from localStorage
-    useEffect(() => {
-        const savedTab = localStorage.getItem(`profile_active_tab`);
-        if (savedTab) {
-            setActiveTab(savedTab);
-        }
-    }, []);
-
-    // Save active tab to localStorage
-    const handleTabChange = (value: string) => {
-        setActiveTab(value);
-        localStorage.setItem(`profile_active_tab`, value);
-    };
 
     // Initialize MFA status
     useEffect(() => {
@@ -598,34 +573,63 @@ export default function ProfilePage() {
             </div>
 
             {message && (
-                <div className={`p-4 rounded-lg flex items-center gap-2 ${ message.type === `success` ? `bg-green-500/10 text-green-500` : `bg-red-500/10 text-red-500` }`}>
+                <div className={`p-4 rounded-lg flex items-center gap-2 ${ message.type === `success` ? `bg-green-500/10 dark:bg-green-950/30 text-green-600 dark:text-green-400` : `bg-red-500/10 dark:bg-red-950/30 text-red-600 dark:text-red-400` }`}>
                     {message.type === `success` ? <CheckCircle className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
                     {message.text}
                 </div>
             )}
 
-            <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
-                <TabsList>
-                    <TabsTrigger value="profile" className="gap-2">
-                        <User className="w-4 h-4" />
-                        Profile
-                    </TabsTrigger>
-                    <TabsTrigger value="security" className="gap-2">
-                        <Shield className="w-4 h-4" />
-                        Security
-                    </TabsTrigger>
-                    <TabsTrigger value="notifications" className="gap-2">
-                        <Bell className="w-4 h-4" />
-                        Notifications
-                    </TabsTrigger>
-                    <TabsTrigger value="apikeys" className="gap-2">
-                        <Key className="w-4 h-4" />
-                        API Keys
-                    </TabsTrigger>
-                </TabsList>
+            {/* Tab Navigation using search params */}
+            <div className="flex gap-1 border-b">
+                <button
+                    onClick={() => setTab("profile")}
+                    className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                        activeTab === "profile"
+                            ? "border-primary text-primary"
+                            : "border-transparent text-muted-foreground hover:text-foreground"
+                    }`}
+                >
+                    <User className="w-4 h-4" />
+                    Profile
+                </button>
+                <button
+                    onClick={() => setTab("security")}
+                    className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                        activeTab === "security"
+                            ? "border-primary text-primary"
+                            : "border-transparent text-muted-foreground hover:text-foreground"
+                    }`}
+                >
+                    <Shield className="w-4 h-4" />
+                    Security
+                </button>
+                <button
+                    onClick={() => setTab("notifications")}
+                    className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                        activeTab === "notifications"
+                            ? "border-primary text-primary"
+                            : "border-transparent text-muted-foreground hover:text-foreground"
+                    }`}
+                >
+                    <Bell className="w-4 h-4" />
+                    Notifications
+                </button>
+                <button
+                    onClick={() => setTab("apikeys")}
+                    className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                        activeTab === "apikeys"
+                            ? "border-primary text-primary"
+                            : "border-transparent text-muted-foreground hover:text-foreground"
+                    }`}
+                >
+                    <Key className="w-4 h-4" />
+                    API Keys
+                </button>
+            </div>
 
-                {/* Profile Tab */}
-                <TabsContent value="profile" className="space-y-4">
+            {/* Tab Content */}
+            {activeTab === "profile" && (
+                <div className="space-y-4">
                     <Card>
                         <CardHeader>
                             <CardTitle>Profile Information</CardTitle>
@@ -635,16 +639,17 @@ export default function ProfilePage() {
                         </CardHeader>
                         <CardContent>
                             <ProfileUpdateForm
-                                initialFirstName={profileData?.user?.first_name || ""}
-                                initialLastName={profileData?.user?.last_name || ""}
+                                initialFullName={profileData?.user?.full_name || ""}
                                 onSuccess={handleProfileSuccess}
                             />
                         </CardContent>
                     </Card>
-                </TabsContent>
+                </div>
+            )}
 
-                {/* Security Tab */}
-                <TabsContent value="security" className="space-y-4">
+            {/* Security Tab */}
+            {activeTab === "security" && (
+                <div className="space-y-4">
                     <Card>
                         <CardHeader>
                             <CardTitle>Change Password</CardTitle>
@@ -782,10 +787,12 @@ export default function ProfilePage() {
                             )}
                         </CardContent>
                     </Card>
-                </TabsContent>
+                </div>
+            )}
 
-                {/* Notifications Tab */}
-                <TabsContent value="notifications" className="space-y-4">
+            {/* Notifications Tab */}
+            {activeTab === "notifications" && (
+                <div className="space-y-4">
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
@@ -850,10 +857,12 @@ export default function ProfilePage() {
                             </div>
                         </CardContent>
                     </Card>
-                </TabsContent>
+                </div>
+            )}
 
-                {/* API Keys Tab */}
-                <TabsContent value="apikeys" className="space-y-4">
+            {/* API Keys Tab */}
+            {activeTab === "apikeys" && (
+                <div className="space-y-4">
                     <Card>
                         <CardHeader>
                             <CardTitle>API Keys</CardTitle>
@@ -917,8 +926,8 @@ export default function ProfilePage() {
                             </div>
                         </CardContent>
                     </Card>
-                </TabsContent>
-            </Tabs>
+                </div>
+            )}
         </div>
     );
 }
