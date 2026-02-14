@@ -262,13 +262,7 @@ pub async fn mfa_verify_login_handler(
     let user_response = AuthenticatedUser {
         id:           db_user.id.clone(),
         email:        db_user.email,
-        display_name: format!(
-            "{} {}",
-            db_user.first_name.unwrap_or_default(),
-            db_user.last_name.unwrap_or_default()
-        )
-        .trim()
-        .to_string(),
+        display_name: db_user.full_name,
         roles:        user_roles,
     };
 
@@ -364,13 +358,7 @@ pub async fn mfa_verify_backup_code_handler(
     let user_response = AuthenticatedUser {
         id:           db_user.id.clone(),
         email:        db_user.email.clone(),
-        display_name: format!(
-            "{} {}",
-            db_user.first_name.unwrap_or_default(),
-            db_user.last_name.unwrap_or_default()
-        )
-        .trim()
-        .to_string(),
+        display_name: db_user.full_name,
         roles:        user_roles,
     };
 

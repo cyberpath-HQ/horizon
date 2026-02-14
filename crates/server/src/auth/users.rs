@@ -77,11 +77,8 @@ pub async fn update_my_profile_handler(
 
     let mut active_model: entity::users::ActiveModel = db_user.into();
 
-    if let Some(first_name) = req.first_name {
-        active_model.first_name = Set(Some(first_name));
-    }
-    if let Some(last_name) = req.last_name {
-        active_model.last_name = Set(Some(last_name));
+    if let Some(full_name) = req.full_name {
+        active_model.full_name = Set(full_name);
     }
     if let Some(avatar_url) = req.avatar_url {
         active_model.avatar_url = Set(Some(avatar_url));
@@ -136,11 +133,7 @@ pub async fn create_user_handler(
 
     // Check if user already exists
     let existing = UsersEntity::find()
-        .filter(
-            Condition::any()
-                .add(UserColumn::Email.eq(&req.email))
-                .add(UserColumn::Username.eq(&req.username)),
-        )
+        .filter(UserColumn::Email.eq(&req.email))
         .one(&state.db)
         .await
         .map_err(|e| {
@@ -151,7 +144,7 @@ pub async fn create_user_handler(
 
     if existing.is_some() {
         return Err(AppError::Conflict {
-            message: "User with this email or username already exists".to_string(),
+            message: "User with this email already exists".to_string(),
         });
     }
 
@@ -166,7 +159,7 @@ pub async fn create_user_handler(
     // Create the user
     let new_user = entity::users::ActiveModel {
         email: Set(req.email.clone()),
-        username: Set(req.username.clone()),
+        full_name: Set(req.full_name.clone()),
         password_hash: Set(hashed_password.expose_secret().to_string()),
         status: Set(UserStatus::Active),
         created_at: Set(Utc::now().naive_utc()),
@@ -235,9 +228,7 @@ pub async fn list_users_handler(
         base_query = base_query.filter(
             Condition::any()
                 .add(UserColumn::Email.like(&search_pattern))
-                .add(UserColumn::Username.like(&search_pattern))
-                .add(UserColumn::FirstName.like(&search_pattern))
-                .add(UserColumn::LastName.like(&search_pattern)),
+                .add(UserColumn::FullName.like(&search_pattern)),
         );
     }
 
@@ -306,9 +297,7 @@ fn user_model_to_response(user: &entity::users::Model, roles: Vec<String>) -> Us
     UserProfileResponse {
         id: user.id.clone(),
         email: user.email.clone(),
-        username: user.username.clone(),
-        first_name: user.first_name.clone(),
-        last_name: user.last_name.clone(),
+        full_name: user.full_name.clone(),
         avatar_url: user.avatar_url.clone(),
         status: format!("{:?}", user.status).to_lowercase(),
         mfa_enabled: user.mfa_enabled,
@@ -329,11 +318,9 @@ mod tests {
         entity::users::Model {
             id: id.to_string(),
             email: email.to_string(),
-            username: email.to_string(),
             password_hash: "hashed".to_string(),
             totp_secret: None,
-            first_name: Some("Test".to_string()),
-            last_name: Some("User".to_string()),
+            full_name: "Test User".to_string(),
             avatar_url: None,
             status,
             email_verified_at: None,
@@ -355,11 +342,9 @@ mod tests {
 
         assert_eq!(response.id, "usr_test123");
         assert_eq!(response.email, "test@example.com");
-        assert_eq!(response.username, "test@example.com");
+        assert_eq!(response.full_name, "Test User");
         assert_eq!(response.roles, vec!["admin"]);
         assert!(!response.mfa_enabled);
-        assert_eq!(response.first_name, Some("Test".to_string()));
-        assert_eq!(response.last_name, Some("User".to_string()));
         assert_eq!(response.status, "active");
     }
 
@@ -408,15 +393,11 @@ mod tests {
 
     #[test]
     fn test_user_model_to_response_no_optional_fields() {
-        let mut user = make_test_user("usr_bare", "bare@example.com", UserStatus::Active, false);
-        user.first_name = None;
-        user.last_name = None;
-        user.avatar_url = None;
+        let user = make_test_user("usr_bare", "bare@example.com", UserStatus::Active, false);
 
         let response = user_model_to_response(&user, vec![]);
 
-        assert!(response.first_name.is_none());
-        assert!(response.last_name.is_none());
+        assert_eq!(response.full_name, "Test User");
         assert!(response.avatar_url.is_none());
     }
 

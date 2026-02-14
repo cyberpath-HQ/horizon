@@ -8,7 +8,7 @@ use entity::system_settings::Entity as SystemSettingsEntity;
 use error::{AppError, Result};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
 use serde::{Deserialize, Serialize};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 use validator::Validate;
 
 use crate::{middleware::auth::AuthenticatedUser, AppState};
@@ -52,6 +52,13 @@ const DEFAULT_SETTINGS: &[(&str, &str, &str)] = &[
         "module_vendors",
         "true",
         "Enable or disable the Vendors module. This module manages vendor relationships and third-party risk.",
+    ),
+    // Security settings
+    (
+        "require_mfa",
+        "false",
+        "Require multi-factor authentication for all users. When enabled, all users must set up MFA to access the \
+         system.",
     ),
 ];
 
@@ -210,7 +217,7 @@ pub async fn update_setting_handler(
         .await
         .map_err(|e| AppError::database(format!("Failed to update setting: {}", e)))?;
 
-    warn!(key = %key, "System setting updated");
+    debug!(key = %key, "System setting updated");
 
     Ok(Json(SettingResponse {
         id:          updated.id,

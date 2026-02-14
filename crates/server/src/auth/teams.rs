@@ -408,13 +408,7 @@ pub async fn add_team_member_handler(
 
     debug!(team_id = %team_id, target_user_id = %req.user_id, user_id = %user.id, "Team member added");
 
-    let display_name = format!(
-        "{} {}",
-        target_user.first_name.unwrap_or_default(),
-        target_user.last_name.unwrap_or_default()
-    )
-    .trim()
-    .to_string();
+    let display_name = target_user.full_name.clone();
 
     Ok(Json(TeamMemberResponse {
         id: created_member.id,
@@ -485,13 +479,7 @@ pub async fn update_team_member_handler(
         .await?
         .ok_or_else(|| AppError::internal("Member user not found"))?;
 
-    let display_name = format!(
-        "{} {}",
-        member_user.first_name.unwrap_or_default(),
-        member_user.last_name.unwrap_or_default()
-    )
-    .trim()
-    .to_string();
+    let display_name = member_user.full_name.clone();
 
     debug!(
         team_id = %team_id,
@@ -607,16 +595,7 @@ pub async fn list_team_members_handler(
         .into_iter()
         .map(|(m, user_opt)| {
             let (email, display_name) = match user_opt {
-                Some(u) => {
-                    let dn = format!(
-                        "{} {}",
-                        u.first_name.unwrap_or_default(),
-                        u.last_name.unwrap_or_default()
-                    )
-                    .trim()
-                    .to_string();
-                    (u.email, dn)
-                },
+                Some(u) => (u.email, u.full_name.clone()),
                 None => ("unknown".to_string(), "Unknown User".to_string()),
             };
             TeamMemberResponse {
