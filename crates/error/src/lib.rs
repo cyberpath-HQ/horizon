@@ -4,6 +4,7 @@
 
 pub mod codes;
 pub mod middleware;
+pub mod rejection;
 pub mod response;
 pub mod traits;
 

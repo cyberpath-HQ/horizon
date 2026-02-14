@@ -334,13 +334,21 @@ impl PermissionService {
     ) -> Result<PermissionCheckResult> {
         let permission_str = permission.to_string();
 
-        // debug!(roles = ?roles, permission = %permission, permission_str = %permission_str, "Checking
-        // permission for roles");
+        tracing::debug!(roles = ?roles, permission = %permission, permission_str = %permission_str, "Checking permission for roles");
+
+        // Super admin bypass - super_admin role has all permissions
+        if roles.iter().any(|r| r == "super_admin") {
+            tracing::debug!(
+                permission = %permission_str,
+                "Permission granted - user has super_admin role"
+            );
+            return Ok(PermissionCheckResult::Allowed);
+        }
 
         // First, check for direct permission matches (for JWT roles that are permission strings)
         for role in roles {
             if role == &permission_str {
-                // debug!(role = %role, "Permission granted by direct match");
+                tracing::debug!(role = %role, "Permission granted by direct match");
                 return Ok(PermissionCheckResult::Allowed);
             }
         }
@@ -349,7 +357,7 @@ impl PermissionService {
         for role_name in roles {
             match self.check_role_permission(role_name, &permission).await? {
                 PermissionCheckResult::Allowed => {
-                    // debug!(role = %role_name, "Permission granted by role");
+                    tracing::debug!(role = %role_name, "Permission granted by role");
                     return Ok(PermissionCheckResult::Allowed);
                 },
                 PermissionCheckResult::Denied => {
@@ -370,7 +378,7 @@ impl PermissionService {
             }
         }
 
-        // debug!(permission = %permission, "Permission denied");
+        tracing::debug!(permission = %permission, "Permission denied");
         Ok(PermissionCheckResult::Denied)
     }
 

@@ -12,12 +12,8 @@ pub struct UserProfileResponse {
     pub id:                String,
     /// User's email address
     pub email:             String,
-    /// User's username
-    pub username:          String,
-    /// User's first name
-    pub first_name:        Option<String>,
-    /// User's last name
-    pub last_name:         Option<String>,
+    /// User's full name
+    pub full_name:         String,
     /// User's avatar URL
     pub avatar_url:        Option<String>,
     /// User's account status
@@ -41,31 +37,42 @@ pub struct UserProfileResponse {
 pub struct CreateUserRequest {
     /// User's email address
     #[validate(email(message = "Invalid email format"))]
-    pub email:    String,
-    /// User's username
+    pub email:     String,
+    /// User's full name (required)
     #[validate(length(
-        min = 3,
-        max = 50,
-        message = "Username must be between 3 and 50 characters"
+        min = 1,
+        max = 255,
+        message = "Full name must be between 1 and 255 characters"
     ))]
-    pub username: String,
+    pub full_name: String,
     /// User's password
     #[validate(length(min = 8, message = "Password must be at least 8 characters"))]
-    pub password: String,
+    pub password:  String,
+    /// Role to assign to the user (admin, manager, viewer, user)
+    pub role:      Option<String>,
 }
 
 /// Request to update user profile
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Validate)]
 pub struct UpdateUserProfileRequest {
-    /// New first name
-    #[validate(length(max = 255, message = "First name must not exceed 255 characters"))]
-    pub first_name: Option<String>,
-    /// New last name
-    #[validate(length(max = 255, message = "Last name must not exceed 255 characters"))]
-    pub last_name:  Option<String>,
+    /// New full name
+    #[validate(length(max = 255, message = "Full name must not exceed 255 characters"))]
+    pub full_name:  Option<String>,
     /// New avatar URL
     #[validate(url(message = "Invalid avatar URL"))]
     pub avatar_url: Option<String>,
+}
+
+/// Request to update a user (admin operation)
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Validate)]
+pub struct UpdateUserRequest {
+    /// New full name
+    #[validate(length(max = 255, message = "Full name must not exceed 255 characters"))]
+    pub full_name: Option<String>,
+    /// New role to assign
+    pub role:      Option<String>,
+    /// User status
+    pub status:    Option<String>,
 }
 
 /// Response for user list
@@ -99,7 +106,7 @@ pub struct UserListQuery {
     pub page:     Option<u64>,
     /// Items per page (default: 20, max: 100)
     pub per_page: Option<u64>,
-    /// Search term for email/username/name
+    /// Search term for email/full_name
     pub search:   Option<String>,
     /// Filter by status
     pub status:   Option<String>,

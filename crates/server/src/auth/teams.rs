@@ -12,7 +12,8 @@ use entity::{
 };
 use error::{AppError, Result};
 use sea_orm::{ActiveModelTrait, ColumnTrait, Condition, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set};
-use tracing::info;
+use tracing::debug;
+use validator::Validate;
 use permissions_macro::with_permission;
 use auth::permissions::{Permission, TeamAction};
 
@@ -47,6 +48,13 @@ pub async fn create_team_handler(
     user: AuthenticatedUser,
     req: CreateTeamRequest,
 ) -> Result<Json<TeamResponse>> {
+    // Validate request
+    req.validate().map_err(|e| {
+        AppError::Validation {
+            message: e.to_string(),
+        }
+    })?;
+
     // Generate slug from name
     let slug = slugify(&req.name);
 
@@ -100,7 +108,7 @@ pub async fn create_team_handler(
         .await
         .map_err(|e| AppError::database(format!("Failed to add creator as team member: {}", e)))?;
 
-    info!(team_id = %created_team.id, user_id = %user.id, "Team created");
+    debug!(team_id = %created_team.id, user_id = %user.id, "Team created");
 
     Ok(Json(team_model_to_response(&created_team, Some(1))))
 }
@@ -207,6 +215,13 @@ pub async fn update_team_handler(
     team_id: &str,
     req: UpdateTeamRequest,
 ) -> Result<Json<TeamResponse>> {
+    // Validate request
+    req.validate().map_err(|e| {
+        AppError::Validation {
+            message: e.to_string(),
+        }
+    })?;
+
     let team = TeamsEntity::find_by_id(team_id)
         .one(&state.db)
         .await?
@@ -257,7 +272,7 @@ pub async fn update_team_handler(
         .await
         .map_err(|e| AppError::database(format!("Failed to update team: {}", e)))?;
 
-    info!(team_id = %team_id, user_id = %user.id, "Team updated");
+    debug!(team_id = %team_id, user_id = %user.id, "Team updated");
 
     Ok(Json(team_model_to_response(&updated, None)))
 }
@@ -294,7 +309,7 @@ pub async fn delete_team_handler(
         .await
         .map_err(|e| AppError::database(format!("Failed to delete team: {}", e)))?;
 
-    info!(team_id = %team_id, user_id = %user.id, "Team soft-deleted");
+    debug!(team_id = %team_id, user_id = %user.id, "Team soft-deleted");
 
     Ok(Json(crate::dto::auth::SuccessResponse {
         success: true,
@@ -312,6 +327,13 @@ pub async fn add_team_member_handler(
     team_id: &str,
     req: AddTeamMemberRequest,
 ) -> Result<Json<TeamMemberResponse>> {
+    // Validate request
+    req.validate().map_err(|e| {
+        AppError::Validation {
+            message: e.to_string(),
+        }
+    })?;
+
     // Check permissions
     let permission_service = auth::permissions::PermissionService::new(state.db.clone());
     permission_service
@@ -336,11 +358,23 @@ pub async fn add_team_member_handler(
         ));
     }
 
-    // Verify the user to add exists
-    let target_user = UsersEntity::find_by_id(&req.user_id)
-        .one(&state.db)
-        .await?
-        .ok_or_else(|| AppError::not_found("User not found"))?;
+    // Verify the user to add exists (by user_id or email)
+    // Check if input looks like a UUID/user ID or an email
+    let target_user = if req.user_id.contains('@') {
+        // It's an email, look up by email
+        UsersEntity::find()
+            .filter(entity::users::Column::Email.eq(&req.user_id))
+            .one(&state.db)
+            .await?
+            .ok_or_else(|| AppError::not_found("User not found"))?
+    }
+    else {
+        // It's a user ID
+        UsersEntity::find_by_id(&req.user_id)
+            .one(&state.db)
+            .await?
+            .ok_or_else(|| AppError::not_found("User not found"))?
+    };
 
     // Parse role
     let role = parse_team_member_role(&req.role)?;
@@ -372,15 +406,9 @@ pub async fn add_team_member_handler(
         .await
         .map_err(|e| AppError::database(format!("Failed to add team member: {}", e)))?;
 
-    info!(team_id = %team_id, target_user_id = %req.user_id, user_id = %user.id, "Team member added");
+    debug!(team_id = %team_id, target_user_id = %req.user_id, user_id = %user.id, "Team member added");
 
-    let display_name = format!(
-        "{} {}",
-        target_user.first_name.unwrap_or_default(),
-        target_user.last_name.unwrap_or_default()
-    )
-    .trim()
-    .to_string();
+    let display_name = target_user.full_name.clone();
 
     Ok(Json(TeamMemberResponse {
         id: created_member.id,
@@ -403,6 +431,13 @@ pub async fn update_team_member_handler(
     member_id: &str,
     req: UpdateTeamMemberRequest,
 ) -> Result<Json<TeamMemberResponse>> {
+    // Validate request
+    req.validate().map_err(|e| {
+        AppError::Validation {
+            message: e.to_string(),
+        }
+    })?;
+
     let team = TeamsEntity::find_by_id(team_id)
         .one(&state.db)
         .await?
@@ -444,15 +479,9 @@ pub async fn update_team_member_handler(
         .await?
         .ok_or_else(|| AppError::internal("Member user not found"))?;
 
-    let display_name = format!(
-        "{} {}",
-        member_user.first_name.unwrap_or_default(),
-        member_user.last_name.unwrap_or_default()
-    )
-    .trim()
-    .to_string();
+    let display_name = member_user.full_name.clone();
 
-    info!(
+    debug!(
         team_id = %team_id,
         member_id = %member_id,
         new_role = %format!("{:?}", role),
@@ -524,7 +553,7 @@ pub async fn remove_team_member_handler(
         .await
         .map_err(|e| AppError::database(format!("Failed to remove team member: {}", e)))?;
 
-    info!(team_id = %team_id, member_id = %member_id, user_id = %user.id, "Team member removed");
+    debug!(team_id = %team_id, member_id = %member_id, user_id = %user.id, "Team member removed");
 
     Ok(Json(crate::dto::auth::SuccessResponse {
         success: true,
@@ -566,16 +595,7 @@ pub async fn list_team_members_handler(
         .into_iter()
         .map(|(m, user_opt)| {
             let (email, display_name) = match user_opt {
-                Some(u) => {
-                    let dn = format!(
-                        "{} {}",
-                        u.first_name.unwrap_or_default(),
-                        u.last_name.unwrap_or_default()
-                    )
-                    .trim()
-                    .to_string();
-                    (u.email, dn)
-                },
+                Some(u) => (u.email, u.full_name.clone()),
                 None => ("unknown".to_string(), "Unknown User".to_string()),
             };
             TeamMemberResponse {

@@ -23,6 +23,9 @@ rand = { workspace = true }
 # Base64 encoding
 base64 = { workspace = true }
 
+# Base32 encoding for TOTP
+base32 = "0.5"
+
 # Secret handling
 secrecy = { workspace = true }
 

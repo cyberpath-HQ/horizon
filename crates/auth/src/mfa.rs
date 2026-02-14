@@ -16,12 +16,24 @@ pub struct MfaSetup {
 
 /// Generate MFA setup data for a user
 pub fn generate_mfa_setup(issuer: &str, email: &str) -> Result<MfaSetup> {
-    // Generate a random secret
-    let secret_obj = Secret::generate_secret();
-    let secret = secret_obj.to_string();
-    let secret_bytes = secret_obj
+    // Generate a random secret (20 bytes for standard TOTP)
+    let secret_bytes = Secret::generate_secret()
         .to_bytes()
         .map_err(|e| error::AppError::internal(format!("Failed to get secret bytes: {}", e)))?;
+
+    // Verify we have valid bytes
+    if secret_bytes.is_empty() {
+        return Err(error::AppError::internal("Generated secret is empty"));
+    }
+
+    // Convert bytes to Base32 encoded string
+    // Use the totp_rs crate's encoding
+    let encoded = base32::encode(
+        base32::Alphabet::Rfc4648 {
+            padding: false,
+        },
+        &secret_bytes,
+    );
 
     // Create TOTP instance
     let totp = TOTP::new(
@@ -44,7 +56,7 @@ pub fn generate_mfa_setup(issuer: &str, email: &str) -> Result<MfaSetup> {
         .map_err(|e| error::AppError::internal(format!("Failed to generate QR code: {}", e)))?;
 
     Ok(MfaSetup {
-        secret,
+        secret: encoded,
         backup_codes,
         otpauth_uri: totp.get_url(),
         qr_code_base64,
@@ -102,10 +114,39 @@ pub fn deserialize_backup_codes(json: &str) -> Result<Vec<String>> {
 
 /// Verify TOTP code
 pub fn verify_totp_code(secret: &str, code: &str, issuer: &str, account_name: &str) -> Result<bool> {
-    let secret_bytes = Secret::Encoded(secret.to_string())
-        .to_bytes()
-        .map_err(|e| error::AppError::internal(format!("Failed to decode TOTP secret: {}", e)))?;
+    // Validate secret is not empty
+    if secret.is_empty() {
+        return Err(error::AppError::internal("TOTP secret is empty"));
+    }
 
+    // Clean the secret - remove any whitespace and convert to uppercase
+    let cleaned_secret: String = secret
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect::<String>()
+        .to_uppercase();
+
+    if cleaned_secret.is_empty() {
+        return Err(error::AppError::internal(
+            "TOTP secret is invalid (empty after cleaning)",
+        ));
+    }
+
+    // Decode the base32 secret directly using the base32 crate
+    let secret_bytes = base32::decode(
+        base32::Alphabet::Rfc4648 {
+            padding: false,
+        },
+        &cleaned_secret,
+    )
+    .ok_or_else(|| error::AppError::internal("Failed to decode base32 secret: Could not decode base32 secret"))?;
+
+    // Ensure we got valid bytes
+    if secret_bytes.is_empty() {
+        return Err(error::AppError::internal("Decoded secret is empty"));
+    }
+
+    // Create TOTP instance
     let totp = TOTP::new(
         Algorithm::SHA1,
         6,

@@ -13,14 +13,11 @@ pub struct Model {
     pub id:                    String,
     #[sea_orm(unique)]
     pub email:                 String,
-    #[sea_orm(unique)]
-    pub username:              String,
     #[serde(skip_serializing)]
     pub password_hash:         String,
     #[serde(skip_serializing)]
     pub totp_secret:           Option<String>,
-    pub first_name:            Option<String>,
-    pub last_name:             Option<String>,
+    pub full_name:             String,
     pub avatar_url:            Option<String>,
     pub status:                UserStatus,
     pub email_verified_at:     Option<DateTime>,

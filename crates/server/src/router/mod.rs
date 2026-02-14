@@ -12,9 +12,14 @@ use axum::{
 };
 use error::Result;
 use redis::AsyncCommands;
+use sea_orm::{EntityTrait, PaginatorTrait};
 use tracing::error;
 
-use crate::{middleware::auth::AuthenticatedUser, AppState};
+use crate::{
+    dto::auth::SuccessResponse,
+    middleware::{auth::AuthenticatedUser, security_headers::CorsConfig},
+    AppState,
+};
 
 /// Creates the API router with all routes
 ///
@@ -35,11 +40,18 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/v1/auth/mfa/disable", post(mfa_disable_handler))
         .route("/api/v1/auth/mfa/regenerate-backup-codes", post(mfa_regenerate_backup_codes_handler))
         .route("/api/v1/auth/mfa/status", get(mfa_status_handler))
+        // Settings endpoints (super-admin)
+        .route("/api/v1/settings", get(settings_list_handler))
+        .route("/api/v1/settings/{key}", get(settings_get_handler))
+        .route("/api/v1/settings/{key}", put(settings_update_handler))
         // User endpoints
         .route("/api/v1/users/me", get(get_my_profile_handler))
         .route("/api/v1/users/me", put(update_my_profile_handler))
         .route("/api/v1/users", post(create_user_handler))
         .route("/api/v1/users", get(list_users_handler))
+        .route("/api/v1/users/{id}", get(get_user_handler))
+        .route("/api/v1/users/{id}", put(update_user_handler))
+        .route("/api/v1/users/{id}", delete(delete_user_handler))
         // Team endpoints
         .route("/api/v1/teams", post(create_team_handler))
         .route("/api/v1/teams", get(list_teams_handler))
@@ -68,10 +80,12 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/v1/auth/login", post(login_handler))
         // MFA verification during login (uses mfa_token from login response, not session auth)
         .route("/api/v1/auth/mfa/verify", post(mfa_verify_login_handler))
-        .route("/api/v1/auth/mfa/verify-backup", post(mfa_verify_backup_code_handler));
+        .route("/api/v1/auth/mfa/verify-backup", post(mfa_verify_backup_code_handler))
+        // MFA enforce-setup (uses mfa_required token from login when global MFA is enforced)
+        .route("/api/v1/auth/mfa/enforce-setup", post(mfa_enforce_setup_handler));
 
-    // Health check route
-    let health_route = Router::new().route("/health", get(health_check_handler));
+    // Health check route - must be public and unauthenticated
+    let health_route = Router::new().route("/api/v1/health", get(health_check_handler));
 
     // Combine all routes
     let all_routes = public_routes
@@ -81,10 +95,33 @@ pub fn create_router(state: AppState) -> Router {
         // Add Extension layer so middleware can access state from extensions
         .layer(Extension(state));
 
+    // Apply rejection handlers for JSON and query deserialization errors
+    // These must be applied after the routes but before the final middleware
+    let routes_with_rejection_handlers = all_routes.fallback(handle_axum_rejections);
+
     // Apply rate limiting to all routes (ConnectInfo will be provided by the tower service)
-    all_routes.layer(middleware::from_fn(
-        crate::middleware::rate_limit::rate_limit_middleware,
-    ))
+    routes_with_rejection_handlers
+        .layer(middleware::from_fn(
+            crate::middleware::rate_limit::rate_limit_middleware,
+        ))
+        .layer(middleware::from_fn(|req, next| {
+            crate::middleware::security_headers::cors_middleware(req, next, CorsConfig::from_env())
+        }))
+}
+
+/// Fallback handler for Axum rejections (JSON deserialization errors, etc.)
+async fn handle_axum_rejections(_req: axum::extract::Request) -> Response {
+    // We can't directly access the rejection here, so we just return a generic error
+    // The proper way is to handle this via the FromRequest implementation
+    // For now, return a 400 error
+    let error_response = error::ApiResponse::<()>::error("BAD_REQUEST", "Invalid request format".to_string());
+    let body = serde_json::to_string(&error_response).unwrap_or_default();
+
+    Response::builder()
+        .status(axum::http::StatusCode::BAD_REQUEST)
+        .header("Content-Type", "application/json")
+        .body(axum::body::Body::from(body))
+        .unwrap()
 }
 
 // ==================== AUTH HANDLERS ====================
@@ -208,7 +245,7 @@ async fn mfa_disable_handler(
 async fn mfa_regenerate_backup_codes_handler(
     State(state): State<AppState>,
     user: crate::middleware::auth::AuthenticatedUser,
-    Json(req): Json<crate::dto::mfa::MfaVerifyRequest>,
+    Json(req): Json<crate::dto::mfa::MfaRegenerateBackupCodesRequest>,
 ) -> Result<Json<crate::dto::mfa::MfaBackupCodesResponse>> {
     crate::auth::mfa::mfa_regenerate_backup_codes_handler(&state, user, req).await
 }
@@ -219,6 +256,49 @@ async fn mfa_status_handler(
     user: crate::middleware::auth::AuthenticatedUser,
 ) -> Result<Json<crate::dto::mfa::MfaStatusResponse>> {
     crate::auth::mfa::mfa_status_handler(&state, user).await
+}
+
+/// Handle MFA setup when required by global policy (public endpoint, uses mfa_required token)
+async fn mfa_enforce_setup_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(req): Json<crate::dto::mfa::MfaSetupEnforceRequest>,
+) -> Result<Json<crate::dto::mfa::MfaSetupResponse>> {
+    let mfa_token = headers
+        .get("authorization")
+        .and_then(|h: &axum::http::HeaderValue| h.to_str().ok())
+        .and_then(|s: &str| s.strip_prefix("Bearer "))
+        .ok_or_else(|| error::AppError::unauthorized("MFA token is required in Authorization header"))?;
+    crate::auth::mfa::mfa_enforce_setup_handler(&state, mfa_token, req).await
+}
+
+// ==================== SETTINGS HANDLERS ====================
+
+/// List all system settings (super-admin only)
+async fn settings_list_handler(
+    State(state): State<AppState>,
+    user: crate::middleware::auth::AuthenticatedUser,
+) -> Result<Json<crate::settings::SettingsListResponse>> {
+    crate::settings::list_settings_handler(&state, user).await
+}
+
+/// Get a single setting by key (super-admin only)
+async fn settings_get_handler(
+    State(state): State<AppState>,
+    user: crate::middleware::auth::AuthenticatedUser,
+    Path(key): Path<String>,
+) -> Result<Json<crate::settings::SettingResponse>> {
+    crate::settings::get_setting_handler(&state, user, Path(key)).await
+}
+
+/// Update a setting by key (super-admin only)
+async fn settings_update_handler(
+    State(state): State<AppState>,
+    user: crate::middleware::auth::AuthenticatedUser,
+    Path(key): Path<String>,
+    Json(req): Json<crate::settings::UpdateSettingRequest>,
+) -> Result<Json<crate::settings::SettingResponse>> {
+    crate::settings::update_setting_handler(&state, user, Path(key), Json(req)).await
 }
 
 // ==================== USER HANDLERS ====================
@@ -259,6 +339,34 @@ async fn list_users_handler(
     Query(query): Query<crate::dto::users::UserListQuery>,
 ) -> Result<Json<crate::dto::users::UserListResponse>> {
     crate::auth::users::list_users_handler(&state, user, query).await
+}
+
+/// Get a user by ID
+async fn get_user_handler(
+    State(state): State<AppState>,
+    user: crate::middleware::auth::AuthenticatedUser,
+    Path(id): Path<String>,
+) -> Result<Json<crate::dto::users::UserProfileResponse>> {
+    crate::auth::users::get_user_handler(&state, user, &id).await
+}
+
+/// Update a user (admin only)
+async fn update_user_handler(
+    State(state): State<AppState>,
+    user: crate::middleware::auth::AuthenticatedUser,
+    Path(id): Path<String>,
+    Json(req): Json<crate::dto::users::UpdateUserRequest>,
+) -> Result<Json<crate::dto::users::UserProfileResponse>> {
+    crate::auth::users::update_user_handler(&state, user, id, req).await
+}
+
+/// Delete a user (admin only)
+async fn delete_user_handler(
+    State(state): State<AppState>,
+    user: crate::middleware::auth::AuthenticatedUser,
+    Path(id): Path<String>,
+) -> Result<Json<SuccessResponse>> {
+    crate::auth::users::delete_user_handler(&state, user, &id).await
 }
 
 // ==================== TEAM HANDLERS ====================
@@ -520,6 +628,13 @@ async fn health_check_handler(State(state): State<AppState>) -> Result<Json<serd
         }),
     );
 
+    // Check if system needs setup (no users exist)
+    let needs_setup = match entity::users::Entity::find().count(&state.db).await {
+        Ok(count) => count == 0,
+        Err(_) => false, // If we can't check, assume setup is done
+    };
+    checks["needs_setup"] = needs_setup.into();
+
     // Update overall status
     checks["status"] = status.into();
 
@@ -577,7 +692,7 @@ mod tests {
         };
 
         Router::new()
-            .route("/health", get(health_check_handler))
+            .route("/api/v1/health", get(health_check_handler))
             .with_state(state)
     }
 

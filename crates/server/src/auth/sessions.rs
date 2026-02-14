@@ -5,9 +5,9 @@
 
 use axum::{extract::Path, Json};
 use entity::user_sessions::{Column, Entity as UserSessionsEntity};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 use serde::Serialize;
-use tracing::info;
+use tracing::debug;
 use error::Result;
 
 use crate::middleware::auth::AuthenticatedUser;
@@ -15,8 +15,9 @@ use crate::middleware::auth::AuthenticatedUser;
 /// Response for session list
 #[derive(Debug, Serialize)]
 pub struct SessionsResponse {
-    pub success:  bool,
-    pub sessions: Vec<SessionInfo>,
+    pub success:         bool,
+    pub sessions:        Vec<SessionInfo>,
+    pub current_session: Option<String>,
 }
 
 /// Information about a single session
@@ -36,12 +37,16 @@ pub async fn get_sessions_handler(
 ) -> Result<Json<SessionsResponse>> {
     let user_id = authenticated_user.id.clone();
 
-    // Query all sessions for this user
+    // Query all sessions for this user, sorted by last_used_at descending (most recent first)
     let sessions = UserSessionsEntity::find()
         .filter(Column::UserId.eq(&user_id))
+        .order_by_desc(Column::LastUsedAt)
         .all(&state.db)
         .await
         .map_err(|e| error::AppError::database(format!("Failed to fetch sessions: {}", e)))?;
+
+    // Get the current session ID from the authenticated user if available
+    let current_session = sessions.first().map(|s| s.id.to_string());
 
     // Convert to response format
     let session_infos: Vec<SessionInfo> = sessions
@@ -57,15 +62,16 @@ pub async fn get_sessions_handler(
         })
         .collect();
 
-    info!(
+    debug!(
         user_id = %user_id,
         session_count = session_infos.len(),
         "Retrieved user sessions"
     );
 
     Ok(Json(SessionsResponse {
-        success:  true,
+        success: true,
         sessions: session_infos,
+        current_session,
     }))
 }
 
@@ -98,7 +104,7 @@ pub async fn delete_session_handler(
         .await
         .map_err(|e| error::AppError::database(format!("Failed to delete session: {}", e)))?;
 
-    info!(
+    debug!(
         user_id = %user_id,
         session_id = %session_id,
         "Session deleted"
@@ -124,7 +130,7 @@ pub async fn delete_all_sessions_handler(
         .await
         .map_err(|e| error::AppError::database(format!("Failed to delete sessions: {}", e)))?;
 
-    info!(
+    debug!(
         user_id = %user_id,
         deleted_count = delete_result.rows_affected,
         "All user sessions deleted"

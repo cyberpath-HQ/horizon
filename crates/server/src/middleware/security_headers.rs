@@ -63,6 +63,43 @@ impl Default for CorsConfig {
     }
 }
 
+impl CorsConfig {
+    pub fn from_env() -> Self {
+        Self {
+            allowed_origins:   std::env::var("HORIZON_CORS_ALLOWED_ORIGINS")
+                .unwrap_or_else(|_| "".to_string())
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .collect(),
+            allowed_methods:   std::env::var("HORIZON_CORS_ALLOWED_METHODS")
+                .unwrap_or_else(|_| "GET,POST,PUT,PATCH,DELETE,OPTIONS".to_string())
+                .split(',')
+                .map(|s| s.trim().parse().unwrap_or(http::Method::GET))
+                .collect(),
+            allowed_headers:   std::env::var("HORIZON_CORS_ALLOWED_HEADERS")
+                .unwrap_or_else(|_| "Content-Type,Authorization,X-Requested-With,Accept,Origin".to_string())
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .collect(),
+            exposed_headers:   std::env::var("HORIZON_CORS_EXPOSED_HEADERS")
+                .unwrap_or_else(|_| {
+                    "X-RateLimit-Limit,X-RateLimit-Remaining,X-RateLimit-Reset,Retry-After,X-Request-ID".to_string()
+                })
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .collect(),
+            allow_credentials: std::env::var("HORIZON_CORS_ALLOW_CREDENTIALS")
+                .unwrap_or_else(|_| "false".to_string())
+                .parse()
+                .unwrap_or(false),
+            max_age:           std::env::var("HORIZON_CORS_MAX_AGE")
+                .unwrap_or_else(|_| "3600".to_string())
+                .parse()
+                .unwrap_or(3600),
+        }
+    }
+}
+
 /// Extract the origin header from a request
 fn get_request_origin(request: &Request) -> Option<String> {
     request
@@ -177,6 +214,11 @@ pub async fn security_headers_middleware(request: Request, next: Next, enable_tl
 /// Handles preflight (OPTIONS) requests automatically.
 pub async fn cors_middleware(request: Request, next: Next, config: CorsConfig) -> Response {
     let origin = get_request_origin(&request);
+    tracing::debug!(
+        "Request origin: {}",
+        origin.clone().unwrap_or_else(|| "None".into())
+    );
+    tracing::debug!("CORS config: {:?}", config);
 
     // Handle preflight (OPTIONS) requests
     if request.method() == http::Method::OPTIONS &&

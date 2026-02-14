@@ -10,11 +10,13 @@ license.workspace = true
 repository.workspace = true
 keywords.workspace = true
 categories.workspace = true
+default-run = "cli"
 
 [dependencies]
 # CLI framework
 clap = { version = "4.5.56", features = ["derive", "env"] }
 clap_complete = "4.5.65"
+dotenvy = "0.15.7"
 
 # Web framework
 axum = { workspace = true }

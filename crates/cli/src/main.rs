@@ -29,11 +29,17 @@ struct Cli {
     command: Commands,
 
     /// Log level (debug, info, warn, error)
-    #[arg(short = 'L', long, env = "RUST_LOG", default_value = "info")]
+    #[arg(short = 'L', long, default_value = "info", global = true)]
     log_level: String,
 
-    /// Output format (json, pretty, compact)
-    #[arg(short, long, env = "HORIZON_LOG_FORMAT", default_value = "pretty")]
+    /// Output format (json, compact)
+    #[arg(
+        short,
+        long,
+        env = "HORIZON_LOG_FORMAT",
+        default_value = "compact",
+        global = true
+    )]
     log_format: String,
 }
 
@@ -52,6 +58,7 @@ enum Commands {
 
 #[tokio::main]
 async fn main() -> error::Result<()> {
+    dotenvy::dotenv().map_err(|e| anyhow::anyhow!("Failed to load .env file: {}", e))?;
     let cli = Cli::parse();
 
     // Initialize logging

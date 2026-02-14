@@ -1,11 +1,29 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import path from "path";
+import tailwindcss from "@tailwindcss/vite";
+import { tanstackRouter } from '@tanstack/router-plugin/vite';
 
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
 export default defineConfig(async() => ({
-    plugins: [ react() ],
+    plugins: [
+        tanstackRouter({
+            target:                `react`,
+            autoCodeSplitting:     true,
+            routesDirectory:       "./src/routes",
+            generatedRouteTree:    "./src/routeTree.gen.ts",
+            routeFileIgnorePrefix: "-",
+        }),
+        react(),
+        tailwindcss(),
+    ],
+    resolve: {
+        alias: {
+            "@": path.resolve(__dirname, `./src`),
+        },
+    },
 
     // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
     //
@@ -30,7 +48,7 @@ export default defineConfig(async() => ({
         },
     },
 
-    // Env variables starting with the item of `envPrefix` will be exposed in tauri's source code through 
+    // Env variables starting with the item of `envPrefix` will be exposed in tauri's source code through
     // `import.meta.env`.
     envPrefix: [
         `VITE_`,

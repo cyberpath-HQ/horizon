@@ -405,6 +405,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "argon2",
+ "base32",
  "base64 0.22.1",
  "blake3",
  "chrono",
@@ -1008,6 +1009,7 @@ dependencies = [
  "axum",
  "clap",
  "clap_complete",
+ "dotenvy",
  "error",
  "hyper",
  "hyper-util",

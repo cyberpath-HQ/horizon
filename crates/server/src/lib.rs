@@ -14,6 +14,7 @@ pub mod dto;
 pub mod middleware;
 pub mod refresh_tokens;
 pub mod router;
+pub mod settings;
 pub mod token_blacklist;
 pub mod utils;
 
