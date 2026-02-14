@@ -245,7 +245,7 @@ async fn mfa_disable_handler(
 async fn mfa_regenerate_backup_codes_handler(
     State(state): State<AppState>,
     user: crate::middleware::auth::AuthenticatedUser,
-    Json(req): Json<crate::dto::mfa::MfaVerifyRequest>,
+    Json(req): Json<crate::dto::mfa::MfaRegenerateBackupCodesRequest>,
 ) -> Result<Json<crate::dto::mfa::MfaBackupCodesResponse>> {
     crate::auth::mfa::mfa_regenerate_backup_codes_handler(&state, user, req).await
 }
